@@ -6,6 +6,37 @@ import {
 } from "../lib/live-data";
 const publication = `<table><caption>U.S. Regular Gasoline Prices*(dollars per gallon)</caption><thead><tr><th></th><th>09/21/26</th><th>09/28/26</th><th>10/05/26</th><th>year ago</th></tr></thead><tbody><tr><td>Lower Atlantic (PADD1C)</td><td>4.163</td><td>4.195</td><td>3.959</td><td>1.062</td></tr></tbody></table><table><caption>Diesel</caption><tbody><tr><td>Lower Atlantic</td><td>8</td></tr></tbody></table>`;
 describe("live data normalization", () => {
+  it("filters requested place kind before limiting results and excludes out-of-radius centers", () => {
+    const grocery = Array.from({ length: 65 }, (_, id) => ({
+      type: "node",
+      id,
+      lat: 33.749,
+      lon: -84.388,
+      tags: { shop: "supermarket", name: "Grocery" },
+    }));
+    const data = {
+      osm3s: { timestamp_osm_base: "2026-10-09" },
+      elements: [
+        ...grocery,
+        {
+          type: "way",
+          id: 66,
+          center: { lat: 33.75, lon: -84.388 },
+          tags: { amenity: "fuel", name: "Local gas" },
+        },
+        {
+          type: "node",
+          id: 67,
+          lat: 34,
+          lon: -84.388,
+          tags: { amenity: "fuel", name: "Far gas" },
+        },
+      ],
+    };
+    const result = normalizePlaces(data, "downtown", 1, "fuel");
+    expect(result.places.map((p) => p.name)).toEqual(["Local gas"]);
+    expect(result.radiusMiles).toBe(1);
+  });
   it("selects latest regular fuel price rather than changes or diesel", () => {
     expect(
       parseEia(publication, new Date("2026-10-09T12:00:00Z")),

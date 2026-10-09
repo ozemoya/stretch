@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Area, FuelQuote, NearbyPlace } from "@/lib/live-data";
 import LocalFuel from "./LocalFuel";
+import OpenMap from "./OpenMap";
 
 type Price = {
   id: string;
@@ -170,6 +171,7 @@ export default function LiveSources({
                 Results for {places.area}. Straight-line distance, not driving
                 distance.
               </p>
+              <OpenMap area={places.area} radius={5} places={places.places} />
               <div className="live-tabs">
                 <button
                   className="text-button"

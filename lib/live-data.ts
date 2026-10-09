@@ -1,11 +1,8 @@
 import { load } from "cheerio";
 import { z } from "zod";
 
-export const centers = {
-  downtown: { lat: 33.749, lon: -84.388, zip: "30303" },
-  midtown: { lat: 33.783, lon: -84.383, zip: "30309" },
-  decatur: { lat: 33.7748, lon: -84.2963, zip: "30030" },
-} as const;
+import { centers } from "./locations";
+export { centers } from "./locations";
 export type Area = keyof typeof centers;
 export type FuelQuote = {
   kind?: "station" | "regional";
@@ -152,7 +149,12 @@ const osmSchema = z.object({
     }),
   ),
 });
-export function normalizePlaces(raw: unknown, area: Area) {
+export function normalizePlaces(
+  raw: unknown,
+  area: Area,
+  radiusMiles = 5,
+  kind: "all" | "grocery" | "fuel" = "all",
+) {
   const data = osmSchema.parse(raw),
     origin = centers[area];
   const places: NearbyPlace[] = [];
@@ -167,22 +169,23 @@ export function normalizePlaces(raw: unknown, area: Area) {
       Math.cos(lat * rad) *
         Math.cos(origin.lat * rad) *
         Math.sin(((lon - origin.lon) * rad) / 2) ** 2;
+    const distance = 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const placeKind = t.amenity === "fuel" ? "fuel" : "grocery";
+    if (distance > radiusMiles || (kind !== "all" && kind !== placeKind))
+      continue;
     places.push({
       id: `${e.type}/${e.id}`,
       name:
         t.name ??
         t.brand ??
         (t.amenity === "fuel" ? "Gas station" : "Grocery store"),
-      kind: t.amenity === "fuel" ? "fuel" : "grocery",
+      kind: placeKind,
       lat,
       lon,
       address: [t["addr:housenumber"], t["addr:street"], t["addr:city"]]
         .filter(Boolean)
         .join(" "),
-      miles:
-        Math.round(
-          3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10,
-        ) / 10,
+      miles: Math.round(distance * 10) / 10,
       mapUrl: `https://www.openstreetmap.org/${e.type}/${e.id}`,
     });
   }
@@ -190,15 +193,21 @@ export function normalizePlaces(raw: unknown, area: Area) {
     places: places.sort((a, b) => a.miles - b.miles).slice(0, 60),
     updatedAt: data.osm3s.timestamp_osm_base,
     source: "OpenStreetMap contributors",
-    radiusMiles: 5,
+    radiusMiles,
     area,
   };
 }
-export function nearbyPlaces(area: Area) {
-  return cached(`places:${area}`, 3600000, async () => {
+export function nearbyPlaces(
+  area: Area,
+  radiusMiles = 5,
+  kind: "all" | "grocery" | "fuel" = "all",
+) {
+  return cached(`places:${area}:${radiusMiles}:${kind}`, 3600000, async () => {
     const c = centers[area];
-    const around = `(around:8047,${c.lat},${c.lon})`;
-    const query = `[out:json][timeout:15];(nwr[shop=supermarket]${around};nwr[shop=grocery]${around};nwr[shop=convenience]${around};nwr[amenity=fuel]${around};);out center tags;`;
+    const around = `(around:${radiusMiles * 1609.344},${c.lat},${c.lon})`;
+    const grocery = `nwr[shop=supermarket]${around};nwr[shop=grocery]${around};nwr[shop=convenience]${around};`;
+    const fuel = `nwr[amenity=fuel]${around};`;
+    const query = `[out:json][timeout:15];(${kind === "fuel" ? fuel : kind === "grocery" ? grocery : grocery + fuel});out center tags;`;
     const response = await checkedFetch(
       "https://overpass-api.de/api/interpreter",
       {
@@ -211,7 +220,7 @@ export function nearbyPlaces(area: Area) {
         body: new URLSearchParams({ data: query }).toString(),
       },
     );
-    return normalizePlaces(await response.json(), area);
+    return normalizePlaces(await response.json(), area, radiusMiles, kind);
   });
 }
 
