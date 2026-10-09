@@ -1,38 +1,42 @@
 # Stretch
 
-The cheapest groceries aren't always the cheapest grocery trip.
+Next.js App Router + React + TypeScript + Supabase. Selected design: Draft C; original PNG logo preserved.
 
-Stretch compares the cost of a whole grocery basket plus the fuel to get everything home.
+## Run
 
-## Project status
+Node 20.9+ required. Run `npm ci`, copy `.env.example` to `.env.local`, then `npm run dev`. Open http://localhost:3000.
 
-Hacklanta prototype. The current files are a static HTML/CSS/JavaScript prototype. The agreed implementation stack is **Next.js + Supabase**; migration and database integration are next.
+## Supabase setup
 
-## Selected design
+Run `supabase/setup.sql` once in the project's SQL Editor against an empty project. It creates tables, read-only public policies, and 30 products / 90 sample offers. Alternatively, apply `supabase/migrations/202610090001_catalog.sql` and then `supabase/seed.sql` through your migration workflow.
 
-**Draft C** is the selected direction. Preserve the original PNG logo and cream, olive, beige, and warm accent colors.
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`, then restart Next.js. The comparison panel should say **Catalog connected to Supabase**. No service-role key is needed. Credentials are ignored by Git.
 
-[Draft C in FigJam](https://www.figma.com/board/TNSW97eqDpo50behte9Xn9/Untitled?node-id=59-39)
+Without a key the app explicitly uses its built-in demo catalog. A database failure displays a warning and falls back to demo data. Hosted setup is not complete until the SQL is applied and the key is configured.
 
-![Draft C](draft-c-final.png)
+## Features
 
-## Run the current prototype
+- Whole-basket optimization across one and two stores, including round-trip fuel.
+- Product search, quantities, area, budget, MPG, gas price, and maximum stops.
+- Optional dietary/budget substitutions with package differences, savings, and undo.
+- Per-store checklists, check-off controls, and downloadable text plan.
+- Missing items excluded from cheapest ranking; timestamp and stale-price labels.
+- Responsive Draft C landing page and interactive planner; no account required.
 
-From this directory, run `python -m http.server 5173`, then open http://localhost:5173.
+## Data and privacy
 
-## Planned MVP
+Prices and dietary tags are fictional sample data recorded October 9, 2026. Routes use illustrative area-based distances, not live navigation. Tax is excluded. Time assumes 25 mph plus 12 minutes per stop. Substitutions are not nutritional equivalents; confirm product labels.
 
-- Grocery list with quantities and dietary preferences.
-- Budget, starting area, MPG, gas price, and maximum stops.
-- Whole-basket and round-trip fuel comparison.
-- One-store and two-store optimization with an item checklist per stop.
-- Optional budget substitutions with quantity and savings explanations.
-- Supabase tables for stores, products, offers, and price timestamps.
+Supabase serves public catalog data only. Grocery lists and preferences remain in browser memory; checklist downloads are created locally. Public users have SELECT access only; INSERT, UPDATE, and DELETE are revoked and protected by RLS.
 
-## Data limitations
+## Checks
 
-Prices and distances in this prototype are illustrative sample data, not live store prices or navigation. Fuel estimates exclude tax and travel time. Do not present incomplete baskets as complete trip estimates.
+`npm test`, `npm run typecheck`, `npm run build`, `npm audit`.
 
-## Configuration
+Tests cover optimizer calculations, quantities, missing items, dietary conflicts, and split-store savings. PGlite applies the actual SQL setup and checks anonymous/authenticated reads and denied writes; this is a local SQL verification, not a hosted Supabase test.
 
-Keep credentials in local environment files. Never commit Supabase secret or service-role keys.
+## Deployment
+
+Import the repository into Vercel with its Next.js preset and configure the two environment variables. No live routing provider is required for the sample demo. Old static files are kept in `archive/`.
+
+[Selected Draft C](https://www.figma.com/board/TNSW97eqDpo50behte9Xn9/Untitled?node-id=59-39)

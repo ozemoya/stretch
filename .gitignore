@@ -9,3 +9,5 @@ Thumbs.db
 asset-inventory.jpg
 board-images*.jpg
 palette*.png
+
+*.tsbuildinfo

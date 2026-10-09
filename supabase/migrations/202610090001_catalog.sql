@@ -1,0 +1,15 @@
+create table public.stores(id text primary key, name text not null);
+create table public.products(id text primary key,name text not null,emoji text not null,category text not null,unit text not null,vegan boolean not null default false,gluten_free boolean not null default false,nut_free boolean not null default false);
+create table public.offers(id text primary key,product_id text not null references public.products(id),store_id text not null references public.stores(id),price_cents integer not null check(price_cents>=0),recorded_at timestamptz not null,is_sample boolean not null default true,available boolean not null default true,unique(product_id,store_id));
+create table public.substitutions(id text primary key,from_id text not null references public.products(id),to_id text not null references public.products(id),note text not null,check(from_id<>to_id));
+create index offers_product on public.offers(product_id);
+alter table public.stores enable row level security;
+alter table public.products enable row level security;
+alter table public.offers enable row level security;
+alter table public.substitutions enable row level security;
+revoke all on public.stores,public.products,public.offers,public.substitutions from anon,authenticated;
+grant select on public.stores,public.products,public.offers,public.substitutions to anon,authenticated;
+create policy catalog_read on public.stores for select to anon,authenticated using(true);
+create policy catalog_read on public.products for select to anon,authenticated using(true);
+create policy catalog_read on public.offers for select to anon,authenticated using(true);
+create policy catalog_read on public.substitutions for select to anon,authenticated using(true);
