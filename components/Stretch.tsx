@@ -2,6 +2,8 @@
 import { useMemo, useState } from "react";
 import type { BasketItem, Catalog, Preferences, Trip } from "@/lib/types";
 import { optimize, suggestSwaps } from "@/lib/optimizer";
+import LiveSources from "./LiveSources";
+import type { FuelQuote } from "@/lib/live-data";
 const money = (c: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     c / 100,
@@ -65,6 +67,7 @@ export default function Stretch({
     [notice, setNotice] = useState(""),
     [showPlanner, setShowPlanner] = useState(false),
     [previousBasket, setPreviousBasket] = useState<BasketItem[] | null>(null);
+  const [fuelSource, setFuelSource] = useState<FuelQuote | null>(null);
   const calculation = useMemo(() => {
     try {
       return { trips: optimize(catalog, basket, prefs), error: "" };
@@ -105,6 +108,7 @@ export default function Stretch({
     setSelected(null);
   }
   function change<K extends keyof Preferences>(key: K, value: Preferences[K]) {
+    if (key === "gas") setFuelSource(null);
     setPrefs((old) => ({ ...old, [key]: value }));
     setChecked([]);
     setSelected(null);
@@ -197,6 +201,11 @@ export default function Stretch({
                 : "Check individual price sources"}{" "}
               · illustrative distances
             </p>
+            <p className="small">
+              {fuelSource
+                ? `Fuel estimate: ${fuelSource.stationName}, reported ${new Date(fuelSource.period).toLocaleString()}. Gas stop detour excluded.`
+                : "Fuel estimate: manually entered gas price."}
+            </p>
             {error && (
               <p role="status" className="alert">
                 {error}
@@ -261,6 +270,17 @@ export default function Stretch({
             YOUR NEXT GOOD TRIP STARTS WITH A LIST. <span>BUILD MY LIST ↗</span>
           </button>
         </section>
+        <LiveSources
+          area={prefs.area}
+          onArea={(area) => change("area", area)}
+          onFuel={(quote) => {
+            change("gas", quote.dollarsPerGallon);
+            setFuelSource(quote);
+            setNotice(
+              `Using ${quote.stationName}'s reported station price. Grocery prices and route distances are still sample data; a gas-station detour is not included.`,
+            );
+          }}
+        />
         <section
           id="planner"
           className={"planner " + (!showPlanner ? "collapsed" : "")}
