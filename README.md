@@ -6,7 +6,7 @@ Stretch compares the cost of a whole grocery basket plus the fuel to get everyth
 
 ## Project status
 
-Hacklanta prototype. The current files are a static HTML/CSS/JavaScript prototype. The agreed implementation stack is **Next.js + Supabase**; migration and database integration are next.
+Hacklanta prototype. The app is now an Expo / React Native application. It keeps the Draft C visual language while using native layout, touch interactions, accessibility props, and a responsive tablet/web layout.
 
 ## Selected design
 
@@ -16,9 +16,11 @@ Hacklanta prototype. The current files are a static HTML/CSS/JavaScript prototyp
 
 ![Draft C](draft-c-final.png)
 
-## Run the current prototype
+## Run the React Native app
 
-From this directory, run `python -m http.server 5173`, then open http://localhost:5173.
+Install dependencies with `npm install`, then run `npm start`. Use the Expo terminal shortcuts to open the app on iOS, Android, or web.
+
+The previous static prototype files remain available as `index.html`, `style.css`, and `app.js` for visual reference.
 
 ## Planned MVP
 
