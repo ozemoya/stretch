@@ -80,6 +80,11 @@ export async function getCatalog(): Promise<{
         note: s.note,
       })),
     });
+    // Keep the starter basket consistent when switching between data sources.
+    const productOrder = new Map(sample.products.map((p, i) => [p.id, i]));
+    catalog.products.sort(
+      (a, b) => (productOrder.get(a.id) ?? Infinity) - (productOrder.get(b.id) ?? Infinity),
+    );
     return { catalog, source: "supabase" };
   } catch {
     return {

@@ -12,7 +12,9 @@ Run `supabase/setup.sql` once in the project's SQL Editor against an empty proje
 
 Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`, then restart Next.js. The comparison panel should say **Catalog connected to Supabase**. No service-role key is needed. Credentials are ignored by Git.
 
-Without a key the app explicitly uses its built-in demo catalog. A database failure displays a warning and falls back to demo data. Hosted setup is not complete until the SQL is applied and the key is configured.
+Without a key the app explicitly uses its built-in demo catalog. A database failure displays a warning and falls back to demo data.
+
+The Stretch project was connected and verified on October 9, 2026: 30 products, 3 stores, 90 sample offers, and 6 substitutions. Local `.env.local` contains the public connection settings and is ignored by Git; each teammate or deployment must configure their own environment.
 
 ## Features
 
