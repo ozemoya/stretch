@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import type { BasketItem, Catalog, Preferences, Trip } from "@/lib/types";
 import { optimize, suggestSwaps } from "@/lib/optimizer";
 import LiveSources from "./LiveSources";
+import PriceAgent from "./PriceAgent";
+import { centers } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
 const money = (c: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -270,6 +272,19 @@ export default function Stretch({
             YOUR NEXT GOOD TRIP STARTS WITH A LIST. <span>BUILD MY LIST ↗</span>
           </button>
         </section>
+        <PriceAgent
+          key={JSON.stringify([basket, prefs.area])}
+          zip={centers[prefs.area].zip}
+          items={basket.map((item) => {
+            const p = catalog.products.find((p) => p.id === item.productId)!;
+            return {
+              id: p.id,
+              name: p.name,
+              unit: p.unit,
+              quantity: item.quantity,
+            };
+          })}
+        />
         <LiveSources
           area={prefs.area}
           onArea={(area) => change("area", area)}

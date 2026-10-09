@@ -67,3 +67,9 @@ Tests cover optimizer calculations, quantities, missing items, dietary conflicts
 Import the repository into Vercel with its Next.js preset and configure the two environment variables. No live routing provider is required for the sample demo. Old static files are kept in `archive/`.
 
 [Selected Draft C](https://www.figma.com/board/TNSW97eqDpo50behte9Xn9/Untitled?node-id=59-39)
+
+### Basket price agent and IP area detection
+
+The "Check my list" flow searches up to ten basket items at up to two nearby Kroger locations, using the server-side Kroger adapter. Each package must be reviewed explicitly before a grocery subtotal is calculated; unknown prices, weighted products, and failed searches keep a basket incomplete. Regular prices are used, without assuming promotional eligibility. This is supported-provider search, not universal retailer scraping. Results do not verify stock or dietary suitability and do not yet include travel, taxes, or cross-store optimization. Kroger credentials remain required; no real price checks can run without them.
+
+The browser requests https://ipapi.co/json/ to estimate its own public-IP location (rather than the server's location). Stretch does not persist the IP or the response. The UI selects the nearest supported Atlanta demo area only within 30 miles, labels this approximation, and preserves a manual choice if detection returns late. Outside coverage or on lookup failures, the manual selector remains available. VPN/mobile-network geolocation can be inaccurate. IP-based detection does not yet replace the three demo route origins with an arbitrary address.

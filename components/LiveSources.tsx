@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { areaFromIp } from "@/lib/ip-area";
 import type { Area, FuelQuote, NearbyPlace } from "@/lib/live-data";
 import LocalFuel from "./LocalFuel";
 import OpenMap from "./OpenMap";
@@ -34,6 +35,49 @@ export default function LiveSources({
   onFuel: (quote: FuelQuote) => void;
   onArea: (area: Area) => void;
 }) {
+  const areaCallback = useRef(onArea);
+  areaCallback.current = onArea;
+  const manualArea = useRef(false);
+  const [locationNote, setLocationNote] = useState(
+    "Finding your approximate area from your IP…",
+  );
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    fetch("https://ipapi.co/json/", {
+      signal: controller.signal,
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Location unavailable");
+        const data = await response.json();
+        if (!active || controller.signal.aborted || manualArea.current) return;
+        const detected =
+          !data.error && areaFromIp(data.latitude, data.longitude);
+        if (detected) {
+          areaCallback.current(detected);
+          setPlaces(null);
+          setLocationNote(
+            `Approximate IP location: ${typeof data.city === "string" ? data.city : "Atlanta area"}. Showing the nearest supported demo area: ${detected}. You can change it below.`,
+          );
+        } else
+          setLocationNote(
+            "Your IP location is outside our supported Atlanta demo areas. Choose an area below.",
+          );
+      })
+      .catch(() => {
+        if (active && !manualArea.current)
+          setLocationNote("IP location is unavailable. Choose an area below.");
+      })
+      .finally(() => clearTimeout(timer));
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, []);
   const [places, setPlaces] = useState<{
       places: NearbyPlace[];
       updatedAt: string;
@@ -137,6 +181,10 @@ export default function LiveSources({
         <select
           value={area}
           onChange={(e) => {
+            manualArea.current = true;
+            setLocationNote(
+              "Using your selected area. IP detection will not override it.",
+            );
             onArea(e.target.value as Area);
             setPlaces(null);
             setPlaceError("");
@@ -147,6 +195,13 @@ export default function LiveSources({
           <option value="decatur">Decatur</option>
         </select>
       </label>
+      <p className="small" role="status">
+        {locationNote}
+      </p>
+      <p className="small">
+        Approximate location provided by ipapi.co using your public IP. VPNs and
+        mobile networks can change the result; your IP is not saved by Stretch.
+      </p>
       <div className="live-grid">
         <LocalFuel key={area} area={area} onFuel={onFuel} />
         <article className="live-card">
