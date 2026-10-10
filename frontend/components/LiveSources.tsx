@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { detectLocation } from "@/lib/detect-location";
 import { originQuery, type SearchOrigin } from "@/lib/locations";
 import type { Area, FuelQuote, NearbyPlace } from "@/lib/live-data";
-import LocalFuel from "./LocalFuel";
+import StopFinder from "./StopFinder";
 import OpenMap from "./OpenMap";
 
 type Price = {
@@ -33,14 +33,18 @@ export default function LiveSources({
   onArea,
   origin,
   onOrigin,
+  autoLoad = false,
 }: {
   area: Area;
   onFuel: (quote: FuelQuote) => void;
   onArea: (area: Area) => void;
   origin: SearchOrigin | null;
   onOrigin: (origin: SearchOrigin | null) => void;
+  autoLoad?: boolean;
 }) {
   const originCallback = useRef(onOrigin);
+  const loaded = useRef(false);
+
   originCallback.current = onOrigin;
   const manualArea = useRef(false);
   const [locationNote, setLocationNote] = useState(
@@ -49,6 +53,7 @@ export default function LiveSources({
   const [detecting, setDetecting] = useState(true);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    if (origin) { setDetecting(false); setLocationNote(`Using ${origin.label} for your checkout search.`); return; }
     let active = true;
     const controller = new AbortController();
     setDetecting(true);
@@ -170,12 +175,6 @@ export default function LiveSources({
   }
   return (
     <section className="live-sources" aria-labelledby="live-title">
-      <p className="eyebrow">A LITTLE CLOSER TO REAL LIFE</p>
-      <h2 id="live-title">Meet your neighborhood.</h2>
-      <p>
-        Find real places and check local pump prices. The basket above still
-        uses labeled sample groceries and illustrative routes.
-      </p>
       <label className="live-area">
         Explore an area
         <select
@@ -233,90 +232,7 @@ export default function LiveSources({
         and mobile networks can change the result; your IP is not saved by
         Stretch.
       </p>
-      <div className="live-grid">
-        <LocalFuel
-          key={JSON.stringify([area, origin])}
-          area={area}
-          origin={origin}
-          onFuel={onFuel}
-        />
-        <article className="live-card">
-          <span className="live-badge">REAL STORE LOCATIONS</span>
-          <h3>Good stops nearby.</h3>
-          <p>
-            Finds mapped supermarkets, grocery shops and convenience stores from
-            every retailer within five miles of your selected area center. Map
-            coverage can be incomplete; locations do not include grocery or pump
-            prices.
-          </p>
-          <button
-            className="button"
-            onClick={getPlaces}
-            disabled={placeLoading}
-          >
-            {placeLoading ? "Finding places…" : "FIND NEARBY STOPS ↗"}
-          </button>
-          {placeError && <p role="alert">{placeError}</p>}
-          {places && (
-            <>
-              <p>
-                Results for {places.origin.label}. Straight-line distance, not
-                driving distance.
-              </p>
-              <OpenMap
-                area={places.area}
-                origin={places.origin}
-                radius={5}
-                places={places.places}
-              />
-              <div className="live-tabs">
-                <button
-                  className="text-button"
-                  aria-pressed={kind === "grocery"}
-                  onClick={() => setKind("grocery")}
-                >
-                  Groceries
-                </button>
-                <button
-                  className="text-button"
-                  aria-pressed={kind === "fuel"}
-                  onClick={() => setKind("fuel")}
-                >
-                  Gas stations
-                </button>
-              </div>
-              <ul className="place-list">
-                {places.places
-                  .filter((p) => p.kind === kind)
-                  .map((p) => (
-                    <li key={p.id}>
-                      <a href={p.mapUrl} target="_blank" rel="noreferrer">
-                        {p.name} ↗
-                      </a>
-                      <span>
-                        {p.miles} mi · {p.address || "Address not supplied"}
-                      </span>
-                    </li>
-                  ))}
-              </ul>
-              {!places.places.some((p) => p.kind === kind) && (
-                <p>No mapped matches returned.</p>
-              )}
-              <p className="small">
-                ©{" "}
-                <a
-                  href="https://www.openstreetmap.org/copyright"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  OpenStreetMap contributors
-                </a>{" "}
-                · Map data {places.updatedAt}
-              </p>
-            </>
-          )}
-        </article>
-      </div>
+      <StopFinder area={area} origin={origin} onFuel={onFuel} autoLoad={autoLoad} />
       <article className="live-card grocery-connection">
         <span className="live-badge">
           {status?.kroger

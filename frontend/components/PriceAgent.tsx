@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import StoreColumns from "./StoreColumns";
+import { useState, useEffect, useRef } from "react";
 import type { AgentItem, StoreCheck } from "@/lib/price-agent";
 import { reviewedTotal } from "@/lib/price-agent";
 import type { SearchOrigin } from "@/lib/locations";
@@ -10,11 +11,13 @@ export default function PriceAgent({
   zip,
   area,
   origin,
+  autoStart = false,
 }: {
   items: AgentItem[];
   zip: string;
   area: "downtown" | "midtown" | "decatur";
   origin: SearchOrigin | null;
+  autoStart?: boolean;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -26,18 +29,33 @@ export default function PriceAgent({
     storeCoverage: StoreCoverage[];
     warnings: string[];
     foundStores: number;
+    agent?: {aiConnected:boolean;mode:string};
   } | null>(null);
+  const [liveReports,setLiveReports] = useState<ScrapeReport[]>([]);
   const [choices, setChoices] = useState<
     Record<string, Record<string, string>>
   >({});
   const [radius, setRadius] = useState(5);
+  const started = useRef(false);
+  useEffect(()=>{if(autoStart && !started.current){started.current=true;void check();}},[autoStart]);
+  const [query,setQuery] = useState("");
+  const [filter,setFilter] = useState("all");
+  const [sort,setSort] = useState("coverage");
+  const [phase,setPhase] = useState(0);
+  useEffect(()=>{
+    if(busy || !result?.publicCatalogs.some(report=>report.status==="pending")) return;
+    const timer=setTimeout(()=>void refreshProvider(),20000);
+    return ()=>clearTimeout(timer);
+  },[busy,result]);
+  useEffect(()=>{ if(!busy) return; setPhase(0); const timer=setInterval(()=>setPhase(p=>Math.min(p+1,2)),4000); return ()=>clearInterval(timer); },[busy]);
   async function check() {
     setBusy(true);
     setError("");
     setResult(null);
+    setLiveReports([]);
     setChoices({});
     try {
-      const response = await fetch("/api/live/compare", {
+      const response = await fetch("/api/agent/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -49,23 +67,52 @@ export default function PriceAgent({
         }),
         signal: AbortSignal.timeout(240000),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setResult(data);
+      if (!response.ok) { const data = await response.json(); throw new Error(data.error); }
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Website search did not return a stream.");
+      const decoder = new TextDecoder(); let pending = "";
+      try {
+        for (;;) {
+          const chunk = await reader.read();
+          pending += decoder.decode(chunk.value,{stream:!chunk.done});
+          const messages = pending.split("\n"); pending = messages.pop() ?? "";
+          for (const message of messages) {
+            if (!message.trim()) continue;
+            const event = JSON.parse(message);
+            if (event.type === "error") throw new Error(event.error);
+            if (event.type === "report") setLiveReports(previous=>[...previous.filter(r=>r.retailer!==event.report.retailer),event.report]);
+            if (event.type === "complete") setResult(event.result);
+          }
+          if (chunk.done) break;
+        }
+      } finally {reader.releaseLock();}
     } catch (e) {
       setError(e instanceof Error ? e.message : "Price check unavailable.");
     } finally {
       setBusy(false);
     }
   }
+  async function refreshProvider() {
+    if (!result || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/live/provider-status", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({zip,items,retailers:[...new Set(result.storeCoverage.map(s=>s.retailer))]}),signal:AbortSignal.timeout(120000)});
+      if (!response.ok) throw new Error("Could not refresh provider prices.");
+      const data = await response.json();
+      setResult(previous => previous ? {...previous,publicCatalogs:previous.publicCatalogs.map(report=>data.reports.find((r:ScrapeReport)=>r.retailer===report.retailer) ?? report)} : previous);
+    } catch(e) { setError(e instanceof Error ? e.message : "Refresh failed."); }
+    finally { setBusy(false); }
+  }
   const totals =
     result?.stores
       .map((s) => reviewedTotal(s, choices[s.id] ?? {}))
       .filter((n): n is number => n !== null) ?? [];
   return (
-    <section className="live-sources" aria-label="Basket price agent">
-      <p className="eyebrow">ONE LIST. A SECOND LOOK.</p>
-      <h2>Check before you checkout.</h2>
+    <section className="live-sources search-workspace" aria-label="Basket price agent">
+      {!result && liveReports.length > 0 && <StoreColumns reports={liveReports} items={items}/> }
+      <p className="eyebrow">YOUR LIST. EVERY POSSIBLE ROUTE.</p>
+      <h2>Find your next best stop.</h2>
+      <div className="search-summary"><span>{items.length} items in your list</span><span>⌖ {origin?.label || zip}</span><span>{radius} mile radius</span></div>
       <p>
         Search your entire list across supported stores, then confirm the brand
         and package you would actually buy. Dietary suitability must be checked
@@ -76,7 +123,7 @@ export default function PriceAgent({
         onClick={check}
         disabled={busy || !items.length || items.length > 30}
       >
-        {busy ? "CHECKING YOUR LIST…" : "CHECK MY LIST ↗"}
+        {busy ? "SEARCH IN PROGRESS…" : "SEARCH STORES & PRICES ↗"}
       </button>
       <label className="live-area">
         Store search radius
@@ -102,8 +149,12 @@ export default function PriceAgent({
         These results do not include travel, tax, or verified stock.
       </p>
       {error && <p role="alert">{error}</p>}
+      {busy && <div className="search-progress" role="status" aria-live="polite"><span className="search-spinner" />{["Finding stores and connected sources…","Searching products and checking packages…","Waiting for sources to respond…"][phase]}<small>Live collection can take a few minutes.</small></div>}
       {result && (
         <>
+          {result.agent && <p className="small">{result.agent.mode}</p>}
+          <div className="search-controls"><label className="result-search"><span>Search results</span><input type="search" placeholder="Store, product, or brand…" value={query} onChange={e=>setQuery(e.target.value)} /></label><label>Order by<select value={sort} onChange={e=>setSort(e.target.value)}><option value="coverage">Price coverage</option><option value="name">Store name</option></select></label></div>
+          <div className="search-filters" aria-label="Filter results">{[["all","All stores"],["retrieved","Prices found"],["pending","Collecting"],["unavailable","Unavailable"]].map(([id,label])=><button key={id} type="button" aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label}</button>)}</div>
           <p>{result.coverage}</p>
           {result.warnings.map((w) => (
             <p role="alert" key={w}>
@@ -153,7 +204,7 @@ export default function PriceAgent({
                       ? "Price source checked"
                       : s.status === "failed"
                         ? "Price check failed"
-                        : "Prices unavailable"}
+                    : "No verified branch price yet"}
                   </strong>
                   <span>{s.detail}</span>
                 </li>
@@ -165,62 +216,13 @@ export default function PriceAgent({
             change at checkout.
           </p>
           {!!result.publicCatalogs?.length && (
-            <div className="live-grid">
-              {result.publicCatalogs
-                .filter((report) => report.lines.length > 0)
-                .map((report) => (
-                  <article className="live-card" key={report.retailer}>
-                    <h3>
-                      {report.retailer} ·{" "}
-                      {report.status === "retrieved"
-                        ? "Live advertised prices"
-                        : report.status === "blocked"
-                          ? "Crawling restricted"
-                          : report.status === "failed"
-                            ? "No usable prices returned"
-                            : "Scraper unavailable"}
-                    </h3>
-                    <p className="small">{report.detail}</p>
-                    {report.lines.map((line) => (
-                      <details key={line.item.id}>
-                        <summary>
-                          {line.item.name} · {line.products.length} possible
-                          matches
-                        </summary>
-                        {line.error && <p>{line.error}</p>}
-                        {!line.error && !line.products.length && (
-                          <p>
-                            No matching priced packages found in the returned
-                            page.
-                          </p>
-                        )}
-                        <ul className="place-list">
-                          {line.products.map((product) => (
-                            <li key={product.id}>
-                              <a
-                                href={product.sourceUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                {product.name} ↗
-                              </a>
-                              <strong>
-                                ${(product.priceCents / 100).toFixed(2)} ·{" "}
-                                {product.size}
-                              </strong>
-                              <span>
-                                Retrieved{" "}
-                                {new Date(product.retrievedAt).toLocaleString()}
-                                . Confirm the package and your branch's price.
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    ))}
-                  </article>
-                ))}
-            </div>
+            <button type="button" disabled={busy} onClick={refreshProvider}>{busy ? "Checking progress…" : "Refresh background prices"}</button>
+          )}
+          {!!result.publicCatalogs?.length && (
+            <StoreColumns items={items} reports={result.publicCatalogs
+              .filter(report=>filter==="all" || (filter==="unavailable" ? !["retrieved","pending"].includes(report.status) : report.status===filter))
+              .filter(report=>`${report.retailer} ${report.lines.map(l=>l.item.name).join(" ")}`.toLowerCase().includes(query.toLowerCase()))
+              .sort((a,b)=>sort==="name" ? a.retailer.localeCompare(b.retailer) : Number(b.status==="retrieved")-Number(a.status==="retrieved") || a.retailer.localeCompare(b.retailer))}/>
           )}
           {!!result.publicCatalogs?.some((report) => !report.lines.length) && (
             <details>

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "062124",
+    "name": "Pasture Raised Large Brown Eggs",
+    "brand": "Trader Joe's",
+    "size": "1 Doz",
+    "priceCents": 599,
+    "sourceUrl": "https://www.traderjoes.com/home/products/pdp/pasture-rasied-large-brown-egss-062124",
+    "imageUrl": "https://www.traderjoes.com/content/dam/trjo/products/m20304/62124.png/jcr:content/renditions/cq5dam.web.1280.1280",
+    "retrievedAt": "2026-10-10T04:20:01.021Z",
+    "verification": "official-page-observation"
+  },
+  {
+    "id": "082978",
+    "name": "Organic Lactose Free Reduced Fat Milk",
+    "brand": "Trader Joe's",
+    "size": "64 Fl Oz",
+    "priceCents": 569,
+    "sourceUrl": "https://www.traderjoes.com/home/products/pdp/organic-lactose-free-reduced-fat-milk-082978",
+    "imageUrl": "https://www.traderjoes.com/content/dam/trjo/products/m20301/82978.png/jcr:content/renditions/cq5dam.web.1280.1280",
+    "retrievedAt": "2026-10-10T04:20:37.772Z",
+    "verification": "official-page-observation"
+  },
+  {
+    "id": "080971",
+    "name": "Organic Milk A2/A2",
+    "brand": "Trader Joe's",
+    "size": "64 Fl Oz",
+    "priceCents": 599,
+    "sourceUrl": "https://www.traderjoes.com/home/products/pdp/organic-milk-a2a2-080971",
+    "imageUrl": "https://www.traderjoes.com/content/dam/trjo/products/m20301/80971.png/jcr:content/renditions/cq5dam.web.1280.1280",
+    "retrievedAt": "2026-10-10T04:20:37.772Z",
+    "verification": "official-page-observation"
+  }
+]

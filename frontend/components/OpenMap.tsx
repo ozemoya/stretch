@@ -27,6 +27,9 @@ export default function OpenMap({
         const c = origin ?? centers[area],
           instance = L.map(container.current, {
             scrollWheelZoom: false,
+            zoomAnimation: false,
+            fadeAnimation: false,
+            markerZoomAnimation: false,
           }).setView([c.lat, c.lon], 13);
         map.current = instance;
         L.tileLayer(

@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   Area,
   FuelQuote,
@@ -13,10 +13,12 @@ export default function LocalFuel({
   area,
   onFuel,
   origin,
+  autoLoad = false,
 }: {
   area: Area;
   onFuel: (quote: FuelQuote) => void;
   origin?: SearchOrigin | null;
+  autoLoad?: boolean;
 }) {
   const [radius, setRadius] = useState(3),
     [type, setType] = useState<FuelType>("REGULAR_UNLEADED"),
@@ -31,6 +33,8 @@ export default function LocalFuel({
     origin: SearchOrigin;
   } | null>(null);
   const run = useRef(0);
+  const started = useRef(false);
+  useEffect(()=>{if(autoLoad && !started.current){started.current=true;void search();}},[autoLoad]);
   async function search() {
     const id = ++run.current;
     setBusy(true);
