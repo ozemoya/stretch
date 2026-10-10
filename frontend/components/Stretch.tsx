@@ -332,9 +332,7 @@ export default function Stretch({
             Skip to main content
           </a>
           <header>
-            <nav>
-              <button onClick={plan}>PLAN A TRIP</button>
-            </nav>
+            <span aria-hidden="true" style={{ width: "35%" }} />
             <a href="#" aria-label="Stretch home">
               <img
                 className="logo"
@@ -342,9 +340,8 @@ export default function Stretch({
                 alt="Stretch"
               />
             </a>
-            <nav>
-              <button onClick={() => router.push("/dashboard")}>DASHBOARD</button>
-              <button onClick={plan}>MY LIST ↗</button>
+            <nav aria-label="Home navigation">
+              <button onClick={() => router.push("/dashboard")}>Start Here!</button>
             </nav>
           </header>
         </>
