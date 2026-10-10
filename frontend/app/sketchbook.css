@@ -221,6 +221,256 @@
 .search-progress .sketch-state-icon { flex: none; margin: 0; animation: searching-cart 1.6s ease-in-out infinite; }
 @keyframes searching-cart { 0%, 100% { transform: translateX(0) rotate(-3deg); } 50% { transform: translateX(9px) rotate(2deg); } }
 
+/* Carry the same sketchbook language through lists, planning, comparison, and checkout. */
+.desktop-shell {
+  --sk-outline: #61752a91;
+  --sk-second-line: #61752a4d;
+  --surface: #fffaf0;
+  --canvas: var(--sk-paper);
+  --line: #a1aa82;
+  --shadow: 4px 5px 0 #61752a17;
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  letter-spacing: .012em;
+}
+.desktop-shell .desktop-sidebar,
+.desktop-shell .desktop-topbar { background: var(--sk-paper); }
+.desktop-shell .desktop-sidebar { border-right: 2px solid var(--sk-outline); }
+.desktop-shell .desktop-topbar { border-bottom: 2px solid var(--sk-outline); }
+.desktop-shell .desktop-content {
+  background-color: var(--sk-paper);
+  background-image: linear-gradient(#61752a0a 1px, transparent 1px), linear-gradient(90deg, #61752a0a 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+.desktop-shell .trip-app {
+  background-color: var(--sk-paper);
+  background-image: linear-gradient(#61752a0a 1px, transparent 1px), linear-gradient(90deg, #61752a0a 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+.desktop-shell .desktop-sidebar nav a,
+.desktop-shell .desktop-location,
+.desktop-shell .global-search input,
+.desktop-shell .nav-caption { font-family: "Patrick Hand", "Comic Sans MS", cursive; }
+.desktop-shell .desktop-sidebar nav a { font-size: 17px; border-radius: 9px 15px 10px 13px; }
+.desktop-shell .desktop-sidebar nav a > span:first-child { transform: rotate(-8deg); }
+.desktop-shell .desktop-sidebar nav a.active {
+  border: 1px solid var(--sk-outline);
+  background: var(--pale);
+  box-shadow: 2px 2px 0 var(--sk-second-line);
+  transform: rotate(-.5deg);
+}
+.desktop-shell .global-search input { font-size: 17px; }
+.desktop-shell .dashboard-heading p,
+.desktop-shell .dashboard-card p,
+.desktop-shell .dashboard-journey > p:not(.eyebrow),
+.desktop-shell .dashboard-empty p,
+.desktop-shell .dashboard-metrics section > span,
+.desktop-shell .dashboard-metrics section > a,
+.desktop-shell .dashboard-metrics section > small,
+.desktop-shell .dashboard-card a,
+.desktop-shell .dashboard-lists strong,
+.desktop-shell .dashboard-lists small,
+.desktop-shell .dashboard-metrics strong small { font-family: "Patrick Hand", "Comic Sans MS", cursive; }
+.desktop-shell .dashboard-card h2,
+.desktop-shell .dashboard-journey h2,
+.desktop-shell .dashboard-empty h3 { font-family: "Kalam", "Patrick Hand", cursive; font-weight: 700; }
+.desktop-shell .global-search kbd,
+.desktop-shell .sidebar-toggle,
+.desktop-shell .profile-control { border-color: var(--sk-outline); border-radius: 8px 13px 9px 12px; }
+.desktop-shell .eyebrow,
+.desktop-shell .nav-caption { font-family: "Patrick Hand", "Comic Sans MS", cursive; font-size: 13px; letter-spacing: .1em; }
+.desktop-shell h1,
+.desktop-shell h2,
+.desktop-shell h3 { color: var(--sk-forest); }
+.desktop-shell .dashboard-heading h1,
+.desktop-shell .lists-heading h1,
+.desktop-shell .trip-app h1 { font-family: "DM Serif Display", Georgia, serif; }
+.desktop-shell .lists-heading h1,
+.desktop-shell .trip-app h1 { animation: stretch-text-boil .6s steps(1, end) infinite; }
+.desktop-shell .trip-app h2,
+.desktop-shell .trip-app h3,
+.desktop-shell .lists-page h2 { font-family: "Kalam", "Patrick Hand", cursive; font-weight: 700; letter-spacing: -.025em; }
+.desktop-shell .lists-heading h1::after,
+.desktop-shell .trip-checkout-heading h1::after {
+  content: "";
+  display: block;
+  width: min(180px, 48%);
+  margin-top: 5px;
+  border-top: 3px solid var(--red);
+  border-radius: 55% 35% 45% 65%;
+  transform: rotate(-2deg);
+}
+.desktop-shell .dashboard-metrics section,
+.desktop-shell .dashboard-card,
+.desktop-shell .dashboard-journey,
+.desktop-shell .saved-list-card,
+.desktop-shell .lists-empty,
+.desktop-shell .list-creator,
+.desktop-shell .trip-app .planner,
+.desktop-shell .trip-app .results-list-panel,
+.desktop-shell .trip-app .planner-area-map,
+.desktop-shell .trip-app .results-map-panel,
+.desktop-shell .trip-app .live-card,
+.desktop-shell .trip-app .nearby-grocery-directory,
+.desktop-shell .trip-app .trip-checkout-basket,
+.desktop-shell .trip-app .trip-checkout-total {
+  border: 1px solid var(--sk-outline);
+  border-radius: 17px 11px 18px 12px / 12px 18px 13px 17px;
+  box-shadow: var(--shadow), inset 1px 1px 0 var(--sk-second-line);
+}
+.desktop-shell .saved-list-card:nth-child(even),
+.desktop-shell .dashboard-metrics section:nth-child(even) { border-radius: 12px 19px 11px 17px / 17px 12px 19px 11px; }
+.desktop-shell .list-creator-summary,
+.desktop-shell .creator-product,
+.desktop-shell .trip-app .product,
+.desktop-shell .trip-app .planner-grid aside,
+.desktop-shell .trip-app .trip-settings,
+.desktop-shell .trip-app .saved-lists,
+.desktop-shell .trip-app .trip-review-list,
+.desktop-shell .trip-app .trip-checkout-stop,
+.desktop-shell .trip-app .store-column,
+.desktop-shell .guest-popover {
+  border: 1px solid var(--sk-outline);
+  border-radius: 11px 16px 10px 14px;
+  box-shadow: 2px 3px 0 #61752a12;
+}
+.desktop-shell .desktop-primary,
+.desktop-shell .trip-app .cta,
+.desktop-shell .trip-app .trip-handoff-primary,
+.desktop-shell .trip-app .results-edit,
+.desktop-shell .trip-app .workspace-tabs button,
+.desktop-shell .trip-app .search-filters button,
+.desktop-shell .trip-app .comparison-toolbar button,
+.desktop-shell .trip-app .nearby-grocery-list button,
+.desktop-shell .lists-page button:not(.desktop-primary) {
+  border-radius: 8px 14px 7px 12px;
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  font-size: max(14px, 1em);
+  box-shadow: 2px 3px 0 #61752a20;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.desktop-shell .desktop-primary:hover,
+.desktop-shell .trip-app .cta:hover,
+.desktop-shell .trip-app .trip-handoff-primary:hover,
+.desktop-shell .trip-app .results-edit:hover,
+.desktop-shell .trip-app .nearby-grocery-list button:hover,
+.desktop-shell .lists-page button:not(.desktop-primary):hover:not(:disabled) { transform: translateY(-2px) rotate(-.4deg); box-shadow: 3px 5px 0 #61752a22; }
+.desktop-shell input:not([type="checkbox"]):not([type="radio"]),
+.desktop-shell select,
+.desktop-shell textarea {
+  border-radius: 7px 13px 8px 12px;
+  border-color: var(--sk-outline);
+  background-color: #fffaf0;
+}
+.desktop-shell .global-search input { border: 0; border-bottom: 1px solid var(--sk-outline); border-radius: 0; background: transparent; }
+.desktop-shell .trip-app input:focus-visible,
+.desktop-shell .trip-app select:focus-visible,
+.desktop-shell .lists-page input:focus-visible { outline: 2px solid var(--sk-olive); outline-offset: 2px; }
+.desktop-shell .trip-app .nearby-grocery-list button small,
+.desktop-shell .trip-app .stop-results small { font-family: "Patrick Hand", "Comic Sans MS", cursive; font-size: 14px; }
+.desktop-shell .trip-app .nearby-grocery-list button { background: var(--surface); border-color: var(--sk-outline); }
+.desktop-shell .trip-app .nearby-grocery-list button[aria-pressed="true"] { background: var(--pale); }
+.desktop-shell .trip-app .osm-map {
+  border: 2px solid var(--sk-outline);
+  border-radius: 14px 9px 16px 11px;
+  box-shadow: 3px 4px 0 #61752a20;
+}
+.desktop-shell .leaflet-popup-content-wrapper { border: 2px solid var(--sk-outline); border-radius: 12px 18px 11px 16px; background: #fffaf0; }
+.desktop-shell .leaflet-popup-content,
+.desktop-shell .leaflet-control-zoom a { font-family: "Patrick Hand", "Comic Sans MS", cursive; font-size: 15px; }
+.desktop-shell .leaflet-control-zoom { border: 1px solid var(--sk-outline); border-radius: 8px 13px 9px 12px; overflow: hidden; }
+/* The handwriting applies to every Stretch surface, including form values and totals. */
+:is(.stretch-home, .desktop-shell) { font-family: "Patrick Hand", "Comic Sans MS", cursive !important; }
+:is(.stretch-home, .desktop-shell) :is(
+  h1, h2, h3, h4, p, span, strong, b, em, small, label, legend, button, a,
+  input, select, option, textarea, summary, dt, dd, th, td, li, time, kbd, output
+) { font-family: "Patrick Hand", "Comic Sans MS", cursive !important; }
+:is(.stretch-home, .desktop-shell) :is(h1, h2, h3, .hand, .route-note) {
+  font-family: "Kalam", "Patrick Hand", cursive !important;
+  letter-spacing: -.025em;
+}
+:is(.stretch-home, .desktop-shell) :is(
+  .route-grand-total, .comparison-price, .trip-checkout-total-row,
+  .trip-equation, .dashboard-metrics strong, .comparison-table
+) { font-variant-numeric: tabular-nums; }
+.stretch-home .hero h1 { line-height: 1.14; }
+.desktop-shell .dashboard-heading h1,
+.desktop-shell .lists-heading h1,
+.desktop-shell .trip-app h1 { line-height: 1.18; }
+:is(.stretch-home, .desktop-shell) :is(input, textarea, select)::placeholder {
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  opacity: .8;
+}
+:is(.stretch-home, .desktop-shell) :is(button, a, summary, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+:is(.stretch-home, .desktop-shell) :is(button, [role="button"], summary) {
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+:is(.stretch-home, .desktop-shell) :is(button, [role="button"], summary):hover:not(:disabled) {
+  filter: saturate(1.12);
+}
+:is(.stretch-home, .desktop-shell) :is(button, [role="button"]):active:not(:disabled) {
+  transform: translateY(2px) rotate(.5deg);
+  box-shadow: 1px 1px 0 #61752a24;
+}
+:is(.stretch-home, .desktop-shell) :is(a:not(.desktop-brand), summary):hover {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--red);
+  text-underline-offset: 4px;
+}
+:is(.stretch-home, .desktop-shell) :is(input, textarea, select):focus-visible {
+  outline: 2px solid var(--sk-olive);
+  outline-offset: 2px;
+  box-shadow: 3px 4px 0 #61752a20;
+}
+:is(.stretch-home, .desktop-shell) :is(a, button, summary):focus-visible {
+  outline: 2px dashed var(--sk-forest);
+  outline-offset: 4px;
+}
+.desktop-shell :is(.dashboard-card, .dashboard-metrics section, .saved-list-card,
+  .list-creator, .creator-product, .trip-app .product, .trip-app .store-column,
+  .trip-app .live-card, .trip-app .nearby-grocery-list button, .trip-app .stop-results li) {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.desktop-shell :is(.dashboard-card, .dashboard-metrics section, .saved-list-card,
+  .creator-product, .trip-app .product, .trip-app .store-column,
+  .trip-app .live-card, .trip-app .nearby-grocery-list button, .trip-app .stop-results li):hover {
+  border-color: var(--sk-olive);
+  box-shadow: 5px 6px 0 #61752a24;
+  transform: translateY(-2px) rotate(-.2deg);
+}
+.desktop-shell .trip-app .nearby-grocery-list button[aria-pressed="true"],
+.desktop-shell .creator-product.added,
+.desktop-shell .trip-app .product.added { border-width: 2px; background: var(--pale); }
+.desktop-shell .trip-app .workspace-tabs button[aria-pressed="true"],
+.desktop-shell .trip-app .search-filters button[aria-pressed="true"] {
+  box-shadow: 3px 4px 0 #61752a25;
+  transform: rotate(-.5deg);
+}
+.desktop-shell .trip-app .stop-results li:focus-within,
+.desktop-shell .trip-app .store-column:focus-within,
+.desktop-shell .saved-list-card:focus-within { border-color: var(--sk-olive); box-shadow: 5px 6px 0 #61752a24; }
+.desktop-shell .leaflet-interactive { transition: stroke-width 160ms ease, fill-opacity 160ms ease; }
+.desktop-shell .leaflet-interactive:hover { stroke-width: 4; fill-opacity: 1; }
+.desktop-shell .leaflet-popup-content :is(button, a) { font-family: "Patrick Hand", "Comic Sans MS", cursive; }
+.desktop-shell .osm-map { font-family: "Patrick Hand", "Comic Sans MS", cursive !important; }
+.desktop-shell .trip-app :is(.cta, .trip-handoff-primary),
+.desktop-shell .lists-page .desktop-primary { position: relative; isolation: isolate; }
+.desktop-shell .trip-app :is(.cta, .trip-handoff-primary)::after,
+.desktop-shell .lists-page .desktop-primary::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid var(--red);
+  border-radius: 12px 5px 11px 6px;
+  transform: rotate(1deg);
+  pointer-events: none;
+}
+.desktop-shell .trip-app :is(.cta, .trip-handoff-primary):hover::after,
+.desktop-shell .lists-page .desktop-primary:hover::after { transform: rotate(-1deg); }
+.desktop-shell .lists-page .desktop-primary::after { border-color: var(--sk-olive); }
+
 @media (max-width: 1000px) {
   .stretch-home .hero { grid-template-columns: minmax(0, 1fr); }
   .stretch-home .home-hero-copy { max-width: 720px; }
@@ -244,4 +494,17 @@
 @media (prefers-reduced-motion: reduce) {
   .route-sticker, .search-progress .sketch-state-icon, .dashboard-shell .journey-doodle { animation: none; }
   .home-search-row button { transition: none; }
+  .desktop-shell .lists-heading h1,
+  .desktop-shell .trip-app h1 { animation: none; }
+  .desktop-shell .desktop-primary,
+  .desktop-shell .trip-app .cta,
+  .desktop-shell .trip-app .trip-handoff-primary,
+  .desktop-shell .trip-app .results-edit,
+  .desktop-shell .trip-app .nearby-grocery-list button,
+  .desktop-shell .lists-page button:not(.desktop-primary) { transition: none; }
+  :is(.stretch-home, .desktop-shell) :is(button, [role="button"], summary),
+  .desktop-shell :is(.dashboard-card, .dashboard-metrics section, .saved-list-card,
+    .list-creator, .creator-product, .trip-app .product, .trip-app .store-column,
+    .trip-app .live-card, .trip-app .nearby-grocery-list button, .trip-app .stop-results li),
+  .desktop-shell .leaflet-interactive { transition: none; }
 }

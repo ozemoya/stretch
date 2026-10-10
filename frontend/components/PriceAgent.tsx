@@ -10,6 +10,8 @@ import {
 } from "@/lib/price-agent";
 import type { SearchOrigin } from "@/lib/locations";
 import type { StoreCoverage } from "@/lib/retailer-coverage";
+import { groceryCoverage } from "@/lib/retailer-coverage";
+import type { NearbyPlace } from "@/lib/live-data";
 import type { ScrapeReport } from "@/lib/retailer-scraper";
 import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
 import { centers } from "@/lib/locations";
@@ -48,6 +50,9 @@ export default function PriceAgent({
   gasPrice,
   gasPriceReported,
   mpg,
+  nearbyPlaces,
+  radius,
+  onRadiusChange,
   autoStart = false,
   onSelectTrip,
 }: {
@@ -59,6 +64,9 @@ export default function PriceAgent({
   gasPrice: number;
   gasPriceReported: boolean;
   mpg: number;
+  nearbyPlaces: NearbyPlace[];
+  radius: number;
+  onRadiusChange: (radius: number) => void;
   autoStart?: boolean;
   onSelectTrip?: (store: StoreCheck, selected: Record<string, string>, route: { miles: number; minutes: number }, storeLocation: { mapUrl: string; lat: number; lon: number }) => void;
 }) {
@@ -91,7 +99,6 @@ export default function PriceAgent({
     routes: Record<string, { miles: number; minutes: number }>;
   }>({ key: "", routes: {} });
   const [routeBusy, setRouteBusy] = useState(false);
-  const [radius, setRadius] = useState(5);
   const started = useRef(false);
   const epoch = useRef(new SearchEpoch());
   const requestController = useRef<AbortController | null>(null);
@@ -105,6 +112,18 @@ export default function PriceAgent({
     items.map((item) => [item.id, item.name, item.unit, item.quantity]),
   ]);
   const previousInput = useRef(inputKey);
+  useEffect(() => {
+    const mapped = groceryCoverage(nearbyPlaces);
+    if (!mapped.length) return;
+    setResult((previous) => previous && !previous.storeCoverage.length
+      ? {
+          ...previous,
+          storeCoverage: mapped,
+          foundStores: mapped.length,
+          coverage: `Mapped ${mapped.length} nearby grocery locations within ${radius} miles. Product prices are only shown when a connected source returns them.`,
+        }
+      : previous);
+  }, [nearbyPlaces, radius, result?.storeCoverage.length]);
   useEffect(() => {
     if (previousInput.current === inputKey) return;
     previousInput.current = inputKey;
@@ -490,7 +509,7 @@ export default function PriceAgent({
           value={radius}
           disabled={busy}
           onChange={(e) => {
-            setRadius(Number(e.target.value));
+            onRadiusChange(Number(e.target.value));
             setResult(null);
             setChoices({});
           }}

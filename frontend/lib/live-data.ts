@@ -157,6 +157,21 @@ const osmSchema = z.object({
     }),
   ),
 });
+export function formatOsmAddress(tags: Record<string, string>): string {
+  const full = tags["addr:full"]?.trim() || tags["contact:address"]?.trim();
+  if (full) return full;
+
+  const house = tags["addr:housenumber"] || tags["contact:housenumber"];
+  const street = tags["addr:street"] || tags["contact:street"] || tags["addr:place"];
+  const locality = tags["addr:city"] || tags["contact:city"];
+  const state = tags["addr:state"] || tags["contact:state"];
+  const postcode = tags["addr:postcode"] || tags["contact:postcode"];
+  return [
+    [house, street].filter(Boolean).join(" "),
+    locality,
+    [state, postcode].filter(Boolean).join(" "),
+  ].filter(Boolean).join(", ");
+}
 export function normalizePlaces(
   raw: unknown,
   area: Area,
@@ -219,9 +234,7 @@ export function normalizePlaces(
       brand: t.brand ?? t.operator ?? "",
       lat,
       lon,
-      address: [t["addr:housenumber"], t["addr:street"], t["addr:city"]]
-        .filter(Boolean)
-        .join(" "),
+      address: formatOsmAddress(t),
       miles: Math.round(distance * 10) / 10,
       mapUrl: `https://www.openstreetmap.org/${e.type}/${e.id}`,
     });

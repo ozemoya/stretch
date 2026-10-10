@@ -1075,7 +1075,22 @@ footer {
 .map-panel-heading p { font-size: 13px; margin: 5px 0; }
 .planner-area-map .osm-map { flex: 1; min-height: 120px; height: auto; }
 .planner-area-map > .small, .planner-area-map .map-caption { flex-shrink: 0; font-size: 11px; margin-bottom: 0; }
-.results-map-panel { min-height: 0; min-width: 0; overflow: hidden; }
+.results-map-panel { min-height: 460px; min-width: 0; height: calc(100dvh - 190px); position: sticky; top: 12px; align-self: start; overflow: hidden; }
+.nearby-grocery-directory { margin: 16px 0 20px; padding: 16px; border: 1px solid var(--sand); border-radius: 16px; background: var(--pale); }
+.nearby-grocery-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nearby-grocery-heading h2 { margin: 3px 0 0; font-size: 21px; }
+.nearby-grocery-heading > strong { flex: none; color: var(--green); font-size: 13px; }
+.nearby-grocery-directory > p { margin: 8px 0 12px; }
+.nearby-grocery-search { display: grid; gap: 5px; font-size: 12px; font-weight: 700; }
+.nearby-grocery-search input { width: 100%; padding: 9px 11px; border: 1px solid var(--sand); border-radius: 10px; background: var(--cream); color: var(--ink); }
+.nearby-grocery-list { margin-top: 10px; max-height: 245px; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 6px; }
+.nearby-grocery-list button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; border: 1px solid var(--sand); border-radius: 10px; background: var(--cream); color: var(--ink); text-align: left; cursor: pointer; }
+.nearby-grocery-list button:hover, .nearby-grocery-list button[aria-pressed="true"] { border-color: var(--green); background: var(--surface); }
+.nearby-grocery-list button span:first-child { min-width: 0; }
+.nearby-grocery-list button strong, .nearby-grocery-list button small { display: block; }
+.nearby-grocery-list button small { margin-top: 4px; color: var(--green); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.nearby-grocery-list button small b { margin-right: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.nearby-grocery-list button > span:last-child { flex: none; font-size: 12px; }
 .trip-app .results-intro { display: block; margin-bottom: 18px; }
 .trip-app .results-intro p { font-size: 12px; }
 .trip-app .results-edit { font-size: 12px; padding: 8px 12px; }
@@ -1106,6 +1121,7 @@ footer {
   .workspace-tabs button[aria-pressed="true"] { background: var(--green); color: var(--cream); }
   .trip-app main[data-view="list"] > .planner-area-map, .trip-app main[data-view="list"] > .results-map-panel { display: none; }
   .trip-app main[data-view="map"] > .planner, .trip-app main[data-view="map"] > .results-list-panel { display: none; }
+  .results-map-panel { position: static; height: calc(100dvh - 240px); min-height: 400px; }
   .trip-app .planner, .results-list-panel { padding: 14px; }
   .trip-app .products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

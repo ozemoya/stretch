@@ -16,6 +16,11 @@ export default function StopFinder({
   selectedStation,
   autoLoad = false,
   compact = false,
+  radius: selectedRadius,
+  onRadiusChange,
+  onPlaces,
+  onPlacesError,
+  selectedPlaceId,
 }: {
   area: Area;
   origin: SearchOrigin | null;
@@ -23,10 +28,16 @@ export default function StopFinder({
   selectedStation: GasStop | null;
   autoLoad?: boolean;
   compact?: boolean;
+  radius?: number;
+  onRadiusChange?: (radius: number) => void;
+  onPlaces?: (places: NearbyPlace[]) => void;
+  onPlacesError?: (error: string) => void;
+  selectedPlaceId?: string | null;
 }) {
   const selectedStationId = selectedStation?.id ?? null;
-  const [radius, setRadius] = useState(5),
-    [kind, setKind] = useState("all"),
+  const [localRadius, setLocalRadius] = useState(5);
+  const radius = selectedRadius ?? localRadius;
+  const [kind, setKind] = useState("all"),
     [places, setPlaces] = useState<NearbyPlace[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -40,8 +51,10 @@ export default function StopFinder({
     const controller = new AbortController();
     setBusy(true);
     setError("");
+    onPlacesError?.("");
     setLoaded(false);
     setPlaces([]);
+    onPlaces?.([]);
     fetch(
       `/api/live/places?area=${area}&radius=${radius}&kind=all${originQuery(origin)}`,
       { signal: controller.signal },
@@ -57,17 +70,24 @@ export default function StopFinder({
       .then((data) => {
         if (!controller.signal.aborted) {
           setPlaces(data.places);
+          onPlaces?.(data.places);
           setLoaded(true);
         }
       })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
+        if (!controller.signal.aborted) {
+          setError(e.message);
+          onPlacesError?.(e.message);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setBusy(false);
       });
     return () => controller.abort();
   }, [area, origin?.lat, origin?.lon, radius, attempt, autoLoad]);
+  useEffect(() => {
+    if (selectedPlaceId) setKind("all");
+  }, [selectedPlaceId]);
   async function checkFuel() {
     setPriceBusy(true);
     setPriceError("");
@@ -115,7 +135,9 @@ export default function StopFinder({
           <select
             value={radius}
             onChange={(e) => {
-              setRadius(Number(e.target.value));
+              const nextRadius = Number(e.target.value);
+              if (onRadiusChange) onRadiusChange(nextRadius);
+              else setLocalRadius(nextRadius);
               setPrices(null);
               onStation(null, null);
             }}
@@ -159,6 +181,7 @@ export default function StopFinder({
           radius={radius}
           places={visible}
           selectedFuelId={selectedStationId}
+          selectedPlaceId={selectedPlaceId}
           onSelectFuel={(place) =>
             onStation(
               {
@@ -195,7 +218,7 @@ export default function StopFinder({
                 </a>
                 <small>
                   {p.kind === "fuel" ? "Gas station" : "Grocery stop"} ·{" "}
-                  {p.miles} mi · {p.address || "Address not supplied"}
+                  {p.miles} mi · Address: {p.address || "Not listed in map data"}
                 </small>
                 {p.kind === "fuel" && (
                   <button
