@@ -9,11 +9,38 @@ discarded. Public fetching checks robots rules, limits response size and request
 volume, and honors cancellation. It cannot guarantee prices from sites that
 block requests or require a store/session to display prices.
 
-The built-in libraries are Lidl, Trader Joe’s, Fresh Market, and Kroger. Kroger
+The built-in libraries are Lidl, Trader Joe’s, Fresh Market, Kroger, and Publix. Kroger
 implements the optional `checkBranches` method through its Products API. Branch
 matching retains its exact physical location checks and pagination/request caps.
 “Lowest” means the lowest eligible price among the returned candidates, not a
 guarantee that every product in the retailer's inventory was searched.
+
+Publix uses the configured hosted Instacart collector when available. Otherwise,
+`lib/scrapers/publix.ts` reads the official weekly-ad page's website-selected store
+number and the anonymous Publix savings service used by that page. This is a
+partial catalog for that website context, not branch-verified pricing for the
+search ZIP. Only current, unconditional dollar package totals with one explicit
+size are returned. BOGO, multibuy, coupons, weight rates, size ranges and product
+alternatives are excluded. Sale, posting and promotion dates are rechecked even
+on cache hits; source timestamps and the official print-detail link are retained.
+
+Public requests check robots on both origins (an explicit service robots 404
+means no published rules; network errors and other failures fail closed), reject
+redirects, use an identified user agent, and enforce 15-second timeouts and byte
+limits. Concurrent baskets share one fetch while cancellation is isolated per
+caller. The five-minute cache retains its original timestamp; unsuccessful
+attempts wait a minute before retrying. Process limits are 15 requests/minute and
+150/day; production needs shared persistent limits. The anonymous service and
+egg offer were checked live on October 10, 2026. No credentials are required for
+this public fallback, and no missing price is inferred.
+
+Run the optional real-network Publix check from `frontend` in PowerShell:
+
+```powershell
+$env:STRETCH_PUBLIX_LIVE_SMOKE = '1'
+npx vitest run tests/publix.test.ts
+Remove-Item Env:STRETCH_PUBLIX_LIVE_SMOKE
+```
 
 ## Add a store
 

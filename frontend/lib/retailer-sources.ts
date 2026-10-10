@@ -10,7 +10,7 @@ export const sourceHosts: Record<string, string[]> = {
     "www.instacart.com",
   ],
   ALDI: ["www.instacart.com"],
-  Publix: ["www.instacart.com"],
+  Publix: ["www.publix.com", "www.instacart.com"],
   "Food Lion": ["www.instacart.com"],
   "Sam’s Club": ["www.instacart.com"],
   Walmart: ["www.walmart.com"],
