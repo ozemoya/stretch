@@ -15,7 +15,7 @@ it("closes a stuck stream by deadline and ignores late provider callbacks", asyn
   const text = response.text();
   await vi.advanceTimersByTimeAsync(SEARCH_WINDOW_MS);
   const events = (await text).trim().split("\n").map(line => JSON.parse(line));
-  expect(events).toEqual([{ type: "report", price: 329 }, { type: "complete", reason: "timeout", elapsedMs: 4000 }]);
+  expect(events).toEqual([{ type: "report", price: 329 }, { type: "complete", reason: "timeout", elapsedMs: SEARCH_WINDOW_MS }]);
   expect(signal?.aborted).toBe(true);
   expect(() => late?.({ price: 999 })).not.toThrow();
 });

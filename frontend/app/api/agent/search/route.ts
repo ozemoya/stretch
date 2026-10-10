@@ -16,6 +16,19 @@ export const runtime = "nodejs";
 const supported = ["Walmart", "Target", "Publix", "ALDI", "The Fresh Market",
   "Food Lion", "Sam’s Club", "Sprouts", "Costco", "Albertsons family"];
 
+function waitForProviderPoll(signal: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) return resolve();
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, 5_000);
+    signal.addEventListener("abort", done, { once: true });
+  });
+}
+
 export async function POST(request: Request) {
   const parsed = input.safeParse(await request.json().catch(() => null));
   if (!parsed.success || new Set(parsed.data.items.map((item) => item.id)).size !== parsed.data.items.length)
@@ -85,10 +98,20 @@ export async function POST(request: Request) {
         return scrapeRetailers(coverage.filter((store) => store.retailer === retailer),
           p.items, mapped.places, plan ?? undefined, signal, (report) => emit(report));
       });
-      const providerTask = planningTask.then(() => {
+      const providerTask = planningTask.then(async () => {
         signal.throwIfAborted();
-        return providerReports(retailers, p.items, p.zip, true, false,
+        let current = await providerReports(retailers, p.items, p.zip, true, false,
           (report) => emit(report), plan ?? undefined, false, signal, { fast: true });
+        // Bright Data can return a job ID before it has product records. Check
+        // that same job during this search; start=false avoids creating another.
+        while (!signal.aborted && current.some((report) =>
+          report.lines.some((line) => line.searchStatus === "searching"))) {
+          await waitForProviderPoll(signal);
+          signal.throwIfAborted();
+          current = await providerReports(retailers, p.items, p.zip, false, false,
+            (report) => emit(report), plan ?? undefined, false, signal, { fast: true });
+        }
+        return current;
       });
       const outcomes = await Promise.allSettled([...publicTasks, providerTask]);
       if (outcomes.some((outcome) => outcome.status === "rejected")) failures = true;

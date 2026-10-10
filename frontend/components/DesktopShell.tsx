@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { readCheckoutDraft } from "@/lib/checkout-draft";
+import SketchIcon, { type SketchIconName } from "./SketchIcon";
 
-const navigation = [
-  ["/dashboard", "Dashboard", "◈"], ["/plan", "Grocery list", "⌕"],
-  ["/lists", "Saved lists", "☷"],
+const navigation: [string, string, SketchIconName | "◈"][] = [
+  ["/dashboard", "Dashboard", "◈"], ["/plan", "Grocery list", "bag"],
+  ["/lists", "Saved lists", "list"],
 ];
 
 export default function DesktopShell({ children }: { children: React.ReactNode }) {
@@ -24,7 +25,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
       <Link href="/" className="desktop-brand"><img src="/assets/stretch-logo-transparent.png" alt="Stretch" /></Link>
       <button className="sidebar-toggle" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? "→" : "←"}</button>
       <span className="nav-caption">SHOPPING</span>
-      <nav>{navigation.map(([href, label, icon]) => <Link key={href} href={href} title={label} className={path === href ? "active" : ""} aria-current={path === href ? "page" : undefined}><span aria-hidden="true">{icon}</span><span>{label}</span></Link>)}</nav>
+      <nav>{navigation.map(([href, label, icon]) => <Link key={href} href={href} title={label} className={path === href ? "active" : ""} aria-current={path === href ? "page" : undefined}><span aria-hidden="true">{icon === "◈" ? icon : <SketchIcon name={icon} size={27} />}</span><span>{label}</span></Link>)}</nav>
       <div className="sidebar-foot"><span className="pilot-dot" /> <span>Atlanta pilot<small>Store coverage varies.</small></span></div>
     </aside>
     <div className="desktop-body">

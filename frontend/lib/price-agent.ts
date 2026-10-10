@@ -94,7 +94,7 @@ export async function checkStores(
             item,
             candidates: [],
             error: timeout
-              ? "Search timed out. Retry this item."
+              ? "Timed out. Retry this item."
               : "Price check failed. Try again later.",
             searchStatus: timeout ? "timeout" : "error",
           });

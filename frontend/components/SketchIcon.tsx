@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 export type SketchIconName =
   | "bag" | "cart" | "milk" | "eggs" | "bread" | "produce"
-  | "tag" | "coin" | "pump" | "car" | "map" | "arrow"
+  | "tag" | "coin" | "pump" | "car" | "map" | "list" | "arrow"
   | "star" | "bubble" | "badge";
 
 type Props = {
@@ -18,8 +18,29 @@ const peach = "#E6AD69";
 const butter = "#F2CD64";
 const sage = "#A6B68B";
 const paper = "#F7F0DD";
+const pngIcons: Partial<Record<SketchIconName, string>> = {
+  bag: "/assets/icons/stretch-icon_1.png",
+  coin: "/assets/icons/stretch-icon_2.png",
+  map: "/assets/icons/stretch-icon_3.png",
+  tag: "/assets/icons/stretch-icon_4.png",
+  list: "/assets/icons/stretch-icon_5.png",
+  cart: "/assets/icons/stretch-icon_6.png",
+  car: "/assets/icons/stretch-icon_7.png",
+};
 
 export default function SketchIcon({ name, size = 72, className, label, style }: Props) {
+  const png = pngIcons[name];
+  if (png) return (
+    <img
+      className={`sketch-icon ${className ?? ""}`}
+      src={png}
+      width={size}
+      height={size}
+      alt={label ?? ""}
+      aria-hidden={label ? undefined : true}
+      style={{ objectFit: "cover", ...style }}
+    />
+  );
   return (
     <svg
       className={`sketch-icon ${className ?? ""}`}

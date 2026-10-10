@@ -333,7 +333,7 @@ export default function PriceAgent({
             : previous,
         );
         const message = timeout
-          ? "The five-second search window ended. Any verified prices already found are kept. You can search again to check slower sources."
+          ? "The search window ended. Any prices already found are kept. Search again to check slower sources."
           : e instanceof Error ? e.message : "Price check unavailable.";
         if (initialComplete) setSourceError(message);
         else setError(message);
@@ -516,12 +516,12 @@ export default function PriceAgent({
                       "Searching products and checking packages…",
                       "Preparing the first comparison…",
                     ][phase]}
-          <small>Up to five seconds. Verified prices appear as they arrive.</small>
+          <small>Prices appear as sources respond. You can cancel at any time.</small>
         </div>
       )}
       {result && sourcesBusy && (
         <p role="status" aria-live="polite" className="small">
-          Checking for new prices — up to five seconds. Your current results stay available.
+          Checking for new prices. Your current results stay available.
         </p>
       )}
       {result?.search && !sourcesBusy && (

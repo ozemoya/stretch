@@ -16,6 +16,7 @@ vi.mock("../lib/provider-prices", () => ({
 
 import { POST } from "../app/api/live/provider-status/route";
 import { providerReports } from "../lib/provider-prices";
+import { SEARCH_WINDOW_MS } from "../lib/search-timing";
 afterEach(() => vi.useRealTimers());
 
 it("streams each retailer update before refresh completes", async () => {
@@ -29,7 +30,7 @@ it("streams each retailer update before refresh completes", async () => {
   expect(events[0].report.retailer).toBe("Target");
 });
 
-it("ends a stuck manual refresh within the same four-second window", async () => {
+it("ends a stuck manual refresh at the search deadline", async () => {
   vi.useFakeTimers();
   vi.mocked(providerReports).mockImplementationOnce(async (_retailers, _items, _zip, _start, _cacheOnly, onReport) => {
     onReport?.(report);
@@ -39,7 +40,7 @@ it("ends a stuck manual refresh within the same four-second window", async () =>
     method: "POST", body: JSON.stringify({ zip: "30303", items: [item], retailers: ["Target"], stream: true }),
   }));
   const text = response.text();
-  await vi.advanceTimersByTimeAsync(4000);
+  await vi.advanceTimersByTimeAsync(SEARCH_WINDOW_MS);
   const events = (await text).trim().split("\n").map(line => JSON.parse(line));
   expect(events.at(-1).timedOut).toBe(true);
   expect(events.at(-1).reports[0].lines[0].searchStatus).toBe("timeout");

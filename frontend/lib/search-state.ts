@@ -39,7 +39,7 @@ export function settlePendingReports(
             searchStatus: status,
             error:
               status === "timeout"
-                ? "Search timed out. Retry this retailer."
+                ? "Timed out. Retry this retailer."
                 : "Search failed. Retry this retailer.",
           }
         : line,
@@ -95,7 +95,7 @@ export function searchStatusLabel(status: SearchStatus) {
       no_results: "No matching result",
       price_unavailable: "Live pricing unavailable",
       integration_unavailable: "Live pricing unavailable",
-      timeout: "Search timed out",
+      timeout: "Timed out",
       error: "Search failed",
     } satisfies Record<SearchStatus, string>
   )[status];
