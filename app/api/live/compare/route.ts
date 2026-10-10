@@ -9,6 +9,7 @@ import {
 import { checkStores } from "@/lib/price-agent";
 import { groceryCoverage } from "@/lib/retailer-coverage";
 import { groceryFeed } from "@/lib/grocery-feed";
+import { scrapeRetailers } from "@/lib/retailer-scraper";
 const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   area: z.enum(["downtown", "midtown", "decatur"]).default("downtown"),
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
     const p = parsed.data;
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
     const coverage = groceryCoverage(mapped.places);
+    const publicCatalogs = await scrapeRetailers(coverage, p.items);
     const checkedStores = [] as Awaited<ReturnType<typeof checkStores>>;
     const warnings: string[] = [];
     try {
@@ -121,14 +123,12 @@ export async function POST(request: Request) {
             id: row.id,
             lines: [
               ...store.lines,
-              ...p.items
-                .slice(10)
-                .map((item) => ({
-                  item,
-                  candidates: [],
-                  error:
-                    "Not checked in this run due to provider request limits.",
-                })),
+              ...p.items.slice(10).map((item) => ({
+                item,
+                candidates: [],
+                error:
+                  "Not checked in this run due to provider request limits.",
+              })),
             ],
           });
         }
@@ -141,6 +141,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         stores: checkedStores,
+        publicCatalogs,
         storeCoverage: coverage,
         warnings,
         foundStores: coverage.length,

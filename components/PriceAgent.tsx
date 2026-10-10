@@ -4,6 +4,7 @@ import type { AgentItem, StoreCheck } from "@/lib/price-agent";
 import { reviewedTotal } from "@/lib/price-agent";
 import type { SearchOrigin } from "@/lib/locations";
 import type { StoreCoverage } from "@/lib/retailer-coverage";
+import type { ScrapeReport } from "@/lib/retailer-scraper";
 export default function PriceAgent({
   items,
   zip,
@@ -19,6 +20,7 @@ export default function PriceAgent({
     [error, setError] = useState("");
   const [result, setResult] = useState<{
     stores: StoreCheck[];
+    publicCatalogs: ScrapeReport[];
     coverage: string;
     checkedAt: string;
     storeCoverage: StoreCoverage[];
@@ -96,8 +98,8 @@ export default function PriceAgent({
       </label>
       <p className="small">
         Discovers mapped grocery stores from every retailer in the radius. Each
-        needs a connected price source before its basket can be compared. These
-        results do not include travel, tax, or verified stock.
+        is checked for a supported public scraper or connected price source.
+        These results do not include travel, tax, or verified stock.
       </p>
       {error && <p role="alert">{error}</p>}
       {result && (
@@ -115,7 +117,7 @@ export default function PriceAgent({
                   .length
               }{" "}
               / {result.foundStores ?? result.storeCoverage.length} locations
-              have a price check.
+              have branch-specific price checks.
             </strong>{" "}
             Unpriced stores cannot be ranked as cheapest.
           </p>
@@ -124,6 +126,15 @@ export default function PriceAgent({
             {[...new Set(result.storeCoverage.map((s) => s.retailer))].join(
               " · ",
             ) || "None returned"}
+          </p>
+          <p>
+            <strong>
+              {result.publicCatalogs?.filter(
+                (report) => report.status === "retrieved",
+              ).length ?? 0}{" "}
+              retailer catalogs returned live advertised prices.
+            </strong>{" "}
+            Review these separately below.
           </p>
           <details>
             <summary>All discovered retailers and price coverage</summary>
@@ -153,10 +164,84 @@ export default function PriceAgent({
             Checked {new Date(result.checkedAt).toLocaleString()}. Prices can
             change at checkout.
           </p>
+          {!!result.publicCatalogs?.length && (
+            <div className="live-grid">
+              {result.publicCatalogs
+                .filter((report) => report.lines.length > 0)
+                .map((report) => (
+                  <article className="live-card" key={report.retailer}>
+                    <h3>
+                      {report.retailer} ·{" "}
+                      {report.status === "retrieved"
+                        ? "Live advertised prices"
+                        : report.status === "blocked"
+                          ? "Crawling restricted"
+                          : report.status === "failed"
+                            ? "No usable prices returned"
+                            : "Scraper unavailable"}
+                    </h3>
+                    <p className="small">{report.detail}</p>
+                    {report.lines.map((line) => (
+                      <details key={line.item.id}>
+                        <summary>
+                          {line.item.name} · {line.products.length} possible
+                          matches
+                        </summary>
+                        {line.error && <p>{line.error}</p>}
+                        {!line.error && !line.products.length && (
+                          <p>
+                            No matching priced packages found in the returned
+                            page.
+                          </p>
+                        )}
+                        <ul className="place-list">
+                          {line.products.map((product) => (
+                            <li key={product.id}>
+                              <a
+                                href={product.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {product.name} ↗
+                              </a>
+                              <strong>
+                                ${(product.priceCents / 100).toFixed(2)} ·{" "}
+                                {product.size}
+                              </strong>
+                              <span>
+                                Retrieved{" "}
+                                {new Date(product.retrievedAt).toLocaleString()}
+                                . Confirm the package and your branch's price.
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ))}
+                  </article>
+                ))}
+            </div>
+          )}
+          {!!result.publicCatalogs?.some((report) => !report.lines.length) && (
+            <details>
+              <summary>Scraping availability for other retailers</summary>
+              <ul className="place-list">
+                {result.publicCatalogs
+                  .filter((report) => !report.lines.length)
+                  .map((report) => (
+                    <li key={report.retailer}>
+                      <strong>{report.retailer}</strong>
+                      <span>{report.detail}</span>
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          )}
           {!result.stores.length && (
             <p>
-              No connected source returned prices for these stores. Store
-              discovery succeeded; live basket comparison is not available yet.
+              No branch-verified prices returned for these stores. Public
+              catalog prices above are reference prices; local basket ranking
+              remains unavailable.
             </p>
           )}
           <div className="live-grid">
