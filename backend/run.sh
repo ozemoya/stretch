@@ -17,5 +17,5 @@ cd "$BACKEND_DIR"
 exec "$PYTHON" -m uvicorn app.main:app \
     --reload \
     --host "${HOST:-127.0.0.1}" \
-    --port "${PORT:-3000}" \
+    --port "${PORT:-8000}" \
     "$@"

@@ -56,6 +56,31 @@ The script starts the FastAPI development server at `http://127.0.0.1:8000`
 with reload enabled. Set `HOST` or `PORT` to override the defaults, or pass
 additional Uvicorn options to the script.
 
+## Deploy the backend to Render
+
+The repository includes a Render Blueprint at [render.yaml](render.yaml).
+Create a new Blueprint on Render and select this repository. Render will use
+the `backend` directory as the service root, install
+`backend/requirements.txt`, start Uvicorn on Render's `$PORT`, and check
+`/health`.
+
+Set these environment variables in the Render service:
+
+```text
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-key
+FRONTEND_ORIGINS=https://your-frontend-domain.example
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` are marked `sync: false` in
+the Blueprint so their values are entered securely in Render and are not
+stored in the repository. Use the Supabase publishable key instead of the
+service-role key only when the database policies permit the required reads.
+
+The production start command is intentionally separate from
+`backend/run.sh`; it does not use `--reload` and listens on `0.0.0.0` using
+Render's assigned port.
+
 ## Checks
 
 From `frontend/`: `npm test` and `npm run build`.
