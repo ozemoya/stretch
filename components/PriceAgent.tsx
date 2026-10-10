@@ -2,12 +2,18 @@
 import { useState } from "react";
 import type { AgentItem, StoreCheck } from "@/lib/price-agent";
 import { reviewedTotal } from "@/lib/price-agent";
+import type { SearchOrigin } from "@/lib/locations";
+import type { StoreCoverage } from "@/lib/retailer-coverage";
 export default function PriceAgent({
   items,
   zip,
+  area,
+  origin,
 }: {
   items: AgentItem[];
   zip: string;
+  area: "downtown" | "midtown" | "decatur";
+  origin: SearchOrigin | null;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -15,10 +21,14 @@ export default function PriceAgent({
     stores: StoreCheck[];
     coverage: string;
     checkedAt: string;
+    storeCoverage: StoreCoverage[];
+    warnings: string[];
+    foundStores: number;
   } | null>(null);
   const [choices, setChoices] = useState<
     Record<string, Record<string, string>>
   >({});
+  const [radius, setRadius] = useState(5);
   async function check() {
     setBusy(true);
     setError("");
@@ -28,7 +38,13 @@ export default function PriceAgent({
       const response = await fetch("/api/live/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zip, items }),
+        body: JSON.stringify({
+          zip,
+          items,
+          area,
+          origin: origin ?? undefined,
+          radius,
+        }),
         signal: AbortSignal.timeout(240000),
       });
       const data = await response.json();
@@ -56,24 +72,93 @@ export default function PriceAgent({
       <button
         className="cta"
         onClick={check}
-        disabled={busy || !items.length || items.length > 10}
+        disabled={busy || !items.length || items.length > 30}
       >
         {busy ? "CHECKING YOUR LIST…" : "CHECK MY LIST ↗"}
       </button>
+      <label className="live-area">
+        Store search radius
+        <select
+          value={radius}
+          disabled={busy}
+          onChange={(e) => {
+            setRadius(Number(e.target.value));
+            setResult(null);
+            setChoices({});
+          }}
+        >
+          {[1, 2, 3, 5, 10].map((r) => (
+            <option key={r} value={r}>
+              {r} mile{r === 1 ? "" : "s"}
+            </option>
+          ))}
+        </select>
+      </label>
       <p className="small">
-        Up to 10 items and two Kroger locations per check. Other stores need a
-        connected price source. These results do not include travel, tax, or
-        verified stock.
+        Discovers mapped grocery stores from every retailer in the radius. Each
+        needs a connected price source before its basket can be compared. These
+        results do not include travel, tax, or verified stock.
       </p>
       {error && <p role="alert">{error}</p>}
       {result && (
         <>
           <p>{result.coverage}</p>
+          {result.warnings.map((w) => (
+            <p role="alert" key={w}>
+              {w}
+            </p>
+          ))}
+          <p>
+            <strong>
+              {
+                result.storeCoverage.filter((s) => s.status === "checked")
+                  .length
+              }{" "}
+              / {result.foundStores ?? result.storeCoverage.length} locations
+              have a price check.
+            </strong>{" "}
+            Unpriced stores cannot be ranked as cheapest.
+          </p>
+          <p className="small">
+            Retailers found:{" "}
+            {[...new Set(result.storeCoverage.map((s) => s.retailer))].join(
+              " · ",
+            ) || "None returned"}
+          </p>
+          <details>
+            <summary>All discovered retailers and price coverage</summary>
+            <ul className="place-list">
+              {result.storeCoverage.map((s) => (
+                <li key={s.id}>
+                  <a href={s.mapUrl} target="_blank" rel="noreferrer">
+                    {s.name} ↗
+                  </a>
+                  <span>
+                    {s.retailer} · {s.miles} mi ·{" "}
+                    {s.address || "Address not supplied"}
+                  </span>
+                  <strong>
+                    {s.status === "checked"
+                      ? "Price source checked"
+                      : s.status === "failed"
+                        ? "Price check failed"
+                        : "Prices unavailable"}
+                  </strong>
+                  <span>{s.detail}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
           <p className="small">
             Checked {new Date(result.checkedAt).toLocaleString()}. Prices can
             change at checkout.
           </p>
-          {!result.stores.length && <p>No supported locations returned.</p>}
+          {!result.stores.length && (
+            <p>
+              No connected source returned prices for these stores. Store
+              discovery succeeded; live basket comparison is not available yet.
+            </p>
+          )}
           <div className="live-grid">
             {result.stores.map((store) => {
               const total = reviewedTotal(store, choices[store.id] ?? {});

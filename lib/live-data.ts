@@ -1,7 +1,7 @@
 import { load } from "cheerio";
 import { z } from "zod";
 
-import { centers } from "./locations";
+import { centers, type SearchOrigin } from "./locations";
 export { centers } from "./locations";
 export type Area = keyof typeof centers;
 export type FuelQuote = {
@@ -22,6 +22,7 @@ export type NearbyPlace = {
   lon: number;
   miles: number;
   mapUrl: string;
+  brand?: string;
 };
 export const EIA_URL = "https://www.eia.gov/petroleum/gasdiesel/";
 export class ProviderError extends Error {
@@ -50,7 +51,11 @@ async function checkedFetch(url: string, init: RequestInit = {}) {
     recent: prior?.minute === minute ? prior.recent : 0,
   };
   const cap =
-    host === "overpass-api.de" ? 90 : host === "www.eia.gov" ? 12 : 800;
+    host.startsWith("overpass.") || host === "overpass-api.de"
+      ? 90
+      : host === "www.eia.gov"
+        ? 12
+        : 800;
   if (usage.total >= cap || usage.recent >= 20)
     throw new ProviderError(
       "Live-data request limit reached. Please try again later.",
@@ -137,6 +142,7 @@ export function fuelQuote() {
   );
 }
 const osmSchema = z.object({
+  remark: z.string().optional(),
   osm3s: z.object({ timestamp_osm_base: z.string() }),
   elements: z.array(
     z.object({
@@ -154,9 +160,14 @@ export function normalizePlaces(
   area: Area,
   radiusMiles = 5,
   kind: "all" | "grocery" | "fuel" = "all",
+  customOrigin?: SearchOrigin,
 ) {
   const data = osmSchema.parse(raw),
-    origin = centers[area];
+    origin = customOrigin ?? centers[area];
+  if (data.remark)
+    throw new ProviderError(
+      "The map query did not finish. Try a smaller radius.",
+    );
   const places: NearbyPlace[] = [];
   for (const e of data.elements) {
     const t = e.tags ?? {},
@@ -171,6 +182,29 @@ export function normalizePlaces(
         Math.sin(((lon - origin.lon) * rad) / 2) ** 2;
     const distance = 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const placeKind = t.amenity === "fuel" ? "fuel" : "grocery";
+    const foodShops = new Set([
+      "supermarket",
+      "grocery",
+      "convenience",
+      "greengrocer",
+      "butcher",
+      "bakery",
+      "deli",
+      "seafood",
+      "farm",
+      "dairy",
+      "food",
+      "health_food",
+      "frozen_food",
+      "general",
+    ]);
+    const groceryDepartment =
+      ["department_store", "wholesale", "warehouse"].includes(t.shop) &&
+      /Walmart|Target|Costco|Sam['’]?s Club/i.test(
+        `${t.brand ?? ""} ${t.name ?? ""}`,
+      );
+    if (placeKind === "grocery" && !foodShops.has(t.shop) && !groceryDepartment)
+      continue;
     if (distance > radiusMiles || (kind !== "all" && kind !== placeKind))
       continue;
     places.push({
@@ -180,6 +214,7 @@ export function normalizePlaces(
         t.brand ??
         (t.amenity === "fuel" ? "Gas station" : "Grocery store"),
       kind: placeKind,
+      brand: t.brand ?? t.operator ?? "",
       lat,
       lon,
       address: [t["addr:housenumber"], t["addr:street"], t["addr:city"]]
@@ -190,27 +225,62 @@ export function normalizePlaces(
     });
   }
   return {
-    places: places.sort((a, b) => a.miles - b.miles).slice(0, 60),
+    places: places.sort((a, b) => a.miles - b.miles),
     updatedAt: data.osm3s.timestamp_osm_base,
     source: "OpenStreetMap contributors",
     radiusMiles,
     area,
+    origin: customOrigin ?? { ...centers[area], label: area },
   };
 }
 export function nearbyPlaces(
   area: Area,
   radiusMiles = 5,
   kind: "all" | "grocery" | "fuel" = "all",
+  customOrigin?: SearchOrigin,
 ) {
-  return cached(`places:${area}:${radiusMiles}:${kind}`, 3600000, async () => {
-    const c = centers[area];
-    const around = `(around:${radiusMiles * 1609.344},${c.lat},${c.lon})`;
-    const grocery = `nwr[shop=supermarket]${around};nwr[shop=grocery]${around};nwr[shop=convenience]${around};`;
-    const fuel = `nwr[amenity=fuel]${around};`;
-    const query = `[out:json][timeout:15];(${kind === "fuel" ? fuel : kind === "grocery" ? grocery : grocery + fuel});out center tags;`;
-    const response = await checkedFetch(
-      "https://overpass-api.de/api/interpreter",
-      {
+  const c = customOrigin ?? centers[area];
+  return cached(
+    `places:${c.lat},${c.lon}:${radiusMiles}:all`,
+    3600000,
+    async () => {
+      // Fetch a conservative bounding box using the spatial index, then enforce the exact circular radius locally.
+      const latitudeDelta = radiusMiles / 69 + 0.00001;
+      const longitudeDelta = Math.min(
+        180,
+        latitudeDelta /
+          Math.max(
+            0.000001,
+            Math.cos(
+              (Math.min(90, Math.abs(c.lat) + latitudeDelta) * Math.PI) / 180,
+            ),
+          ),
+      );
+      const south = Math.max(-90, c.lat - latitudeDelta),
+        north = Math.min(90, c.lat + latitudeDelta);
+      const west = c.lon - longitudeDelta,
+        east = c.lon + longitudeDelta;
+      const longitudeRanges =
+        longitudeDelta === 180
+          ? [[-180, 180]]
+          : west < -180
+            ? [
+                [west + 360, 180],
+                [-180, east],
+              ]
+            : east > 180
+              ? [
+                  [west, 180],
+                  [-180, east - 360],
+                ]
+              : [[west, east]];
+      const boxes = longitudeRanges.map(
+        ([w, e]) => `(${south},${w},${north},${e})`,
+      );
+      const grocery = boxes.map((box) => `nwr[shop]${box};`).join("");
+      const fuel = boxes.map((box) => `nwr[amenity=fuel]${box};`).join("");
+      const query = `[out:json][timeout:15];(${grocery + fuel});out center tags;`;
+      const init: RequestInit = {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -218,10 +288,36 @@ export function nearbyPlaces(
             "Stretch-Hacklanta/1.0 (https://github.com/ozemoya/stretch)",
         },
         body: new URLSearchParams({ data: query }).toString(),
-      },
-    );
-    return normalizePlaces(await response.json(), area, radiusMiles, kind);
-  });
+      };
+      for (const endpoint of [
+        "https://overpass.private.coffee/api/interpreter",
+        "https://overpass-api.de/api/interpreter",
+      ]) {
+        try {
+          const response = await checkedFetch(endpoint, init);
+          return normalizePlaces(
+            await response.json(),
+            area,
+            radiusMiles,
+            "all",
+            customOrigin,
+          );
+        } catch (e) {
+          if (
+            endpoint.includes("overpass-api.de") ||
+            (e instanceof ProviderError && e.status === 429)
+          )
+            throw e;
+        }
+      }
+      throw new ProviderError("Map locations unavailable.");
+    },
+  ).then((data) => ({
+    ...data,
+    area,
+    origin: customOrigin ?? { ...centers[area], label: area },
+    places: data.places.filter((p) => kind === "all" || p.kind === kind),
+  }));
 }
 
 let token: { value: string; until: number } | undefined;
@@ -286,6 +382,9 @@ export function krogerStores(zip: string) {
           z.object({
             locationId: z.string(),
             name: z.string(),
+            geolocation: z
+              .object({ latitude: z.number(), longitude: z.number() })
+              .optional(),
             address: z.object({
               addressLine1: z.string(),
               city: z.string(),
@@ -299,6 +398,9 @@ export function krogerStores(zip: string) {
     return parsed.data.map((s) => ({
       id: s.locationId,
       name: s.name,
+      coordinates: s.geolocation
+        ? { lat: s.geolocation.latitude, lon: s.geolocation.longitude }
+        : undefined,
       address: `${s.address.addressLine1}, ${s.address.city}, ${s.address.state} ${s.address.zipCode}`,
     }));
   });
@@ -416,6 +518,7 @@ export type LocalFuelResult = {
   stations: StationPrice[];
   radiusMiles: number;
   area: Area;
+  origin?: SearchOrigin;
   fuelType: string;
   retrievedAt: string;
   source: "Google Maps";
@@ -462,8 +565,13 @@ const googlePlacesSchema = z.object({
     )
     .default([]),
 });
-function distanceMiles(lat: number, lon: number, area: Area) {
-  const c = centers[area],
+function distanceMiles(
+  lat: number,
+  lon: number,
+  area: Area,
+  origin?: SearchOrigin,
+) {
+  const c = origin ?? centers[area],
     r = Math.PI / 180;
   const a =
     Math.sin(((lat - c.lat) * r) / 2) ** 2 +
@@ -478,6 +586,7 @@ export function normalizeLocalFuel(
   radiusMiles: number,
   fuelType: FuelType,
   now = new Date(),
+  origin?: SearchOrigin,
 ): LocalFuelResult {
   const stations = googlePlacesSchema
     .parse(raw)
@@ -486,6 +595,7 @@ export function normalizeLocalFuel(
         p.location.latitude,
         p.location.longitude,
         area,
+        origin,
       );
       if (miles > radiusMiles) return [];
       const f = p.fuelOptions?.fuelPrices?.find(
@@ -527,6 +637,7 @@ export function normalizeLocalFuel(
   return {
     stations,
     area,
+    origin,
     radiusMiles,
     fuelType,
     source: "Google Maps",
@@ -543,13 +654,14 @@ export async function localFuel(
   area: Area,
   radiusMiles: number,
   fuelType: FuelType,
+  origin?: SearchOrigin,
 ) {
   if (!localFuelConfigured())
     throw new ProviderError(
       "Local pump prices need Google Places access. Configure a Places API key and enable the connection on the server.",
       503,
     );
-  const c = centers[area];
+  const c = origin ?? centers[area];
   // Google Places content is not persisted or cached. Store-specific missing prices stay unknown.
   const r = await checkedFetch(
     "https://places.googleapis.com/v1/places:searchNearby",
@@ -574,5 +686,12 @@ export async function localFuel(
       }),
     },
   );
-  return normalizeLocalFuel(await r.json(), area, radiusMiles, fuelType);
+  return normalizeLocalFuel(
+    await r.json(),
+    area,
+    radiusMiles,
+    fuelType,
+    new Date(),
+    origin,
+  );
 }
