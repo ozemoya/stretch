@@ -6,6 +6,16 @@ Next.js App Router + React + TypeScript + Supabase. Selected design: Draft C; or
 
 Node 20.9+ required. Run `npm ci`, copy `.env.example` to `.env.local`, then `npm run dev`. Open http://localhost:3000.
 
+To run the production server locally, create the production build first:
+
+```bash
+npm ci
+npm run build
+npm start
+```
+
+`npm start` does not build the app automatically. It serves the existing `.next` output, so running it before `npm run build` causes Next.js to report that no production build was found. Use `npm run dev` for development.
+
 ## Supabase setup
 
 The FastAPI bridge reads the existing `products`, `product`, and `store` tables. `product.id` joins to `products.id`, and `product.locationID` joins to `store.locationID`. Prices are converted from dollars to frontend cents; rows without a product or store mapping are skipped.

@@ -7,7 +7,7 @@ import { readCheckoutDraft } from "@/lib/checkout-draft";
 
 const navigation = [
   ["/dashboard", "Dashboard", "◈"], ["/plan", "Find groceries", "⌕"],
-  ["/plan?panel=list", "My grocery list", "☷"], ["/plan/results", "Compare stores", "▤"],
+  ["/lists", "My grocery lists", "☷"], ["/plan/results", "Compare stores", "▤"],
   ["/plan/results?view=map", "Trip planner & gas", "⌁"],
   ["/plan?panel=settings", "Trip settings", "⚙"],
 ];
