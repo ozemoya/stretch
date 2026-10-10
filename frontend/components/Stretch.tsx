@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TripFlowHeader from "./TripFlowHeader";
 import OpenMap from "./OpenMap";
@@ -115,11 +115,51 @@ export default function Stretch({
   const [basket, setBasket] = useState<BasketItem[]>([]),
     [prefs, setPrefs] = useState(defaults),
     [search, setSearch] = useState(""),
+    [modalSearch, setModalSearch] = useState(""),
     [restored, setRestored] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [savedLists, setSavedLists] = useState<SavedList[]>([]);
   const [savedListName, setSavedListName] = useState("");
   const [savedListNotice, setSavedListNotice] = useState("");
+  const [isAddItemsOpen, setIsAddItemsOpen] = useState(false);
+  const addItemsTriggerRef = useRef<HTMLButtonElement>(null);
+  const addItemsModalRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!isAddItemsOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const modal = addItemsModalRef.current;
+    const trigger = addItemsTriggerRef.current;
+    modal?.querySelector<HTMLElement>("input, button")?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      trigger?.focus();
+    };
+  }, [isAddItemsOpen]);
+  function handleModalKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") {
+      setIsAddItemsOpen(false);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const modal = addItemsModalRef.current;
+    if (!modal) return;
+    const focusable = Array.from(
+      modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
   function persistBasket(nextBasket: BasketItem[], nextPrefs = prefs,
     nextOrigin = searchOrigin, nextIpArea = ipArea, nextManualGas = manualGas,
     nextGasStop = gasStop, nextFuelSource = fuelSource) {
@@ -369,6 +409,11 @@ export default function Stretch({
     setBasket(next);
     persistBasket(next);
   }
+  function removeItem(id: string) {
+    const next = basket.filter((item) => item.productId !== id);
+    setBasket(next);
+    persistBasket(next);
+  }
   function change<K extends keyof Preferences>(key: K, value: Preferences[K]) {
     if (key === "gas") {
       setFuelSource(null);
@@ -593,12 +638,6 @@ export default function Stretch({
             <details className="saved-lists">
               <summary>Saved lists · {savedLists.length}</summary>
               <div className="saved-lists-content">
-              <div className="saved-list-controls">
-                <label>List name
-                  <input value={savedListName} maxLength={60} placeholder="Weekly groceries" onChange={(event) => setSavedListName(event.target.value)} />
-                </label>
-                <button type="button" disabled={!basket.length} onClick={saveList}>SAVE CURRENT LIST</button>
-              </div>
               {savedLists.length ? <ul>{savedLists.map((list) => <li key={list.id}>
                 <span><strong>{list.name}</strong><small>{list.basket.length} foods · {new Date(list.savedAt).toLocaleDateString()}</small></span>
                 <button type="button" onClick={() => loadList(list)}>Use list</button>
@@ -610,78 +649,113 @@ export default function Stretch({
             </details>
             <div className="planner-grid">
               <div>
-                <div className="search-row">
-                  <label>
-                    Find a staple
-                    <input
-                      placeholder="Search your groceries…"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </label>
+                <div className="add-items-prompt">
+                  <div>
+                    <p className="eyebrow">BUILD YOUR LIST</p>
+                    <h2>Add groceries to your list</h2>
+                    <p>Search the catalog and choose exactly what you need.</p>
+                  </div>
                   <button
-                    className="text-button"
+                    type="button"
+                    className="add-items-button"
+                    ref={addItemsTriggerRef}
                     onClick={() => {
-                      setBasket([]);
-                      persistBasket([]);
+                      setModalSearch(search);
+                      setIsAddItemsOpen(true);
                     }}
                   >
-                    Clear list
+                    <span>＋</span> ADD ITEMS
                   </button>
-                </div>
-                <div className="products">
-                  {!search.trim() && !basket.length && (
-                    <div className="empty-list sketch-empty-state">
-                      <SketchIcon name="bag" size={68} className="sketch-state-icon" />
-                      <p>Your grocery list is empty. Search for a food to add it.</p>
-                    </div>
-                  )}
-                  {catalog.products
-                    .filter((p) =>
-                      search.trim()
-                        ? (p.name + " " + p.category)
-                            .toLowerCase()
-                            .includes(search.trim().toLowerCase())
-                        : basket.some((item) => item.productId === p.id),
-                    )
-                    .map((p) => {
-                      const q =
-                        basket.find((i) => i.productId === p.id)?.quantity ?? 0;
-                      return (
-                        <article
-                          key={p.id}
-                          className={q ? "product added" : "product"}
-                        >
-                          <span className="emoji"><SketchIcon name={foodIcon(p.name)} size={38} /></span>
-                          <h3>{p.name}</h3>
-                          <small>{p.unit}</small>
-                          <div className="quantity">
-                            <button
-                              onClick={() => quantity(p.id, -1)}
-                              disabled={!q}
-                              aria-label={"Remove one " + p.name}
-                            >
-                              −
-                            </button>
-                            <output aria-label={p.name + " quantity"}>
-                              {q}
-                            </output>
-                            <button
-                              onClick={() => quantity(p.id, 1)}
-                              disabled={q === 99}
-                              aria-label={"Add one " + p.name}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })}
                 </div>
               </div>
               <aside aria-live="polite">
+                <div className="current-list-panel">
+                  <div className="current-list-heading">
+                    <div>
+                      <p className="eyebrow">YOUR ACTIVE LIST</p>
+                      <h2>{basket.length ? `${basket.length} items` : "Start your list"}</h2>
+                    </div>
+                    {!!basket.length && (
+                      <button
+                        type="button"
+                        className="text-button current-list-clear"
+                        onClick={() => {
+                          setBasket([]);
+                          persistBasket([]);
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {basket.length ? (
+                    <ul className="current-list-items">
+                      {basket.map((item) => {
+                        const product = catalog.products.find((entry) => entry.id === item.productId);
+                        if (!product) return null;
+                        return (
+                          <li key={item.productId}>
+                            <span className="current-list-icon">
+                              <SketchIcon name={foodIcon(product.name)} size={25} />
+                            </span>
+                            <span className="current-list-item-name">
+                              <strong>{product.name}</strong>
+                              <small>{product.unit}</small>
+                            </span>
+                            <span className="quantity compact-quantity">
+                              <button
+                                type="button"
+                                onClick={() => quantity(product.id, -1)}
+                                aria-label={`Remove one ${product.name}`}
+                              >
+                                −
+                              </button>
+                              <output aria-label={`${product.name} quantity`}>{item.quantity}</output>
+                              <button
+                                type="button"
+                                onClick={() => quantity(product.id, 1)}
+                                disabled={item.quantity === 99}
+                                aria-label={`Add one ${product.name}`}
+                              >
+                                +
+                              </button>
+                            </span>
+                            <button
+                              type="button"
+                              className="remove-list-item"
+                              onClick={() => removeItem(product.id)}
+                              aria-label={`Remove ${product.name} from list`}
+                            >
+                              ×
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="current-list-empty">
+                      <SketchIcon name="bag" size={42} />
+                      <p>Search for a staple and tap <strong>+</strong> to build your list.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="save-list-card">
+                  <p className="eyebrow">KEEP THIS LIST</p>
+                  <label htmlFor="active-list-name">List name</label>
+                  <input
+                    id="active-list-name"
+                    value={savedListName}
+                    maxLength={60}
+                    placeholder="Weekly groceries"
+                    onChange={(event) => setSavedListName(event.target.value)}
+                  />
+                  <button type="button" className="save-list-button" disabled={!basket.length} onClick={saveList}>
+                    SAVE LIST <span>↗</span>
+                  </button>
+                  {savedListNotice && <p role="status" className="save-list-notice">{savedListNotice}</p>}
+                </div>
                 <p>
-                  {basket.length} {basket.length === 1 ? "food" : "foods"}{" "}
+                  {basket.length === 0 ? "No" : basket.length} {basket.length === 1 || basket.length === 0? "food" : "foods"}{" "}
                   selected. Next, compare nearby stores and choose your gas
                   stop.
                 </p>
@@ -696,6 +770,12 @@ export default function Stretch({
                 >
                   CONTINUE TO STORES & GAS →
                 </button>
+                {!basket.length && (
+                  <p className="small">Add at least one food to continue.</p>
+                )}
+                {basket.length > 0 && !searchOrigin && (
+                  <p className="small">Choose a starting area to continue.</p>
+                )}
                 {checkoutError && (
                   <p className="alert" role="alert">
                     {checkoutError}
@@ -709,6 +789,90 @@ export default function Stretch({
                 </p>
               </aside>
             </div>
+            {isAddItemsOpen && (
+              <div
+                className="add-items-overlay"
+                role="presentation"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) setIsAddItemsOpen(false);
+                }}
+              >
+                <section
+                  className="add-items-modal"
+                  ref={addItemsModalRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="add-items-title"
+                  onKeyDown={handleModalKeyDown}
+                >
+                  <div className="add-items-modal-heading">
+                    <div>
+                      <p className="eyebrow">YOUR PANTRY, YOUR WAY</p>
+                      <h2 id="add-items-title">Add items</h2>
+                      <p>Tap + to add an item. Adjust quantities anytime.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="modal-close"
+                      aria-label="Close add items popup"
+                      onClick={() => setIsAddItemsOpen(false)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <label className="modal-search">
+                    Search groceries
+                    <input
+                      autoFocus
+                      placeholder="Try milk, bread, apples…"
+                      value={modalSearch}
+                      onChange={(event) => setModalSearch(event.target.value)}
+                    />
+                  </label>
+                  <div className="modal-products">
+                    {catalog.products
+                      .filter((product) =>
+                        (product.name + " " + product.category)
+                          .toLowerCase()
+                          .includes(modalSearch.trim().toLowerCase()),
+                      )
+                      .map((product) => {
+                        const item = basket.find((entry) => entry.productId === product.id);
+                        const itemQuantity = item?.quantity ?? 0;
+                        return (
+                          <article key={product.id} className={itemQuantity ? "product added" : "product"}>
+                            <span className="emoji"><SketchIcon name={foodIcon(product.name)} size={32} /></span>
+                            <div className="modal-product-copy">
+                              <h3>{product.name}</h3>
+                              <small>{product.unit}</small>
+                            </div>
+                            <button
+                              type="button"
+                              className="modal-add-button"
+                              onClick={() => quantity(product.id, 1)}
+                              disabled={itemQuantity === 99}
+                              aria-label={`Add one ${product.name}`}
+                            >
+                              {itemQuantity ? `${itemQuantity} +` : "＋"}
+                            </button>
+                          </article>
+                        );
+                      })}
+                    {!catalog.products.some((product) =>
+                      (product.name + " " + product.category)
+                        .toLowerCase()
+                        .includes(modalSearch.trim().toLowerCase()),
+                    ) && <p className="modal-no-results">No groceries match that search yet.</p>}
+                  </div>
+                  <div className="add-items-modal-footer">
+                    <span>{basket.length} {basket.length === 1 ? "item" : "items"} in your list</span>
+                    <button type="button" className="add-items-done" onClick={() => setIsAddItemsOpen(false)}>
+                      DONE
+                    </button>
+                  </div>
+                </section>
+              </div>
+            )}
           </section>
         )}
         {mode === "planner" && (
