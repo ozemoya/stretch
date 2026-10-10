@@ -12,6 +12,7 @@ const groups = [
   ["yogurt", "yoghurt"],
   ["potato", "potatoes"],
   ["lentil", "lentils"],
+  ["chicken", "chickens"],
 ];
 export function isCloseFood(request: string, name: string) {
   const wanted = tokens(request),
@@ -39,6 +40,17 @@ export function isCloseFood(request: string, name: string) {
     !/chocolate|powder|condensed|evaporated|creamer/.test(request.toLowerCase())
   )
     return false;
+  if (group.includes("chicken")) {
+    const requested = request.toLowerCase();
+    const candidate = name.toLowerCase();
+    const preparedKinds = ["nugget", "sausage", "meatball", "soup", "broth", "stock", "wrap", "sandwich", "salad", "pizza", "pasta", "rice", "jerky", "chip"];
+    const requestedKind = preparedKinds.find((kind) => requested.includes(kind));
+    const candidateKind = preparedKinds.find((kind) => candidate.includes(kind));
+    if (requestedKind !== candidateKind) return false;
+    for (const cut of ["breast", "thigh", "wing", "drumstick", "ground"]) {
+      if (requested.includes(cut) && !candidate.includes(cut)) return false;
+    }
+  }
   return true;
 }
 export function selectFoodMatches(

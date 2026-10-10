@@ -18,24 +18,15 @@ function getRoute(
   requireMeasuredRoute = false,
 ) {
   const fallbackDistances = areas[area];
-
-  const fallbackMiles =
-    selected.length === 1
-      ? 2 * fallbackDistances[selected[0]]
-      : fallbackDistances[selected[0]] +
-        between[selected[0]][selected[1]] +
-        fallbackDistances[selected[1]];
-
-  const fallback = {
-    miles: fallbackMiles,
-    minutes: Math.round((fallbackMiles / 25) * 60),
-    order: selected,
-  };
+  const orders = selected.length < 2 ? [selected] : selected.flatMap((first) =>
+    permutations(selected.filter((index) => index !== first)).map((rest) => [first, ...rest]));
+  const fallback = orders.map((order) => {
+    const miles = fallbackDistances[order[0]] + fallbackDistances[order.at(-1)!] +
+      order.slice(1).reduce((sum, index, position) => sum + between[order[position]][index], 0);
+    return { miles, minutes: Math.round((miles / 25) * 60), order };
+  }).sort((a, b) => a.miles - b.miles || a.minutes - b.minutes)[0];
 
   if (!routes) return requireMeasuredRoute ? null : fallback;
-
-  const orders =
-    selected.length === 2 ? [selected, [...selected].reverse()] : [selected];
 
   const candidates = orders.flatMap((order) => {
     const key = order.map((i) => catalog.stores[i].id).join("|");
@@ -59,6 +50,12 @@ function getRoute(
     candidates.sort((a, b) => a.miles - b.miles || a.minutes - b.minutes)[0] ??
     (requireMeasuredRoute ? null : fallback)
   );
+}
+
+function permutations(values: number[]): number[][] {
+  if (!values.length) return [[]];
+  return values.flatMap((value, index) => permutations(values.filter((_, i) => i !== index))
+    .map((rest) => [value, ...rest]));
 }
 
 export function optimize(
@@ -168,12 +165,30 @@ export function optimize(
         route.minutes + stops.length * 12 + (requireMeasuredRoute ? 5 : 0),
     });
   }
-  return trips.sort(
-    (a, b) =>
-      Number(!!a.missing.length) - Number(!!b.missing.length) ||
-      a.totalCents - b.totalCents ||
-      a.stops.length - b.stops.length,
-  );
+  const complete = trips.filter((trip) => !trip.missing.length);
+  const baseline = complete.filter((trip) => trip.stops.length === 1)
+    .sort((a, b) => a.totalCents - b.totalCents)[0];
+  const thresholdCents = Math.max(0, p.minExtraStopSavings) * 100;
+  const bestTwo = complete.filter((trip) => trip.stops.length === 2 &&
+    (!baseline || baseline.totalCents - trip.totalCents >= thresholdCents))
+    .sort((a, b) => a.totalCents - b.totalCents)[0];
+  const eligible = trips.filter((trip) => {
+    if (trip.missing.length || trip.stops.length === 1 || !baseline) return true;
+    if (baseline.totalCents - trip.totalCents < thresholdCents * (trip.stops.length - 1)) return false;
+    if (trip.stops.length === 3 && bestTwo && bestTwo.totalCents - trip.totalCents < thresholdCents) return false;
+    return true;
+  });
+  return eligible.sort((a, b) => {
+    const completeness = Number(!!a.missing.length) - Number(!!b.missing.length);
+    if (completeness) return completeness;
+    if (p.shoppingPriority === "fewest_stops")
+      return a.stops.length - b.stops.length || a.totalCents - b.totalCents;
+    if (p.shoppingPriority === "balanced") {
+      const score = (trip: Trip) => trip.totalCents + (trip.stops.length - 1) * 200 + trip.minutes * 5;
+      return score(a) - score(b) || a.totalCents - b.totalCents;
+    }
+    return a.totalCents - b.totalCents || a.stops.length - b.stops.length;
+  });
 }
 
 export function suggestSwaps(

@@ -97,6 +97,22 @@ it("never attributes an ALDI catalog URL to Kroger, Walmart, or Whole Foods", ()
   });
 });
 
+it("does not promote chicken soup as a raw chicken price", () => {
+  const item = { id: "chicken", name: "Chicken", unit: "1 lb", quantity: 1 };
+  const report = normalizeCatalogReport({
+    retailer: "Lidl",
+    status: "retrieved",
+    detail: "Public catalog",
+    lines: [{ item, products: [{
+      id: "soup", name: "hearty chicken soup", brand: "Lidl", size: "18.6 oz",
+      priceCents: 179, sourceUrl: "https://www.lidl.com/p/hearty-chicken-soup/p11674413",
+      retrievedAt: "2026-10-10T12:00:00Z",
+    }] }],
+  });
+  expect(report.lines[0].products).toEqual([]);
+  expect(report.status).toBe("failed");
+});
+
 it("keeps missing items and foreign retailer prices out of branch totals", () => {
   const kroger = store("Kroger family", "kroger-1", [
     candidate("ALDI", "aldi-1", "wrong", 199),

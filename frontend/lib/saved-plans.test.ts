@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createSavedList, readSavedLists, readSavedSettings, writeSavedLists, writeSavedSettings } from "./saved-plans";
 
 const prefs = { area: "midtown" as const, budget: 35, mpg: 27, gas: 3.5,
-  maxStops: 2, vegan: false, glutenFree: true, nutFree: false };
+  maxStops: 3, minExtraStopSavings: 5, shoppingPriority: "balanced" as const, vegan: false, glutenFree: true, nutFree: false };
 const basket = [{ productId: "milk", quantity: 2 }];
 function memoryStorage() {
   const data = new Map<string, string>();

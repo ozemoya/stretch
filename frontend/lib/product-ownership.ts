@@ -1,6 +1,7 @@
 import type { ScrapeReport, ScrapedProduct } from "./retailer-scraper";
 import { catalogLineStatus } from "./search-state";
 import type { AgentItem } from "./price-agent";
+import { isCloseFood } from "./food-alternatives";
 
 const sourceHosts: Record<string, string[]> = {
   "Kroger family": ["www.kroger.com"],
@@ -133,7 +134,10 @@ export function normalizeCatalogReport(
         },
     ) ?? report.lines;
   const filtered = sourceLines.map((line) => {
-    const products = ownedCatalogProducts(report, line.products);
+    const relevant = /\bchicken\b/i.test(line.item.name)
+      ? line.products.filter((product) => isCloseFood(line.item.name, product.name))
+      : line.products;
+    const products = ownedCatalogProducts(report, relevant);
     return {
       ...line,
       products,

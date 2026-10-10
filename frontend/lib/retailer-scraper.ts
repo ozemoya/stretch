@@ -1,4 +1,5 @@
 import { traderJoesReport } from "./trader-joes";
+import { isCloseFood } from "./food-alternatives";
 import type { SearchPlan } from "./local-search-agent";
 import { load } from "cheerio";
 import { z } from "zod";
@@ -21,6 +22,7 @@ export type ScrapedProduct = {
   priceCents: number;
   sourceUrl: string;
   imageUrl?: string;
+  upc?: string;
   matchKind?: "alternative";
   verification?: "official-page-observation";
   retrievedAt: string;
@@ -278,7 +280,13 @@ export async function scrapeRetailers(
           continue;
         }
         try {
-          lines[index] = { item, products: await searchLidl(item.name, signal) };
+          const found = await searchLidl(item.name, signal);
+          lines[index] = {
+            item,
+            products: /\bchicken\b/i.test(item.name)
+              ? found.filter((product) => isCloseFood(item.name, product.name))
+              : found,
+          };
         } catch (e) {
           lines[index] = { item, products: [], error: e instanceof Error ? e.message : "Public price search failed." };
         }

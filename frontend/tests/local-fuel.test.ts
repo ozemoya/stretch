@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { normalizeLocalFuel } from "../lib/live-data";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import {
+  localFuel,
+  localFuelConfigured,
+  normalizeLocalFuel,
+} from "../lib/live-data";
 const now = new Date("2026-10-09T12:00:00Z");
 const station = (id: string, prices: unknown[] = [], latitude = 33.749) => ({
   id,
@@ -19,6 +23,45 @@ const price = (
   price: { units: "3", nanos: 459000000, currencyCode },
 });
 describe("local station prices", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("only enables Places when both the server key and opt-in are set", () => {
+    vi.stubEnv("GOOGLE_MAPS_API_KEY", "");
+    vi.stubEnv("GOOGLE_PLACES_ENABLED", "true");
+    expect(localFuelConfigured()).toBe(false);
+    vi.stubEnv("GOOGLE_MAPS_API_KEY", "server-key");
+    vi.stubEnv("GOOGLE_PLACES_ENABLED", "false");
+    expect(localFuelConfigured()).toBe(false);
+    vi.stubEnv("GOOGLE_PLACES_ENABLED", "true");
+    expect(localFuelConfigured()).toBe(true);
+  });
+
+  it("queries Google Places on the server for the requested fuel type and radius", async () => {
+    vi.stubEnv("GOOGLE_MAPS_API_KEY", "server-key");
+    vi.stubEnv("GOOGLE_PLACES_ENABLED", "true");
+    const fetchMock = vi.fn(async () =>
+      Response.json({ places: [station("atlanta-station", [price()])] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await localFuel("downtown", 3, "REGULAR_UNLEADED");
+    expect(result.stations[0].dollarsPerGallon).toBe(3.459);
+    const [url, options] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("https://places.googleapis.com/v1/places:searchNearby");
+    expect(options.headers).toMatchObject({
+      "X-Goog-Api-Key": "server-key",
+    });
+    expect(JSON.parse(options.body as string)).toMatchObject({
+      includedTypes: ["gas_station"],
+      locationRestriction: { circle: { radius: 4828.032 } },
+    });
+  });
+
   it("converts dollars and nanos, preserves report timestamps and sorts prices", () => {
     const r = normalizeLocalFuel(
       {

@@ -1,122 +1,172 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { AgentItem, StoreCheck } from "@/lib/price-agent";
-import type { SearchOrigin } from "@/lib/locations";
-import { centers } from "@/lib/locations";
+import type { AgentItem, Candidate, StoreCheck } from "@/lib/price-agent";
+import { centers, type SearchOrigin } from "@/lib/locations";
 import type { StoreCoverage } from "@/lib/retailer-coverage";
 import type { GasStop } from "@/lib/gas-stop";
-import { fuelCostCents } from "@/lib/live-trip";
-import { buildMultiStorePlan, eligibleMultiStoreOptions, type MultiStoreSelections } from "@/lib/multi-store-plan";
+import { eligibleMultiStoreOptions, type MultiStoreSelections } from "@/lib/multi-store-plan";
+import { optimizeMixMatch, priceSelections, type MixMatchPlan, type MixMatchPriority, type RoadMatrix } from "@/lib/mix-match-optimizer";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-export default function MultiStorePlanner({ items, stores, locations, origin, area, gasStop, mpg, gasPrice, maxStores }: {
+export default function MultiStorePlanner({ items, stores, locations, origin, area, gasStop, mpg, gasPrice,
+  maxStores, minExtraStopSavings, shoppingPriority }: {
   items: AgentItem[]; stores: StoreCheck[]; locations: StoreCoverage[]; origin: SearchOrigin | null;
   area: "downtown" | "midtown" | "decatur"; gasStop: GasStop | null | undefined;
-  mpg: number; gasPrice: number; maxStores: number;
+  mpg: number; gasPrice: number; maxStores: number; minExtraStopSavings: number;
+  shoppingPriority: MixMatchPriority;
 }) {
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(maxStores > 1);
   const [selections, setSelections] = useState<MultiStoreSelections>({});
-  const [route, setRoute] = useState<{ key: string; miles: number; minutes: number; orderedIds: string[] } | null>(null);
+  const [road, setRoad] = useState<{ key: string; matrix: RoadMatrix } | null>(null);
   const [routeStatus, setRouteStatus] = useState<"idle" | "loading" | "unavailable">("idle");
   const [copied, setCopied] = useState("");
-  const plan = useMemo(() => buildMultiStorePlan(items, stores, selections, maxStores), [items, stores, selections, maxStores]);
   const home = origin ?? centers[area];
-  const selectedLocations = plan?.lists.map((list) => locations.find((location) => location.id === list.store.id));
-  const routeKey = JSON.stringify([home.lat, home.lon, gasStop?.id, selectedLocations?.map((location) => location?.id)]);
+  const pricedStores = useMemo(() => stores.filter((store) => locations.some((location) => location.id === store.id))
+    .sort((a, b) => {
+      const coverage = (store: StoreCheck) => items.filter((item) => eligibleMultiStoreOptions(item, [store]).length).length;
+      return coverage(b) - coverage(a) || a.id.localeCompare(b.id);
+    }), [stores, locations, items]);
+  // One OSRM road-distance table keeps the search bounded. Larger sets are marked approximate.
+  const routeStores = pricedStores.slice(0, 8);
+  const routeLocations = routeStores.map((store) => locations.find((location) => location.id === store.id)!);
+  const routeKey = JSON.stringify([home.lat, home.lon, gasStop?.id, gasStop?.lat, gasStop?.lon,
+    routeLocations.map((location) => [location.id, location.lat, location.lon])]);
+  const itemKey = JSON.stringify([items.map((item) => [item.id, item.quantity, item.unit]), routeStores.map((store) => store.id)]);
 
+  useEffect(() => { setSelections({}); }, [itemKey]);
   useEffect(() => {
-    setRoute(null);
-    if (!enabled || !plan || !gasStop || selectedLocations?.some((location) => !location)) {
-      setRouteStatus("idle");
-      return;
-    }
+    setRoad(null);
+    if (!enabled || !routeStores.length) { setRouteStatus("idle"); return; }
     const controller = new AbortController();
     setRouteStatus("loading");
-    const locationsForRoute = selectedLocations as StoreCoverage[];
-    const orders = [locationsForRoute, [...locationsForRoute].reverse()];
-    void Promise.all(orders.map(async (order) => {
-      try {
-        const response = await fetch("/api/routes", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ points: [home, ...order, gasStop, home].map(({ lat, lon }) => ({ lat, lon })) }), signal: controller.signal });
-        if (!response.ok) return null;
-        const result: { miles?: number; minutes?: number } = await response.json();
-        return Number.isFinite(result.miles) && Number.isFinite(result.minutes)
-          ? { miles: result.miles!, minutes: result.minutes!, orderedIds: order.map((location) => location.id) } : null;
-      } catch { return null; }
-    })).then((routes) => {
-      if (controller.signal.aborted) return;
-      const best = routes.filter((value): value is NonNullable<typeof value> => value !== null)
-        .sort((a, b) => a.miles - b.miles)[0];
-      setRoute(best ? { ...best, key: routeKey } : null);
-      setRouteStatus(best ? "idle" : "unavailable");
-    });
+    const points = [home, ...routeLocations, ...(gasStop ? [gasStop] : [])]
+      .map(({ lat, lon }) => ({ lat, lon }));
+    void fetch("/api/routes", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matrix: true, points }), signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Road routes unavailable");
+        return response.json() as Promise<Pick<RoadMatrix, "distances" | "durations">>;
+      }).then((result) => {
+        if (controller.signal.aborted) return;
+        setRoad({ key: routeKey, matrix: { storeIds: routeStores.map((store) => store.id),
+          distances: result.distances, durations: result.durations, hasFuelStop: !!gasStop } });
+        setRouteStatus("idle");
+      }).catch(() => { if (!controller.signal.aborted) setRouteStatus("unavailable"); });
     return () => controller.abort();
-  }, [enabled, routeKey, plan, gasStop, home.lat, home.lon]);
+  }, [enabled, routeKey]);
 
-  const activeRoute = route?.key === routeKey ? route : null;
-  const fuelCents = activeRoute ? fuelCostCents(activeRoute.miles, mpg, gasPrice) : null;
-  const directionsUrl = activeRoute && gasStop ? (() => {
+  const matrix = road?.key === routeKey ? road.matrix : null;
+  const optimization = useMemo(() => matrix ? optimizeMixMatch(items, routeStores, matrix, {
+    maxStores, minNetSavingsCents: Math.round(minExtraStopSavings * 100),
+    priority: shoppingPriority, mpg, gasPrice,
+  }) : null, [matrix, items, routeStores, maxStores, minExtraStopSavings, shoppingPriority, mpg, gasPrice]);
+  useEffect(() => {
+    if (optimization?.recommended) setSelections((current) =>
+      Object.keys(current).length ? current : optimization.recommended!.selections);
+  }, [optimization?.recommended]);
+  const selectedPlan = matrix ? priceSelections(items, routeStores, selections, matrix, mpg, gasPrice, maxStores) : null;
+  const plan = selectedPlan ?? (Object.keys(selections).length ? null : optimization?.recommended ?? null);
+  const baseline = optimization?.baseline;
+  const savings = plan && baseline ? baseline.totalCents - plan.totalCents : null;
+  const requiredSavings = plan ? Math.round(minExtraStopSavings * 100) * (plan.storeIds.length - 1) : 0;
+  const belowThreshold = plan && plan.storeIds.length > 1 && (savings === null || savings < requiredSavings);
+  const directionsUrl = plan ? (() => {
     const url = new URL("https://www.google.com/maps/dir/");
     url.searchParams.set("api", "1");
     url.searchParams.set("origin", `${home.lat},${home.lon}`);
     url.searchParams.set("destination", `${home.lat},${home.lon}`);
-    url.searchParams.set("waypoints", [...activeRoute.orderedIds.map((id) => {
+    url.searchParams.set("waypoints", [...plan.routeOrder.map((id) => {
       const location = locations.find((entry) => entry.id === id)!;
       return `${location.lat},${location.lon}`;
-    }), `${gasStop.lat},${gasStop.lon}`].join("|"));
+    }), ...(gasStop ? [`${gasStop.lat},${gasStop.lon}`] : [])].join("|"));
     url.searchParams.set("travelmode", "driving");
     return url.toString();
   })() : null;
 
-  async function copyList(name: string, products: NonNullable<typeof plan>["lists"][number]["products"]) {
+  async function copyList(name: string, products: { item: AgentItem; product: Candidate }[]) {
     try {
       await navigator.clipboard.writeText([name, ...products.map(({ item, product }) =>
         `${item.quantity} × ${product.productName} (${product.size})${product.productUrl ? ` — ${product.productUrl}` : ""}`)].join("\n"));
       setCopied(`Copied ${name} list.`);
     } catch { setCopied(`Could not copy ${name}. You can use the list shown here.`); }
   }
+  function listFor(chosen: MixMatchPlan, storeId: string) {
+    return items.flatMap((item) => {
+      const choice = chosen.selections[item.id];
+      if (choice?.storeId !== storeId) return [];
+      const option = eligibleMultiStoreOptions(item, routeStores).find(({ store, product }) =>
+        store.id === storeId && product.id === choice.candidateId);
+      return option ? [{ item, product: option.product }] : [];
+    });
+  }
 
   return <section className="multi-store-planner" aria-label="Mix and match stores">
     <label className="multi-store-toggle"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
-      <span><strong>Mix items from two stores</strong><small>Make a separate shopping list for each stop and check whether the extra drive pays off.</small></span></label>
+      <span><strong>Mix & Match</strong><small>Compare complete lists at up to {maxStores} stores, including the drive.</small></span></label>
     {enabled && <div className="multi-store-content">
-      {maxStores < 2 ? <p>Change “Maximum stops” to two in your list settings to compare two stores.</p> : <>
-        <p>Choose a verified item for every food. Prices stay with the store that supplied them.</p>
-        <div className="multi-store-items">{items.map((item) => {
-          const options = eligibleMultiStoreOptions(item, stores);
-          const value = selections[item.id];
-          return <label key={item.id}><span>{item.quantity} × {item.name}</span>
-            <select aria-label={`Store and product for ${item.name}`} value={value ? JSON.stringify(value) : ""}
-              onChange={(event) => setSelections((current) => ({ ...current, [item.id]: event.target.value ? JSON.parse(event.target.value) : undefined }))}>
-              <option value="">Choose a store and package</option>
-              {options.map(({ store, product }) => <option key={`${store.id}-${product.id}`} value={JSON.stringify({ storeId: store.id, candidateId: product.id })}>
-                {store.name} · {product.productName} · {product.size} · {money(product.regularCents!)}
-              </option>)}
-            </select>
-            {!options.length && <small>No verified store price for this item yet.</small>}
-          </label>;
-        })}</div>
-        {!plan && <p className="small">Choose one priced product for each food from two different stores to build separate lists.</p>}
-        {plan && <>
-          <div className="multi-store-lists">{plan.lists.map((list) => <article key={list.store.id}>
-            <h4>{list.store.name}</h4><p>{list.store.address}</p>
-            <ul>{list.products.map(({ item, product }) => <li key={item.id}><span>{item.quantity} × {product.productName} <small>{product.size} · {product.priceSource} · {new Date(product.verifiedAt).toLocaleString()}</small></span><b>{money(product.regularCents! * item.quantity)}</b>{product.productUrl && <a href={product.productUrl} target="_blank" rel="noreferrer">Product ↗</a>}</li>)}</ul>
-            <strong>List subtotal: {money(list.subtotalCents)}</strong>
-            <button type="button" onClick={() => void copyList(list.store.name, list.products)}>Copy this store’s list</button>
-          </article>)}</div>
-          {copied && <p role="status">{copied}</p>}
-          <div className="multi-store-total"><strong>Groceries: {money(plan.groceryCents)}</strong>
-            {routeStatus === "loading" && <span role="status">Checking the two-stop drive…</span>}
-            {routeStatus === "unavailable" && <span>Route unavailable; no trip total yet.</span>}
-            {!gasStop && <span>Choose a gas station on the map for a trip total.</span>}
-            {activeRoute && fuelCents !== null && <><span>Driving: {money(fuelCents)} · {activeRoute.miles.toFixed(1)} miles · about {activeRoute.minutes} minutes</span><b>Estimated trip: {money(plan.groceryCents + fuelCents)}</b></>}
-          </div>
-          {directionsUrl && <a className="multi-store-directions" href={directionsUrl} target="_blank" rel="noreferrer">Open two-store directions ↗</a>}
-          <p className="small">These are separate shopping lists. Open each product link to shop; carts are not transferred between retailers. Taxes, stock, and final checkout prices can change.</p>
-        </>}
+      <p className="small">{shoppingPriority === "balanced" ? "Balanced" : shoppingPriority === "lowest_cost" ? "Lowest cost" : "Fewest stops"} priority · {money(Math.round(minExtraStopSavings * 100))} minimum net savings per extra stop. Change these in your saved trip preferences.</p>
+      {pricedStores.length > 8 && <p className="small">Road optimization uses the eight nearby stores with the most priced items; this is a bounded comparison.</p>}
+      {routeStatus === "loading" && <p role="status">Checking road distances for the priced stores…</p>}
+      {routeStatus === "unavailable" && <p role="status">Road routes are unavailable right now, so Stretch cannot quote a Mix & Match total.</p>}
+      {optimization?.unresolved.length ? <p>Some foods have no matching branch price: {items.filter((item) => optimization.unresolved.includes(item.id)).map((item) => item.name).join(", ")}. No complete route can be recommended.</p> : null}
+      {optimization && !optimization.unresolved.length && <>
+        <div className="mix-strategies" role="group" aria-label="Shopping strategies">
+          {([ ["Balanced", optimization.balanced], ["Cheapest overall", optimization.cheapest], ["Fewest stops", optimization.fewest] ] as const)
+            .filter(([, choice]) => !!choice).map(([label, choice]) => <button key={label} type="button"
+              onClick={() => setSelections(choice!.selections)}>
+              <strong>{label}</strong><span>{money(choice!.totalCents)} · {choice!.storeIds.length} {choice!.storeIds.length === 1 ? "store" : "stores"}</span>
+            </button>)}
+        </div>
+        {!baseline && <p className="small">No complete single-store basket exists, so extra-stop savings cannot be verified. You can still assign items manually.</p>}
+        {baseline && optimization.plans.some((candidate) => candidate.storeIds.length > 1) &&
+          !optimization.plans.some((candidate) => candidate.storeIds.length > 1 &&
+            baseline.totalCents - candidate.totalCents >= Math.round(minExtraStopSavings * 100) * (candidate.storeIds.length - 1)) &&
+          <p className="small">A second stop does not clear your {money(Math.round(minExtraStopSavings * 100))} net-savings minimum. One store is recommended.</p>}
       </>}
+      <div className="multi-store-items">{items.map((item) => {
+        const options = eligibleMultiStoreOptions(item, routeStores);
+        const value = selections[item.id];
+        return <label key={item.id}><span>{item.quantity} × {item.name}</span>
+          <select aria-label={`Store and product for ${item.name}`} value={value ? JSON.stringify(value) : ""}
+            onChange={(event) => setSelections((current) => {
+              const next = { ...current };
+              if (event.target.value) next[item.id] = JSON.parse(event.target.value);
+              else delete next[item.id];
+              return next;
+            })}>
+            <option value="">Choose a store and package</option>
+            {options.map(({ store, product }) => <option key={`${store.id}-${product.id}`} value={JSON.stringify({ storeId: store.id, candidateId: product.id })}>
+              {store.name} · {product.productName} · {product.size} · {money(product.regularCents!)}
+            </option>)}
+          </select>
+          {!options.length && <small>No verified store price for this item yet.</small>}
+        </label>;
+      })}</div>
+      {plan ? <>
+        <div className="multi-store-lists">{plan.routeOrder.map((id, index) => {
+          const store = routeStores.find((entry) => entry.id === id)!;
+          const products = listFor(plan, id);
+          return <article key={id}><h4>{index + 1}. {store.name}</h4><p>{store.address}</p>
+            <ul>{products.map(({ item, product }) => <li key={item.id}><span>{item.quantity} × {product.productName}
+              <small>{product.size} · {product.priceSource} · {new Date(product.verifiedAt).toLocaleString()}</small></span>
+              <b>{money(product.regularCents! * item.quantity)}</b>
+              {product.productUrl && <a href={product.productUrl} target="_blank" rel="noreferrer">Product ↗</a>}</li>)}</ul>
+            <strong>List subtotal: {money(products.reduce((sum, { item, product }) => sum + product.regularCents! * item.quantity, 0))}</strong>
+            <button type="button" onClick={() => void copyList(store.name, products)}>Copy this store’s list</button>
+          </article>;
+        })}</div>
+        {copied && <p role="status">{copied}</p>}
+        <div className="multi-store-total"><strong>Groceries: {money(plan.groceryCents)}</strong>
+          <span>Driving: {money(plan.fuelCents)} · {plan.miles.toFixed(1)} road miles · about {Math.round(plan.minutes)} minutes</span>
+          <b>Estimated trip: {money(plan.totalCents)}</b></div>
+        {savings !== null && <p className="small">{savings >= 0 ? `Estimated net savings: ${money(savings)}` : `Estimated extra cost: ${money(-savings)}`} compared with the lowest complete single-store trip.</p>}
+        {belowThreshold && <p className="small" role="status">This manual plan does not meet your {money(requiredSavings)} extra-stop savings target, so it is not recommended.</p>}
+        {!gasStop && <p className="small">Fuel uses your entered gas price; choose a station on the map to include its detour.</p>}
+        {directionsUrl && <a className="multi-store-directions" href={directionsUrl} target="_blank" rel="noreferrer">Open route directions ↗</a>}
+        <p className="small">Separate store lists; carts are not transferred. Taxes, stock, and checkout prices may change.</p>
+      </> : <p className="small">Choose one priced product for every food to calculate a complete trip.</p>}
     </div>}
   </section>;
 }
