@@ -116,6 +116,24 @@ function fixture({
 afterEach(() => vi.restoreAllMocks());
 
 describe("shared Kroger library", () => {
+  it("geocodes an address-only Kroger branch before ranking and saving it", async () => {
+    const h = fixture();
+    const original = h.fetcher;
+    h.fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.hostname === "geocoding.geo.census.gov") return Response.json({ result: { addressMatches: [{
+        coordinates: { x: -84.39, y: 33.75 }, addressComponents: { zip: "30303" },
+      }] } });
+      if (url.pathname.endsWith("/locations")) return Response.json({ data: stores.map((store, index) =>
+        index === 0 ? { ...store, geolocation: undefined } : store) });
+      return original(input, init);
+    });
+    const result = await saveCheapestKrogerProducts({ item: "whole milk", amount: "1 gal", origin }, h);
+    expect(result.products).toHaveLength(3);
+    expect(result.products.find(row => row.location_key === "kroger:branch:1100672")?.store)
+      .toMatchObject({ latitude: 33.75, longitude: -84.39 });
+  });
+
   it("saves and reuses dietary winners separately from regular searches", async () => {
     const options = {
       item: "black beans",

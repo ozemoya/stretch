@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, it, expect, vi } from "vitest";
+vi.mock("next/server", () => ({ after: vi.fn() }));
 const item = { id: "milk", name: "milk", unit: "gallon", quantity: 1 };
 const report = { retailer: "Target", status: "retrieved" as const, detail: "Catalog price", lines: [{ item,
   products: [{ id: "p", name: "Milk", brand: "Target", size: "1 gallon", priceCents: 329,
@@ -100,12 +101,11 @@ it("returns cached evidence and an honest partial result when map discovery hang
 
 it("stops unfinished item loading states while retaining verified matches", async () => {
   vi.useFakeTimers();
-  vi.mocked(providerReports).mockImplementation(async (_retailers, _items, _zip, _start, cacheOnly, onReport) => {
-    if (cacheOnly) return [];
+  vi.mocked(providerReports).mockResolvedValue([]);
+  vi.mocked(scrapeRetailers).mockImplementation(async (_stores, _items, _places, _plan, _signal, onReport) => {
     onReport?.({ ...report, status: "pending", lines: [{ item, products: [], searchStatus: "searching" }] });
     return new Promise(() => {});
   });
-  vi.mocked(scrapeRetailers).mockResolvedValue([]);
   const response = await POST(request());
   const text = response.text();
   await vi.advanceTimersByTimeAsync(SEARCH_WINDOW_MS);

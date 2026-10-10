@@ -27,6 +27,9 @@ export type Candidate = {
 };
 export type StoreCheck = {
   id: string;
+  /** Native branch ID supplied by a retailer adapter, independent of an OSM ID. */
+  sourceLocationId?: string;
+  coordinates?: { lat: number; lon: number };
   retailerId: string;
   name: string;
   address: string;

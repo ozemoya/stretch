@@ -1,6 +1,7 @@
 // Shared Node.js implementation. Next.js callers use the server-only ./index entry point.
 import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { resolveStoreCoordinates, storeAddress } from "../store-coordinates.mjs";
 
 export function normalizeSearchOptions(options) {
   if (!options || typeof options !== "object")
@@ -674,6 +675,7 @@ export function productRow(result) {
     price: result.regular_price_cents / 100,
     unit_price: result.unit_price_cents / 100,
     locationID: Number(result.location_id),
+    location_key: `kroger:branch:${BigInt(result.location_id)}`,
     date: productDate(result.retrieved_at ?? new Date()),
     ...Object.fromEntries(
       Object.values(dietaryColumns).map((column) => [
@@ -715,6 +717,10 @@ export function storeRow(result) {
   const address = result.store_address ?? {};
   return {
     locationID: location,
+    location_key: `kroger:branch:${BigInt(result.location_id)}`,
+    retailer_key: "kroger",
+    location_scope: "branch",
+    source_location_id: BigInt(result.location_id).toString(),
     ...splitStoreName(result.store_name),
     latitude: point?.latitude ?? null,
     longitude: point?.longitude ?? null,
@@ -796,7 +802,7 @@ export async function run(
     (flag) => options[flag] === true,
   );
   const productColumns =
-    "ID,category,count,price,unit_price,locationID,date,gluten_free,vegan,nut_free";
+    "ID,category,count,price,unit_price,locationID,location_key,date,gluten_free,vegan,nut_free";
   log(
     `[1/5] Checking configuration for ${JSON.stringify(item)} using ${zip ? `ZIP ${zip}` : options.origin ? "supplied coordinates" : "current approximate IP location"}.`,
   );
@@ -850,7 +856,7 @@ export async function run(
     }
     const storeCheck = await db
       .from("store")
-      .select("locationID,store,sub-location,latitude,longitude,address")
+      .select("location_key,locationID,store,sub-location,latitude,longitude,address")
       .limit(0);
     if (storeCheck.error)
       throw new Error(
@@ -906,6 +912,14 @@ export async function run(
       "filter.chain": "KROGER",
       "filter.limit": "200",
     });
+    if (Array.isArray(raw.data) && (raw.data.length >= 200 ||
+      (raw.meta?.pagination?.total ?? raw.meta?.total ?? 0) > raw.data.length)) nearestStores(raw, origin, radius);
+    if (Array.isArray(raw.data)) raw.data = await Promise.all(raw.data.map(async store => {
+      const point = await resolveStoreCoordinates({ latitude: store.geolocation?.latitude,
+        longitude: store.geolocation?.longitude, address: storeAddress(store.address) }, { fetcher });
+      if (!point) throw new Error(`Could not locate Kroger branch ${store.locationId} from its coordinates or street address.`);
+      return { ...store, geolocation: { latitude: point.latitude, longitude: point.longitude } };
+    }));
     stores = nearestStores(raw, origin, radius);
     log(
       `  ${radius}-mile search: ${raw.data.length} locations returned; ${stores.length} selected.`,
@@ -945,7 +959,7 @@ export async function run(
       if (
         !store ||
         row.category !== item.toLowerCase() ||
-        Number(row.locationID) !== Number(store.locationId)
+        (row.location_key ?? `kroger:branch:${BigInt(row.locationID)}`) !== `kroger:branch:${BigInt(store.locationId)}`
       )
         throw new Error(
           "A saved product ID conflicts with this search; no Kroger product searches performed.",
@@ -973,6 +987,7 @@ export async function run(
         price: Number(row.price),
         unit_price: Number(row.unit_price),
         locationID: Number(row.locationID),
+        location_key: row.location_key ?? `kroger:branch:${BigInt(row.locationID)}`,
         date: row.date,
         ...Object.fromEntries(
           Object.values(dietaryColumns).map((column) => [
@@ -1122,13 +1137,13 @@ export async function run(
       ...new Map(
         rows.map((row) => {
           const mapped = storeRow(row);
-          return [mapped.locationID, mapped];
+          return [mapped.location_key, mapped];
         }),
       ).values(),
     ];
     const existing = await db
       .from("product")
-      .select("ID,category,locationID")
+      .select("ID,category,locationID,location_key")
       .in(
         "ID",
         savedRows.map((row) => row.ID),
@@ -1142,7 +1157,7 @@ export async function run(
       if (
         !intended ||
         row.category !== intended.category ||
-        Number(row.locationID) !== intended.locationID
+        (row.location_key ?? `kroger:branch:${BigInt(row.locationID)}`) !== intended.location_key
       )
         throw new Error(
           "A product ID conflicts with an unrelated existing row; no winners saved.",
@@ -1150,13 +1165,13 @@ export async function run(
     }
     const storeSave = await db
       .from("store")
-      .upsert(savedStores, { onConflict: "locationID" })
-      .select("locationID,store,sub-location,latitude,longitude,address");
+      .upsert(savedStores, { onConflict: "location_key" })
+      .select("location_key,locationID,store,sub-location,latitude,longitude,address");
     if (storeSave.error || storeSave.data?.length !== savedStores.length)
       throw new Error(
         "Supabase did not confirm the store save; no product winners were saved.",
       );
-    log(`  Saved ${storeSave.data.length} stores, linked by locationID.`);
+    log(`  Saved ${storeSave.data.length} stores, linked by location_key.`);
     const { data, error } = await db
       .from("product")
       .upsert(savedRows, { onConflict: "ID" })

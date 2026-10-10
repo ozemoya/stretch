@@ -18,11 +18,13 @@ npm start
 
 ## Supabase setup
 
-The FastAPI bridge reads the existing `products`, `product`, and `store` tables. `product.id` joins to `products.id`, and `product.locationID` joins to `store.locationID`. Prices are converted from dollars to frontend cents; rows without a product or store mapping are skipped.
+The FastAPI bridge reads the existing `products`, `product`, and `store` tables. `product.id` joins to `products.id`, and `product.location_key` references the `store.location_key` primary key. Prices are converted from dollars to frontend cents; rows without a product or store mapping are skipped.
 
-Run the FastAPI bridge from the repository root with `uvicorn backend.main:app --reload --port 8000` after copying `backend/.env.example` to `backend/.env` and setting its Supabase credentials. Set `BACKEND_API_URL=http://localhost:8000` in the frontend `.env.local`, then restart Expo/Next.js. The comparison panel should say **Catalog connected to Supabase**. Supabase credentials belong only to the backend; never expose a service-role key to the frontend.
+Run the FastAPI bridge from the repository root with `uvicorn backend.main:app --reload --port 8000` after copying `backend/.env.example` to `backend/.env` and setting its Supabase credentials. Set `BACKEND_API_URL=http://localhost:8000` in the frontend `.env.local`, then restart Expo/Next.js. The comparison panel should say **Catalog connected to Supabase**. Secret Supabase credentials belong only in server processes; never expose a service-role key to browser code.
 
 Without a key the app explicitly uses its built-in demo catalog. A database failure displays a warning and falls back to demo data.
+
+The Next.js server saves scraped prices to the existing `store` and `product` tables. Set its server-only Supabase credentials in `frontend/.env.local` (Next does not load the repository-root file). See [modular scrapers and saved prices](docs/modular-scrapers.md) for adapters, the migration, stable location keys, and the saved-price read API. Never expose a secret or service-role key to browser code.
 
 The Stretch project was connected and verified on October 9, 2026: 30 products, 3 stores, 90 sample offers, and 6 substitutions. Local `.env.local` contains the backend URL and is ignored by Git; each teammate or deployment must configure its own backend environment.
 

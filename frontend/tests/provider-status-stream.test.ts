@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+vi.mock("next/server", () => ({ after: vi.fn() }));
 import type { ScrapeReport } from "../lib/retailer-scraper";
 
 const item = { id: "milk", name: "milk", unit: "gallon", quantity: 1 };

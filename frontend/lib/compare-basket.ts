@@ -1,18 +1,15 @@
 import { z } from "zod";
 import {
-  krogerStores,
-  krogerProducts,
   errorResponse,
   nearbyPlaces,
-  krogerConfigured,
 } from "@/lib/live-data";
 import { checkStores } from "@/lib/price-agent";
 import { groceryCoverage } from "@/lib/retailer-coverage";
 import { groceryFeed } from "@/lib/grocery-feed";
-import { scrapeRetailers } from "@/lib/retailer-scraper";
+import { scrapeRetailers, scrapeBranches } from "@/lib/retailer-scraper";
 import type { ScrapeReport } from "@/lib/retailer-scraper";
-import { providerReports } from "@/lib/provider-prices";
-import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
+import { catalogPriceBatch, branchPriceBatch } from "@/lib/scrapers/persistence";
+import { savePricesAfterResponse } from "@/lib/scrapers/save-after-response";
 import type { SearchPlan } from "@/lib/local-search-agent";
 import { normalizeCatalogReport } from "@/lib/product-ownership";
 export const input = z.object({
@@ -67,45 +64,10 @@ export async function compareBasket(
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
     request.signal.throwIfAborted();
     const coverage = groceryCoverage(mapped.places);
-    const [publicCatalogs, providerCatalogs] = await Promise.all([
-      options.deferPublic
-        ? Promise.resolve([] as ScrapeReport[])
-        : scrapeRetailers(
-        coverage,
-        p.items,
-        mapped.places,
-        agentPlan,
-        request.signal,
-        (report) => onReport?.(normalizeCatalogReport(report, p.items)),
-      ),
-      options.deferProvider
-        ? Promise.resolve([] as ScrapeReport[])
-        : providerReports(
-            [...new Set(coverage.map((c) => c.retailer))],
-            p.items,
-            p.zip,
-            true,
-            false,
-            onReport,
-            agentPlan,
-            false,
-            request.signal,
-          ),
-    ]);
-    for (const rawReport of providerCatalogs) {
-      const report = normalizeCatalogReport(rawReport, p.items);
-      const index = publicCatalogs.findIndex(
-        (r) => r.retailer === report.retailer,
-      );
-      if (index >= 0) {
-        publicCatalogs[index] =
-          report.retailer === "The Fresh Market"
-            ? mergeCatalogReports(publicCatalogs[index], report)
-            : report;
-      } else publicCatalogs.push(report);
-    }
-    for (const [index, report] of publicCatalogs.entries())
-      publicCatalogs[index] = normalizeCatalogReport(report, p.items);
+    const publicCatalogs = options.deferPublic ? [] : await scrapeRetailers(
+      coverage, p.items, mapped.places, agentPlan, request.signal,
+      report => onReport?.(normalizeCatalogReport(report, p.items)), { zip: p.zip },
+    );
     request.signal.throwIfAborted();
     const checkedStores = [] as Awaited<ReturnType<typeof checkStores>>;
     const warnings: string[] = [];
@@ -124,80 +86,19 @@ export async function compareBasket(
         "The multi-retailer price feed failed. Its prices remain unavailable.",
       );
     }
-    if (
-      krogerConfigured() &&
-      coverage.some(
-        (c) => c.retailer === "Kroger family" && c.status !== "checked",
-      )
-    ) {
-      try {
-        const stores = await krogerStores(p.zip);
-        // Match the exact physical branch; never attach a different store's prices by brand alone.
-        const matched = stores.flatMap((s) => {
-          if (!s.coordinates) return [];
-          const row = coverage.find(
-            (c) =>
-              c.status !== "checked" &&
-              c.retailer === "Kroger family" &&
-              Math.abs(
-                mapped.places.find((m) => m.id === c.id)!.lat -
-                  s.coordinates!.lat,
-              ) < 0.001 &&
-              Math.abs(
-                mapped.places.find((m) => m.id === c.id)!.lon -
-                  s.coordinates!.lon,
-              ) < 0.001,
-          );
-          return row
-            ? [{ ...s, retailerId: "Kroger family", coverageId: row.id }]
-            : [];
-        });
-        const checked = await checkStores(
-          p.items.slice(0, 10),
-          matched,
-          krogerProducts,
-          request.signal,
-        );
-        for (const store of checked) {
-          const row = coverage.find(
-            (c) => c.id === matched.find((m) => m.id === store.id)!.coverageId,
-          )!;
-          row.status = store.lines.every((l) => l.error) ? "failed" : "checked";
-          row.detail =
-            "Kroger API search (up to ten items, two matched branches, at most three 20-product pages per item). More catalog results may exist; remaining items and stock are unverified.";
-          checkedStores.push({
-            ...store,
-            id: row.id,
-            lines: [
-              ...store.lines.map((line) => ({
-                ...line,
-                candidates: line.candidates
-                  .filter(
-                    (candidate) =>
-                      candidate.storeLocationId === store.id &&
-                      candidate.retailerId === row.retailer,
-                  )
-                  .map((candidate) => ({
-                    ...candidate,
-                    storeLocationId: row.id,
-                  })),
-              })),
-              ...p.items.slice(10).map((item) => ({
-                item,
-                candidates: [],
-                error:
-                  "Not checked in this run due to provider request limits.",
-              })),
-            ],
-          });
-        }
-      } catch {
-        request.signal.throwIfAborted();
-        warnings.push(
-          "Kroger price search failed. Affected stores remain unpriced.",
-        );
-      }
+    const branchResult = await scrapeBranches({ stores: coverage, items: p.items, places: mapped.places,
+      zip: p.zip, plan: agentPlan, signal: request.signal });
+    warnings.push(...branchResult.warnings);
+    for (const store of branchResult.stores) {
+      const row = coverage.find(entry => entry.id === store.id)!;
+      row.status = store.lines.every(line => line.error) ? "failed" : "checked";
+      row.detail = "Store-specific library checked this physical branch. Review each package and source.";
+      checkedStores.push(store);
     }
+    savePricesAfterResponse(() => [
+      ...publicCatalogs.map(report => catalogPriceBatch(report, p.zip)),
+      ...checkedStores.map(store => branchPriceBatch(store, coverage)),
+    ]);
     return Response.json(
       {
         stores: checkedStores,

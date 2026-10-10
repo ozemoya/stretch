@@ -66,6 +66,9 @@ let starts: number[] = [];
 export function providerConfigured() {
   return !!process.env.BRIGHT_DATA_API_KEY;
 }
+export function providerSupports(retailer: string) {
+  return providerConfigured() && Object.hasOwn(providers, retailer);
+}
 export function matchesRequestedFood(name: string, term: string) {
   const words = name.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   return (term.toLowerCase().match(/[a-z0-9]+/g) ?? []).every((word) =>

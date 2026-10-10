@@ -11,9 +11,11 @@ import { settlePendingReports } from "../../../../lib/search-state";
 import { deadlineStream, untilAborted } from "../../../../lib/deadline-stream";
 import { AI_PLAN_WINDOW_MS, SEARCH_WINDOW_MS } from "../../../../lib/search-timing";
 import { catalogCache } from "../../../../lib/catalog-cache";
+import { catalogPriceBatch } from "../../../../lib/scrapers/persistence";
+import { savePricesAfterResponse } from "../../../../lib/scrapers/save-after-response";
 
 export const runtime = "nodejs";
-const supported = ["Walmart", "Target", "Publix", "ALDI", "The Fresh Market",
+const supported = ["Walmart", "Target", "Publix", "ALDI",
   "Food Lion", "Sam’s Club", "Sprouts", "Costco", "Albertsons family"];
 
 export async function POST(request: Request) {
@@ -22,6 +24,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Choose 1–30 distinct foods and a valid search location." }, { status: 400 });
   const p = parsed.data;
   const reports = new Map<string, ScrapeReport>();
+  savePricesAfterResponse(() => [...reports.values()].map(report => catalogPriceBatch(report, p.zip)));
   let comparison: Record<string, unknown> | null = null;
   let plan: SearchPlan | null = null;
   let failures = false;
@@ -80,17 +83,11 @@ export async function POST(request: Request) {
         coverage: `Discovered ${coverage.length} mapped grocery locations within ${p.radius} miles of ${mapped.origin.label}. Online catalog prices do not establish branch prices.` };
       const retailers = [...new Set(coverage.map((store) => store.retailer))];
       const publicTasks = retailers.map(async (retailer) => {
-        if (retailer === "Trader Joe’s") await planningTask;
         signal.throwIfAborted();
         return scrapeRetailers(coverage.filter((store) => store.retailer === retailer),
-          p.items, mapped.places, plan ?? undefined, signal, (report) => emit(report));
+          p.items, mapped.places, plan ?? undefined, signal, (report) => emit(report), { zip: p.zip, fast: true });
       });
-      const providerTask = planningTask.then(() => {
-        signal.throwIfAborted();
-        return providerReports(retailers, p.items, p.zip, true, false,
-          (report) => emit(report), plan ?? undefined, false, signal, { fast: true });
-      });
-      const outcomes = await Promise.allSettled([...publicTasks, providerTask]);
+      const outcomes = await Promise.allSettled(publicTasks);
       if (outcomes.some((outcome) => outcome.status === "rejected")) failures = true;
     });
     const outcomes = await Promise.allSettled([cachedTask, planningTask, comparisonTask, sourceTask]);
