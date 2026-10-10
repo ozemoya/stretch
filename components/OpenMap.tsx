@@ -1,16 +1,18 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
-import { centers } from "@/lib/locations";
+import { centers, type SearchOrigin } from "@/lib/locations";
 import type { Area, NearbyPlace } from "@/lib/live-data";
 export default function OpenMap({
   area,
   radius,
   places,
+  origin,
 }: {
   area: Area;
   radius: number;
   places: NearbyPlace[];
+  origin?: SearchOrigin | null;
 }) {
   const container = useRef<HTMLDivElement>(null),
     map = useRef<LeafletMap | null>(null);
@@ -22,7 +24,7 @@ export default function OpenMap({
     import("leaflet")
       .then((L) => {
         if (cancelled || !container.current) return;
-        const c = centers[area],
+        const c = origin ?? centers[area],
           instance = L.map(container.current, {
             scrollWheelZoom: false,
           }).setView([c.lat, c.lon], 13);
@@ -95,13 +97,13 @@ export default function OpenMap({
       map.current?.remove();
       map.current = null;
     };
-  }, [area, radius, places]);
+  }, [area, radius, places, origin]);
   return (
     <>
       <div
         className="osm-map"
         ref={container}
-        aria-label={`OpenStreetMap: locations within ${radius} ${radius === 1 ? "mile" : "miles"} of ${area}`}
+        aria-label={`OpenStreetMap: locations within ${radius} ${radius === 1 ? "mile" : "miles"} of ${origin?.label ?? area}`}
       />
       <p className="map-caption">
         Green: groceries · Red: gas stations · Circle: your search radius

@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { detectLocation } from "@/lib/detect-location";
+import { originQuery, type SearchOrigin } from "@/lib/locations";
 import type { Area, FuelQuote, NearbyPlace } from "@/lib/live-data";
 import LocalFuel from "./LocalFuel";
 import OpenMap from "./OpenMap";
@@ -20,7 +22,7 @@ const usd = (c: number) =>
     c / 100,
   );
 async function request<T>(url: string): Promise<T> {
-  const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
+  const r = await fetch(url, { signal: AbortSignal.timeout(45000) });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error ?? "Live data is unavailable.");
   return data;
@@ -29,15 +31,54 @@ export default function LiveSources({
   area,
   onFuel,
   onArea,
+  origin,
+  onOrigin,
 }: {
   area: Area;
   onFuel: (quote: FuelQuote) => void;
   onArea: (area: Area) => void;
+  origin: SearchOrigin | null;
+  onOrigin: (origin: SearchOrigin | null) => void;
 }) {
+  const originCallback = useRef(onOrigin);
+  originCallback.current = onOrigin;
+  const manualArea = useRef(false);
+  const [locationNote, setLocationNote] = useState(
+    "Finding your approximate area from your IP…",
+  );
+  const [detecting, setDetecting] = useState(true);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    setDetecting(true);
+    setLocationNote("Finding your approximate area from your IP…");
+    detectLocation(controller.signal)
+      .then((detected) => {
+        if (!active || controller.signal.aborted || manualArea.current) return;
+        originCallback.current(detected);
+        setPlaces(null);
+        setLocationNote(
+          `Approximate IP location: ${detected.label}. Nearby searches use these coordinates. You can change the area below.`,
+        );
+      })
+      .catch(() => {
+        if (active && !manualArea.current)
+          setLocationNote("IP location is unavailable. Choose an area below.");
+      })
+      .finally(() => {
+        if (active) setDetecting(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [attempt]);
   const [places, setPlaces] = useState<{
       places: NearbyPlace[];
       updatedAt: string;
       area: Area;
+      origin: SearchOrigin;
     } | null>(null),
     [placeError, setPlaceError] = useState(""),
     [placeLoading, setPlaceLoading] = useState(false);
@@ -77,9 +118,12 @@ export default function LiveSources({
     setPlaces(null);
     try {
       setPlaces(
-        await request<{ places: NearbyPlace[]; updatedAt: string; area: Area }>(
-          `/api/live/places?area=${area}`,
-        ),
+        await request<{
+          places: NearbyPlace[];
+          updatedAt: string;
+          area: Area;
+          origin: SearchOrigin;
+        }>(`/api/live/places?area=${area}${originQuery(origin)}`),
       );
     } catch (e) {
       setPlaceError((e as Error).message);
@@ -135,27 +179,75 @@ export default function LiveSources({
       <label className="live-area">
         Explore an area
         <select
-          value={area}
+          value={origin ? "ip" : area}
           onChange={(e) => {
+            manualArea.current = true;
+            onOrigin(null);
+            setLocationNote(
+              "Using your selected area. IP detection will not override it.",
+            );
             onArea(e.target.value as Area);
             setPlaces(null);
             setPlaceError("");
           }}
         >
+          {origin && (
+            <option value="ip">Current IP area: {origin.label}</option>
+          )}
           <option value="downtown">Downtown Atlanta</option>
           <option value="midtown">Midtown Atlanta</option>
           <option value="decatur">Decatur</option>
         </select>
       </label>
+      <button
+        className="text-button"
+        disabled={detecting}
+        onClick={() => {
+          manualArea.current = false;
+          setAttempt((a) => a + 1);
+        }}
+      >
+        {" "}
+        {detecting ? "DETECTING LOCATION…" : "DETECT MY AREA ↗"}
+      </button>
+      <p className="small" role="status">
+        {locationNote}
+      </p>
+      {origin && (
+        <p className="small">
+          Your detected coordinates are used for nearby stores and gas stations.
+          The sample trip cards still use illustrative {area} routes.
+        </p>
+      )}
+      {origin && (
+        <details>
+          <summary>Approximate location details</summary>
+          <p>
+            Search center: {origin.lat}, {origin.lon}. IP locations can cover a
+            broad area; this is not GPS.
+          </p>
+        </details>
+      )}
+      <p className="small">
+        Approximate location provided by IPwhois; ipify is used if needed. VPNs
+        and mobile networks can change the result; your IP is not saved by
+        Stretch.
+      </p>
       <div className="live-grid">
-        <LocalFuel key={area} area={area} onFuel={onFuel} />
+        <LocalFuel
+          key={JSON.stringify([area, origin])}
+          area={area}
+          origin={origin}
+          onFuel={onFuel}
+        />
         <article className="live-card">
           <span className="live-badge">REAL STORE LOCATIONS</span>
           <h3>Good stops nearby.</h3>
           <p>
-            Shows up to 60 nearby places within five miles of your selected area
-            center. Map coverage can be incomplete; locations do not include
-            grocery or pump prices.
+            Finds mapped supermarkets, grocery shops and convenience stores from
+            every retailer within five miles of your selected area center. Map
+            coverage can be incomplete; locations do not include grocery or pump
+            prices.
           </p>
           <button
             className="button"
@@ -168,10 +260,15 @@ export default function LiveSources({
           {places && (
             <>
               <p>
-                Results for {places.area}. Straight-line distance, not driving
-                distance.
+                Results for {places.origin.label}. Straight-line distance, not
+                driving distance.
               </p>
-              <OpenMap area={places.area} radius={5} places={places.places} />
+              <OpenMap
+                area={places.area}
+                origin={places.origin}
+                radius={5}
+                places={places.places}
+              />
               <div className="live-tabs">
                 <button
                   className="text-button"

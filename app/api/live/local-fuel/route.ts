@@ -6,6 +6,7 @@ import {
   type Area,
   type FuelType,
 } from "@/lib/live-data";
+import { parseOrigin } from "@/lib/locations";
 export async function GET(request: Request) {
   const p = new URL(request.url).searchParams,
     area = p.get("area") ?? "downtown",
@@ -26,8 +27,17 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   try {
+    let origin;
+    try {
+      origin = parseOrigin(p);
+    } catch {
+      return Response.json(
+        { error: "Enter valid latitude and longitude." },
+        { status: 400 },
+      );
+    }
     return Response.json(
-      await localFuel(area as Area, radius, type as FuelType),
+      await localFuel(area as Area, radius, type as FuelType, origin),
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

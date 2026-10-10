@@ -5,6 +5,8 @@ import { optimize, suggestSwaps } from "@/lib/optimizer";
 import { getRouteMeasurements } from "@/lib/routing";
 import type { RouteMeasurements } from "@/lib/optimizer";
 import LiveSources from "./LiveSources";
+import PriceAgent from "./PriceAgent";
+import { centers, type SearchOrigin } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
 const money = (c: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -127,6 +129,7 @@ export default function Stretch({
 
 
 
+  const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
   const calculation = useMemo(() => {
     try {
       return {
@@ -348,8 +351,25 @@ export default function Stretch({
             YOUR NEXT GOOD TRIP STARTS WITH A LIST. <span>BUILD MY LIST ↗</span>
           </button>
         </section>
+        <PriceAgent
+          key={JSON.stringify([basket, prefs.area, searchOrigin])}
+          zip={searchOrigin?.zip ?? centers[prefs.area].zip}
+          area={prefs.area}
+          origin={searchOrigin}
+          items={basket.map((item) => {
+            const p = catalog.products.find((p) => p.id === item.productId)!;
+            return {
+              id: p.id,
+              name: p.name,
+              unit: p.unit,
+              quantity: item.quantity,
+            };
+          })}
+        />
         <LiveSources
           area={prefs.area}
+          origin={searchOrigin}
+          onOrigin={setSearchOrigin}
           onArea={(area) => change("area", area)}
           onFuel={(quote) => {
             change("gas", quote.dollarsPerGallon);
