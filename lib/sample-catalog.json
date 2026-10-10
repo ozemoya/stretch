@@ -1,0 +1,1072 @@
+{
+  "products": [
+    {
+      "id": "bananas",
+      "name": "Bananas",
+      "emoji": "🍌",
+      "unit": "1 bunch",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "milk",
+      "name": "Milk",
+      "emoji": "🥛",
+      "unit": "1 gallon",
+      "category": "Staples",
+      "vegan": false,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "eggs",
+      "name": "Eggs",
+      "emoji": "🥚",
+      "unit": "12 count",
+      "category": "Staples",
+      "vegan": false,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "bread",
+      "name": "Bread",
+      "emoji": "🍞",
+      "unit": "1 loaf",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": false,
+      "nutFree": true
+    },
+    {
+      "id": "rice",
+      "name": "Rice",
+      "emoji": "🍚",
+      "unit": "2 lb",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "chicken",
+      "name": "Chicken",
+      "emoji": "🍗",
+      "unit": "1 lb",
+      "category": "Staples",
+      "vegan": false,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "broccoli",
+      "name": "Broccoli",
+      "emoji": "🥦",
+      "unit": "1 lb",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "apples",
+      "name": "Apples",
+      "emoji": "🍎",
+      "unit": "3 lb",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "potatoes",
+      "name": "Potatoes",
+      "emoji": "🥔",
+      "unit": "5 lb",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "onions",
+      "name": "Onions",
+      "emoji": "🧅",
+      "unit": "3 lb",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "carrots",
+      "name": "Carrots",
+      "emoji": "🥕",
+      "unit": "1 lb",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "pasta",
+      "name": "Pasta",
+      "emoji": "🍝",
+      "unit": "16 oz",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": false,
+      "nutFree": true
+    },
+    {
+      "id": "black-beans",
+      "name": "Black beans",
+      "emoji": "🥫",
+      "unit": "15 oz",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "oats",
+      "name": "Oats",
+      "emoji": "🥣",
+      "unit": "18 oz",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "peanut-butter",
+      "name": "Peanut butter",
+      "emoji": "🥜",
+      "unit": "16 oz",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": false
+    },
+    {
+      "id": "tomatoes",
+      "name": "Tomatoes",
+      "emoji": "🍅",
+      "unit": "1 lb",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "spinach",
+      "name": "Spinach",
+      "emoji": "🥬",
+      "unit": "8 oz",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "cheddar",
+      "name": "Cheddar",
+      "emoji": "🧀",
+      "unit": "8 oz",
+      "category": "Staples",
+      "vegan": false,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "yogurt",
+      "name": "Yogurt",
+      "emoji": "🥄",
+      "unit": "32 oz",
+      "category": "Staples",
+      "vegan": false,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "olive-oil",
+      "name": "Olive oil",
+      "emoji": "🫒",
+      "unit": "16.9 oz",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "tuna",
+      "name": "Tuna",
+      "emoji": "🐟",
+      "unit": "5 oz",
+      "category": "Staples",
+      "vegan": false,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "frozen-peas",
+      "name": "Frozen peas",
+      "emoji": "🧊",
+      "unit": "12 oz",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "oranges",
+      "name": "Oranges",
+      "emoji": "🍊",
+      "unit": "3 lb",
+      "category": "Produce",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "lentils",
+      "name": "Lentils",
+      "emoji": "🫘",
+      "unit": "1 lb",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "tortillas",
+      "name": "Tortillas",
+      "emoji": "🌮",
+      "unit": "10 count",
+      "category": "Staples",
+      "vegan": true,
+      "glutenFree": false,
+      "nutFree": true
+    },
+    {
+      "id": "oat-milk",
+      "name": "Oat milk",
+      "emoji": "🌱",
+      "unit": "1 gallon",
+      "category": "Alternatives",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "tofu",
+      "name": "Tofu",
+      "emoji": "🌱",
+      "unit": "14 oz",
+      "category": "Alternatives",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "plant-cheese",
+      "name": "Plant cheese",
+      "emoji": "🌱",
+      "unit": "8 oz",
+      "category": "Alternatives",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "soy-yogurt",
+      "name": "Soy yogurt",
+      "emoji": "🌱",
+      "unit": "32 oz",
+      "category": "Alternatives",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    },
+    {
+      "id": "chickpeas",
+      "name": "Chickpeas",
+      "emoji": "🌱",
+      "unit": "15 oz",
+      "category": "Alternatives",
+      "vegan": true,
+      "glutenFree": true,
+      "nutFree": true
+    }
+  ],
+  "stores": [
+    {
+      "id": "market-a",
+      "name": "Market A"
+    },
+    {
+      "id": "market-b",
+      "name": "Market B"
+    },
+    {
+      "id": "market-c",
+      "name": "Market C"
+    }
+  ],
+  "offers": [
+    {
+      "productId": "bananas",
+      "storeId": "market-a",
+      "priceCents": 109,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "bananas",
+      "storeId": "market-b",
+      "priceCents": 157,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "bananas",
+      "storeId": "market-c",
+      "priceCents": 213,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "milk",
+      "storeId": "market-a",
+      "priceCents": 392,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "milk",
+      "storeId": "market-b",
+      "priceCents": 211,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "milk",
+      "storeId": "market-c",
+      "priceCents": 426,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "eggs",
+      "storeId": "market-a",
+      "priceCents": 358,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "eggs",
+      "storeId": "market-b",
+      "priceCents": 314,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "eggs",
+      "storeId": "market-c",
+      "priceCents": 245,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "bread",
+      "storeId": "market-a",
+      "priceCents": 190,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "bread",
+      "storeId": "market-b",
+      "priceCents": 235,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "bread",
+      "storeId": "market-c",
+      "priceCents": 358,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "rice",
+      "storeId": "market-a",
+      "priceCents": 358,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "rice",
+      "storeId": "market-b",
+      "priceCents": 170,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "rice",
+      "storeId": "market-c",
+      "priceCents": 392,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "chicken",
+      "storeId": "market-a",
+      "priceCents": 504,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "chicken",
+      "storeId": "market-b",
+      "priceCents": 426,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "chicken",
+      "storeId": "market-c",
+      "priceCents": 354,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "broccoli",
+      "storeId": "market-a",
+      "priceCents": 143,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "broccoli",
+      "storeId": "market-b",
+      "priceCents": 202,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "broccoli",
+      "storeId": "market-c",
+      "priceCents": 291,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "apples",
+      "storeId": "market-a",
+      "priceCents": 459,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "apples",
+      "storeId": "market-b",
+      "priceCents": 258,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "apples",
+      "storeId": "market-c",
+      "priceCents": 504,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "potatoes",
+      "storeId": "market-a",
+      "priceCents": 470,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "potatoes",
+      "storeId": "market-b",
+      "priceCents": 414,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "potatoes",
+      "storeId": "market-c",
+      "priceCents": 326,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "onions",
+      "storeId": "market-a",
+      "priceCents": 190,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "onions",
+      "storeId": "market-b",
+      "priceCents": 258,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "onions",
+      "storeId": "market-c",
+      "priceCents": 358,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "carrots",
+      "storeId": "market-a",
+      "priceCents": 134,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "carrots",
+      "storeId": "market-b",
+      "priceCents": 68,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "carrots",
+      "storeId": "market-c",
+      "priceCents": 168,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "pasta",
+      "storeId": "market-a",
+      "priceCents": 168,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "pasta",
+      "storeId": "market-b",
+      "priceCents": 123,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "pasta",
+      "storeId": "market-c",
+      "priceCents": 122,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "black-beans",
+      "storeId": "market-a",
+      "priceCents": 75,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "black-beans",
+      "storeId": "market-b",
+      "priceCents": 95,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "black-beans",
+      "storeId": "market-c",
+      "priceCents": 146,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oats",
+      "storeId": "market-a",
+      "priceCents": 325,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oats",
+      "storeId": "market-b",
+      "priceCents": 163,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oats",
+      "storeId": "market-c",
+      "priceCents": 370,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "peanut-butter",
+      "storeId": "market-a",
+      "priceCents": 314,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "peanut-butter",
+      "storeId": "market-b",
+      "priceCents": 246,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "peanut-butter",
+      "storeId": "market-c",
+      "priceCents": 211,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tomatoes",
+      "storeId": "market-a",
+      "priceCents": 163,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tomatoes",
+      "storeId": "market-b",
+      "priceCents": 224,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tomatoes",
+      "storeId": "market-c",
+      "priceCents": 314,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "spinach",
+      "storeId": "market-a",
+      "priceCents": 280,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "spinach",
+      "storeId": "market-b",
+      "priceCents": 143,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "spinach",
+      "storeId": "market-c",
+      "priceCents": 336,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "cheddar",
+      "storeId": "market-a",
+      "priceCents": 291,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "cheddar",
+      "storeId": "market-b",
+      "priceCents": 246,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "cheddar",
+      "storeId": "market-c",
+      "priceCents": 211,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "yogurt",
+      "storeId": "market-a",
+      "priceCents": 245,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "yogurt",
+      "storeId": "market-b",
+      "priceCents": 358,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "yogurt",
+      "storeId": "market-c",
+      "priceCents": 459,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "olive-oil",
+      "storeId": "market-a",
+      "priceCents": 717,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "olive-oil",
+      "storeId": "market-b",
+      "priceCents": 394,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "olive-oil",
+      "storeId": "market-c",
+      "priceCents": 806,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": false
+    },
+    {
+      "productId": "tuna",
+      "storeId": "market-a",
+      "priceCents": 146,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tuna",
+      "storeId": "market-b",
+      "priceCents": 112,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tuna",
+      "storeId": "market-c",
+      "priceCents": 109,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "frozen-peas",
+      "storeId": "market-a",
+      "priceCents": 116,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "frozen-peas",
+      "storeId": "market-b",
+      "priceCents": 146,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "frozen-peas",
+      "storeId": "market-c",
+      "priceCents": 224,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oranges",
+      "storeId": "market-a",
+      "priceCents": 493,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oranges",
+      "storeId": "market-b",
+      "priceCents": 265,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oranges",
+      "storeId": "market-c",
+      "priceCents": 549,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "lentils",
+      "storeId": "market-a",
+      "priceCents": 202,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "lentils",
+      "storeId": "market-b",
+      "priceCents": 168,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "lentils",
+      "storeId": "market-c",
+      "priceCents": 150,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tortillas",
+      "storeId": "market-a",
+      "priceCents": 163,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tortillas",
+      "storeId": "market-b",
+      "priceCents": 213,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tortillas",
+      "storeId": "market-c",
+      "priceCents": 314,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oat-milk",
+      "storeId": "market-a",
+      "priceCents": 290,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oat-milk",
+      "storeId": "market-b",
+      "priceCents": 350,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "oat-milk",
+      "storeId": "market-c",
+      "priceCents": 320,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tofu",
+      "storeId": "market-a",
+      "priceCents": 190,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tofu",
+      "storeId": "market-b",
+      "priceCents": 240,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "tofu",
+      "storeId": "market-c",
+      "priceCents": 220,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "plant-cheese",
+      "storeId": "market-a",
+      "priceCents": 280,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "plant-cheese",
+      "storeId": "market-b",
+      "priceCents": 310,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "plant-cheese",
+      "storeId": "market-c",
+      "priceCents": 350,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "soy-yogurt",
+      "storeId": "market-a",
+      "priceCents": 290,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "soy-yogurt",
+      "storeId": "market-b",
+      "priceCents": 350,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "soy-yogurt",
+      "storeId": "market-c",
+      "priceCents": 320,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "chickpeas",
+      "storeId": "market-a",
+      "priceCents": 95,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "chickpeas",
+      "storeId": "market-b",
+      "priceCents": 110,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    },
+    {
+      "productId": "chickpeas",
+      "storeId": "market-c",
+      "priceCents": 125,
+      "recordedAt": "2026-10-09T12:00:00Z",
+      "isSample": true,
+      "available": true
+    }
+  ],
+  "swaps": [
+    {
+      "fromId": "milk",
+      "toId": "oat-milk",
+      "note": "Same volume; different nutrition."
+    },
+    {
+      "fromId": "eggs",
+      "toId": "tofu",
+      "note": "12 eggs to 14 oz tofu; different nutrition and quantity."
+    },
+    {
+      "fromId": "cheddar",
+      "toId": "plant-cheese",
+      "note": "Same package size; check ingredients."
+    },
+    {
+      "fromId": "yogurt",
+      "toId": "soy-yogurt",
+      "note": "Same package size; different nutrition."
+    },
+    {
+      "fromId": "tuna",
+      "toId": "chickpeas",
+      "note": "5 oz tuna to 15 oz chickpeas; different nutrition and quantity."
+    },
+    {
+      "fromId": "chicken",
+      "toId": "lentils",
+      "note": "1 lb chicken to 1 lb dry lentils; different preparation and nutrition."
+    }
+  ]
+}
