@@ -1,6 +1,8 @@
 import type {
   KrogerAmount,
   KrogerDependencies,
+  KrogerDietaryFilters,
+  KrogerDietaryFlags,
   KrogerProductRow,
   KrogerSearchOptions,
   KrogerSearchResult,
@@ -41,5 +43,13 @@ export function productID(
   searchTerm: string,
   locationId: string,
   requestedAmount?: KrogerAmount,
+  dietary?: KrogerDietaryFilters,
 ): number;
+export function dietaryFlags(product: {
+  description?: string;
+}): KrogerDietaryFlags;
+export function matchesDietary(
+  flags: KrogerDietaryFlags,
+  filters?: KrogerDietaryFilters,
+): boolean;
 export function storeRow(result: KrogerWinner): KrogerStoreRow;

@@ -125,6 +125,9 @@ export async function runCatalog(
     try {
       const search = catalogSearchOptions(product, {
         origin,
+        glutenFree: options.glutenFree,
+        vegan: options.vegan,
+        nutFree: options.nutFree,
         dryRun: options.dryRun ?? false,
         forceRefresh: options.refreshIds?.includes(product.id) ?? false,
       });
@@ -190,12 +193,15 @@ if (
         report: { type: "string" },
         "refresh-only": { type: "string" },
         only: { type: "string" },
+        "gluten-free": { type: "boolean" },
+        vegan: { type: "boolean" },
+        "nut-free": { type: "boolean" },
         help: { type: "boolean" },
       },
     });
     if (values.help)
       console.log(
-        "Usage: node scripts/kroger-catalog.mjs [--dry-run] [--lat N --lng N | --zip ZIP] [--only ID,ID] [--refresh-only ID,ID] [--report PATH]\nRuns the existing Kroger script for every products.id, saving winners to product/store. --refresh-only bypasses today's cache for the specified IDs.",
+        "Usage: node scripts/kroger-catalog.mjs [--dry-run] [--lat N --lng N | --zip ZIP] [--only ID,ID] [--refresh-only ID,ID] [--gluten-free] [--vegan] [--nut-free] [--report PATH]\nRuns the existing Kroger script for every products.id, saving winners to product/store. --refresh-only bypasses today's cache for the specified IDs.",
       );
     else {
       const require = createRequire(import.meta.url);
@@ -212,6 +218,9 @@ if (
       const report = await runCatalog(
         {
           dryRun: values["dry-run"],
+          glutenFree: values["gluten-free"],
+          vegan: values.vegan,
+          nutFree: values["nut-free"],
           ...(values["refresh-only"]
             ? {
                 refreshIds: values["refresh-only"]

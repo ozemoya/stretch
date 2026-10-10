@@ -26,6 +26,50 @@ async function fixture() {
   return db;
 }
 
+it("adds nullable dietary booleans without inventing claims or changing existing prices", async () => {
+  const db = await fixture();
+  try {
+    const before = (await db.query('select * from product order by "ID"')).rows;
+    await db.exec(
+      readFileSync(
+        "supabase/migrations/202610100002_product_dietary.sql",
+        "utf8",
+      ),
+    );
+    const after = (await db.query('select * from product order by "ID"')).rows;
+    expect(
+      after.map(({ gluten_free, vegan, nut_free, ...row }) => row),
+    ).toEqual(before);
+    expect(
+      after.every(
+        (row) =>
+          row.gluten_free === null &&
+          row.vegan === null &&
+          row.nut_free === null,
+      ),
+    ).toBe(true);
+    await db.exec(
+      'update product set gluten_free=true,vegan=false,nut_free=null where "ID"=1',
+    );
+    expect(
+      (
+        await db.query(
+          'select gluten_free,vegan,nut_free from product where "ID"=1',
+        )
+      ).rows[0],
+    ).toEqual({ gluten_free: true, vegan: false, nut_free: null });
+    const types = (
+      await db.query(
+        "select data_type from information_schema.columns where table_name='product' and column_name in ('gluten_free','vegan','nut_free')",
+      )
+    ).rows;
+    expect(types).toHaveLength(3);
+    expect(types.every((row) => row.data_type === "boolean")).toBe(true);
+  } finally {
+    await db.close();
+  }
+}, 20000);
+
 it("adds a real date column without inventing update dates or changing existing product values", async () => {
   const db = await fixture();
   try {

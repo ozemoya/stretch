@@ -4,7 +4,21 @@ export type KrogerUnit = "each" | "oz" | "fl-oz";
 export type KrogerAmount = { unit: KrogerUnit; amount: number };
 export type KrogerOrigin = { latitude: number; longitude: number };
 
-export interface KrogerSearchOptions {
+export interface KrogerDietaryFilters {
+  /** True requires an explicit product-name claim; false/omitted applies no filter. */
+  glutenFree?: boolean;
+  vegan?: boolean;
+  nutFree?: boolean;
+}
+
+export interface KrogerDietaryFlags {
+  /** Null means the provider description did not establish this attribute. */
+  gluten_free: boolean | null;
+  vegan: boolean | null;
+  nut_free: boolean | null;
+}
+
+export interface KrogerSearchOptions extends KrogerDietaryFilters {
   item: string;
   /** A number uses `unit` or the item's inferred unit; strings accept "1 gal", "12 ct", etc. */
   amount?: number | string | KrogerAmount;
@@ -29,9 +43,10 @@ export interface KrogerDependencies {
   now?: () => Date;
 }
 
-export interface KrogerWinner {
+export interface KrogerWinner extends KrogerDietaryFlags {
   search_term: string;
   requested_amount?: KrogerAmount;
+  requested_dietary?: KrogerDietaryFilters;
   search_zip?: string;
   location_id: string;
   store_name: string;
@@ -89,7 +104,7 @@ export interface KrogerProductResult extends KrogerProductRow {
   store: KrogerStoreRow;
 }
 
-export interface KrogerProductRow {
+export interface KrogerProductRow extends KrogerDietaryFlags {
   ID: number;
   category: string;
   count: number;

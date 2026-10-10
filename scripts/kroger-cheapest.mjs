@@ -9,6 +9,7 @@ export * from "../lib/kroger/core.mjs";
 export const help = `Usage: npm run kroger:save -- --item "whole milk"
 Options: --amount "12 ct" (prefer exact; otherwise within ±1/3), --category "Dairy",
 --unit fl-oz|oz|each, --dry-run, --help
+Dietary filters: --gluten-free, --vegan, --nut-free (combine to require all).
 Location defaults to approximate IP location. Override with --lat and --lng,
 or --zip for a ZIP representative point. Finds up to three KROGER stores
 within 100 miles. Compares regular price per normalized unit for soldBy=UNIT.
@@ -27,6 +28,9 @@ export function readOptions(args) {
       unit: { type: "string" },
       category: { type: "string" },
       amount: { type: "string" },
+      "gluten-free": { type: "boolean" },
+      vegan: { type: "boolean" },
+      "nut-free": { type: "boolean" },
       "dry-run": { type: "boolean", default: false },
       help: { type: "boolean" },
     },
@@ -40,6 +44,9 @@ export function readOptions(args) {
     unit: values.unit,
     category: values.category,
     amount: values.amount,
+    glutenFree: values["gluten-free"],
+    vegan: values.vegan,
+    nutFree: values["nut-free"],
     zip: values.zip,
     dryRun: values["dry-run"],
     ...(hasCoordinates

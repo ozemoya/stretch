@@ -10,10 +10,14 @@ export {
   productID,
   productDate,
   storeRow,
+  dietaryFlags,
+  matchesDietary,
 } from "./core.mjs";
 export type {
   KrogerAmount,
   KrogerDependencies,
+  KrogerDietaryFilters,
+  KrogerDietaryFlags,
   KrogerIssue,
   KrogerOrigin,
   KrogerProductRow,
