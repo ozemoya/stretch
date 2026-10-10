@@ -1,10 +1,13 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BasketItem, Catalog, Preferences, Trip } from "@/lib/types";
 import { optimize, suggestSwaps } from "@/lib/optimizer";
+import { getRouteMeasurements } from "@/lib/routing";
+import type { RouteMeasurements } from "@/lib/optimizer";
 import LiveSources from "./LiveSources";
+import { detectLocation } from "@/lib/detect-location";
 import PriceAgent from "./PriceAgent";
-import { centers } from "@/lib/locations";
+import { centers, type SearchOrigin } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
 const money = (c: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -58,35 +61,129 @@ export default function Stretch({
   error?: string;
 }) {
   const [basket, setBasket] = useState<BasketItem[]>(
-      catalog.products
-        .slice(0, 9)
-        .map((p) => ({ productId: p.id, quantity: 1 })),
+      [],
     ),
     [prefs, setPrefs] = useState(defaults),
     [search, setSearch] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
     [checked, setChecked] = useState<string[]>([]),
     [notice, setNotice] = useState(""),
-    [showPlanner, setShowPlanner] = useState(false),
+    [showPlanner, setShowPlanner] = useState(true),
     [previousBasket, setPreviousBasket] = useState<BasketItem[] | null>(null);
+  const [checkoutBasket,setCheckoutBasket] = useState<BasketItem[] | null>(null);
+  const [checkoutBusy,setCheckoutBusy] = useState(false);
+  const [checkoutRun,setCheckoutRun] = useState(0);
+  async function checkout() {
+    if (!basket.length || checkoutBusy) return;
+    setCheckoutBusy(true);
+    if (!searchOrigin) { setCheckoutBusy(false); return; }
+    setCheckoutBasket(basket.map(item=>({...item})));
+    setCheckoutRun(run=>run+1);
+    setCheckoutBusy(false);
+    setTimeout(()=>document.getElementById("checkout-results")?.scrollIntoView({behavior:"smooth"}),50);
+  }
   const [fuelSource, setFuelSource] = useState<FuelQuote | null>(null);
+
+  const [routeData, setRouteData] =
+    useState<{
+      area: typeof prefs.area;
+      catalog: Catalog;
+      routes: RouteMeasurements;
+    } | null>(null);
+
+  const [routesLoading, setRoutesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoutes() {
+      setRoutesLoading(true);
+
+      try {
+        const routes = await getRouteMeasurements(
+          catalog,
+          prefs.area,
+        );
+
+        if (!cancelled) {
+          setRouteData({
+            area: prefs.area,
+            catalog,
+            routes,
+          });
+        }
+      } catch (error) {
+        console.error("Unable to load routes:", error);
+
+        if (!cancelled) {
+          setRouteData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setRoutesLoading(false);
+        }
+      }
+    }
+
+    void loadRoutes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [catalog, prefs.area]);
+
+  const currentRoutes =
+    routeData?.area === prefs.area &&
+    routeData.catalog === catalog
+      ? routeData.routes
+      : undefined;
+
+
+
+  const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
+  const [ipArea,setIpArea] = useState(true);
+  const [locationState,setLocationState] = useState("Detecting your IP area…");
+  useEffect(()=>{
+    const controller=new AbortController();
+    detectLocation(controller.signal).then(origin=>{if(!controller.signal.aborted){setSearchOrigin(origin);setLocationState("Approximate location from your IP");}}).catch(()=>{if(!controller.signal.aborted)setLocationState("Could not detect your area. Choose a starting area below.");});
+    return ()=>controller.abort();
+  },[]);
   const calculation = useMemo(() => {
     try {
-      return { trips: optimize(catalog, basket, prefs), error: "" };
+      return {
+        trips: optimize(
+          catalog,
+          basket,
+          prefs,
+          currentRoutes,
+        ),
+        error: "",
+      };
     } catch (e) {
-      return { trips: [], error: (e as Error).message };
+      return {
+        trips: [],
+        error: (e as Error).message,
+      };
     }
-  }, [catalog, basket, prefs]);
+  }, [catalog, basket, prefs, currentRoutes]);
+
   const complete = calculation.trips.filter((t) => !t.missing.length),
     best = complete[0],
     active = complete.find((t) => t.id === selected) ?? best;
+
   const swaps = useMemo(() => {
     try {
-      return suggestSwaps(catalog, basket, prefs);
+      return suggestSwaps(
+        catalog,
+        basket,
+        prefs,
+        currentRoutes,
+      );
     } catch {
       return [];
     }
-  }, [catalog, basket, prefs]);
+  }, [catalog, basket, prefs, currentRoutes]);
+
   const singles = complete.filter((t) => t.stops.length === 1),
     extra =
       best && singles[0] && best.stops.length > 1
@@ -189,7 +286,7 @@ export default function Stretch({
           </div>
           <Route />
         </section>
-        <section className="compare">
+        {checkoutBasket && <section className="compare">
           <div className="comparison-paper">
             <p className="eyebrow">SAME LIST. DIFFERENT TRIPS.</p>
             <h2>Find your sweet spot.</h2>
@@ -271,40 +368,21 @@ export default function Stretch({
           <button className="list-banner" onClick={plan}>
             YOUR NEXT GOOD TRIP STARTS WITH A LIST. <span>BUILD MY LIST ↗</span>
           </button>
-        </section>
-        <PriceAgent
-          key={JSON.stringify([basket, prefs.area])}
-          zip={centers[prefs.area].zip}
-          items={basket.map((item) => {
-            const p = catalog.products.find((p) => p.id === item.productId)!;
-            return {
-              id: p.id,
-              name: p.name,
-              unit: p.unit,
-              quantity: item.quantity,
-            };
-          })}
-        />
-        <LiveSources
-          area={prefs.area}
-          onArea={(area) => change("area", area)}
-          onFuel={(quote) => {
-            change("gas", quote.dollarsPerGallon);
-            setFuelSource(quote);
-            setNotice(
-              `Using ${quote.stationName}'s reported station price. Grocery prices and route distances are still sample data; a gas-station detour is not included.`,
-            );
-          }}
-        />
+        </section>}
         <section
           id="planner"
           className={"planner " + (!showPlanner ? "collapsed" : "")}
         >
+
           <div className="section-head">
             <div>
               <p className="eyebrow">LET’S MAKE THE NUMBERS WORK</p>
-              <h2>Your list. Your rules.</h2>
+              <h2>First, pick your food.</h2>
+              <p className="small" role="status">
+                {routesLoading || !currentRoutes ? "Loading driving routes…" : "Driving routes ready"}
+              </p>
             </div>
+
             <button
               className="text-button"
               onClick={() => setShowPlanner(!showPlanner)}
@@ -312,21 +390,27 @@ export default function Stretch({
               {showPlanner ? "Hide planner −" : "Open planner +"}
             </button>
           </div>
+
           {showPlanner && (
             <>
               <div className="settings">
                 <label>
                   Starting area
                   <select
-                    value={prefs.area}
-                    onChange={(e) =>
-                      change("area", e.target.value as Preferences["area"])
-                    }
+                    value={searchOrigin && ipArea ? "ip" : searchOrigin ? prefs.area : "pending"}
+                    onChange={(e) => {
+                      if(e.target.value === "ip" || e.target.value === "pending") return;
+                      const area=e.target.value as Preferences["area"];
+                      change("area",area);setIpArea(false);setSearchOrigin({...centers[area],label:area});setLocationState("Starting area selected manually");
+                    }}
                   >
+                    {!searchOrigin && <option value="pending">{locationState}</option>}
+                    {searchOrigin && ipArea && <option value="ip">Current IP area: {searchOrigin.label}</option>}
                     <option value="downtown">Downtown Atlanta</option>
                     <option value="midtown">Midtown Atlanta</option>
                     <option value="decatur">Decatur</option>
                   </select>
+                  <small>{locationState}</small>
                 </label>
                 {(["budget", "mpg", "gas"] as const).map((k) => (
                   <label key={k}>
@@ -410,11 +494,12 @@ export default function Stretch({
                     </button>
                   </div>
                   <div className="products">
+                    {!search.trim() && !basket.length && <p className="empty-list">Your grocery list is empty. Search for a food to add it.</p>}
                     {catalog.products
                       .filter((p) =>
-                        (p.name + " " + p.category)
+                        search.trim() ? (p.name + " " + p.category)
                           .toLowerCase()
-                          .includes(search.toLowerCase()),
+                          .includes(search.trim().toLowerCase()) : basket.some(item=>item.productId===p.id),
                       )
                       .map((p) => {
                         const q =
@@ -453,6 +538,9 @@ export default function Stretch({
                   </div>
                 </div>
                 <aside aria-live="polite">
+                  <p className="eyebrow">STEP 1 · BUILD YOUR FOOD LIST</p>
+                  <p>{basket.length} different foods selected. Checkout searches nearby groceries and gas stations.</p>
+                  <button className="cta" disabled={!basket.length || !searchOrigin || checkoutBusy || basket.some(i=>i.quantity>20)} onClick={checkout}>{checkoutBusy ? "FINDING YOUR AREA…" : "CHECKOUT · FIND MY STOPS"}</button>
                   <p className="eyebrow">YOUR NEXT GOOD TRIP</p>
                   <h2>
                     {active ? money(active.totalCents) : "Let’s find a way."}
@@ -592,6 +680,41 @@ export default function Stretch({
             </>
           )}
         </section>
+        {checkoutBasket && <div id="checkout-results">
+        <p className="eyebrow">STEP 2 · YOUR STORES & GAS STOPS</p>
+        <button type="button" onClick={plan}>Edit your food list</button>
+        <PriceAgent
+          autoStart
+          key={JSON.stringify([checkoutRun, checkoutBasket, prefs.area])}
+          zip={searchOrigin?.zip ?? centers[prefs.area].zip}
+          area={prefs.area}
+          origin={searchOrigin}
+          items={checkoutBasket.map((item) => {
+            const p = catalog.products.find((p) => p.id === item.productId)!;
+            return {
+              id: p.id,
+              name: p.name,
+              unit: p.unit,
+              quantity: item.quantity,
+            };
+          })}
+        />
+        <LiveSources
+          key={checkoutRun}
+          autoLoad
+          area={prefs.area}
+          origin={searchOrigin}
+          onOrigin={setSearchOrigin}
+          onArea={(area) => change("area", area)}
+          onFuel={(quote) => {
+            change("gas", quote.dollarsPerGallon);
+            setFuelSource(quote);
+            setNotice(
+              `Using ${quote.stationName}'s reported station price. Grocery prices and route distances are still sample data; a gas-station detour is not included.`,
+            );
+          }}
+        />
+        </div>}
         <section id="story" className="story">
           <div>
             <p className="eyebrow">FOOD + FUEL + A PLAN</p>
