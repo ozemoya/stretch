@@ -5,7 +5,11 @@ import { z } from "zod";
 import type { AgentItem } from "./price-agent";
 import type { StoreCoverage } from "./retailer-coverage";
 import type { NearbyPlace } from "./live-data";
-import { freshMarketSpecials } from "./fresh-market-specials";
+import {
+  freshMarketObservedReport,
+  freshMarketSpecials,
+} from "./fresh-market-specials";
+import { mergeCatalogReports } from "./merge-catalog-reports";
 
 export type ScrapedProduct = {
   id: string;
@@ -190,17 +194,23 @@ export async function scrapeRetailers(
 ): Promise<ScrapeReport[]> {
   const reports: ScrapeReport[] = [];
   for (const retailer of new Set(stores.map((s) => s.retailer))) {
-    if (retailer === "Trader Joe’s") { reports.push(await traderJoesReport(items,plan)); continue; }
+    if (retailer === "Trader Joe’s") {
+      reports.push(await traderJoesReport(items, plan));
+      continue;
+    }
     if (retailer === "The Fresh Market") {
+      const observed = freshMarketObservedReport(places, items);
       try {
-        reports.push(await freshMarketSpecials(places, items));
+        reports.push(
+          mergeCatalogReports(
+            observed,
+            await freshMarketSpecials(places, items),
+          ),
+        );
       } catch {
         reports.push({
-          retailer,
-          status: "failed",
-          detail:
-            "Weekly offer source could not be retrieved. Prices remain unknown.",
-          lines: [],
+          ...observed,
+          detail: `${observed.detail} Weekly offer source could not be retrieved.`,
         });
       }
       continue;

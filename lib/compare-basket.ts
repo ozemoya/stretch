@@ -12,6 +12,7 @@ import { groceryFeed } from "@/lib/grocery-feed";
 import { scrapeRetailers } from "@/lib/retailer-scraper";
 import type { ScrapeReport } from "@/lib/retailer-scraper";
 import { providerReports } from "@/lib/provider-prices";
+import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
 import type { SearchPlan } from "@/lib/local-search-agent";
 export const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
@@ -41,7 +42,11 @@ export const input = z.object({
     .max(30),
 });
 let running = false;
-export async function compareBasket(request: Request, onReport?: (report: ScrapeReport) => void, agentPlan?: SearchPlan) {
+export async function compareBasket(
+  request: Request,
+  onReport?: (report: ScrapeReport) => void,
+  agentPlan?: SearchPlan,
+) {
   if (running)
     return Response.json(
       { error: "A price check is already running. Please try again shortly." },
@@ -67,11 +72,26 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([
       scrapeRetailers(coverage, p.items, mapped.places, agentPlan),
-      providerReports([...new Set(coverage.map(c => c.retailer))], p.items, p.zip, true, false, onReport, agentPlan),
+      providerReports(
+        [...new Set(coverage.map((c) => c.retailer))],
+        p.items,
+        p.zip,
+        true,
+        false,
+        onReport,
+        agentPlan,
+      ),
     ]);
     for (const report of providerCatalogs) {
-      const index = publicCatalogs.findIndex(r => r.retailer === report.retailer);
-      if (index >= 0) publicCatalogs[index] = report; else publicCatalogs.push(report);
+      const index = publicCatalogs.findIndex(
+        (r) => r.retailer === report.retailer,
+      );
+      if (index >= 0) {
+        publicCatalogs[index] =
+          report.retailer === "The Fresh Market"
+            ? mergeCatalogReports(publicCatalogs[index], report)
+            : report;
+      } else publicCatalogs.push(report);
     }
     const checkedStores = [] as Awaited<ReturnType<typeof checkStores>>;
     const warnings: string[] = [];
@@ -136,7 +156,8 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
               ...p.items.slice(10).map((item) => ({
                 item,
                 candidates: [],
-                error: "Not checked in this run due to provider request limits.",
+                error:
+                  "Not checked in this run due to provider request limits.",
               })),
             ],
           });
@@ -150,7 +171,14 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
     return Response.json(
       {
         stores: checkedStores,
-        agent: { aiConnected: !!agentPlan, mode: agentPlan ? `Local AI planned product searches using ${agentPlan.model}; prices still come from validated retailer pages.` : process.env.BRIGHT_DATA_SERP_ZONE ? "Website search is running; the local AI model is unavailable." : "The local AI model and website search provider are unavailable." },
+        agent: {
+          aiConnected: !!agentPlan,
+          mode: agentPlan
+            ? `Local AI planned product searches using ${agentPlan.model}; prices still come from validated retailer pages.`
+            : process.env.BRIGHT_DATA_SERP_ZONE
+              ? "Website search is running; the local AI model is unavailable."
+              : "The local AI model and website search provider are unavailable.",
+        },
         publicCatalogs,
         storeCoverage: coverage,
         warnings,

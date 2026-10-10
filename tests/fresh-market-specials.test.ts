@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { parseFreshMarketSpecials } from "../lib/fresh-market-specials";
+import {
+  freshMarketObservedReport,
+  parseFreshMarketSpecials,
+} from "../lib/fresh-market-specials";
 import type { NearbyPlace } from "../lib/live-data";
 const place: NearbyPlace = {
   id: "store",
@@ -62,4 +65,25 @@ it("rejects expired offers, different branches and ambiguous promotions", () => 
       parseFreshMarketSpecials(html(price), [place], [item], now).lines[0]
         .products,
     ).toEqual([]);
+});
+it("shows a dated in-store milk observation only for its nearby branch", () => {
+  const milk = { id: "milk", name: "Milk", unit: "1 gal", quantity: 1 };
+  const now = new Date("2026-10-10T05:00:00Z");
+  const report = freshMarketObservedReport([place], [milk], now);
+  expect(report.status).toBe("retrieved");
+  expect(report.lines[0].products).toMatchObject([
+    { priceCents: 1149, size: "1 gal" },
+    { priceCents: 399, size: "0.5 gal", matchKind: "alternative" },
+  ]);
+  expect(
+    freshMarketObservedReport(
+      [{ ...place, address: "3000 Peachtree Road" }],
+      [milk],
+      now,
+    ).lines[0].products,
+  ).toEqual([]);
+  expect(
+    freshMarketObservedReport([place], [milk], new Date("2026-10-11T05:00:00Z"))
+      .lines[0].products,
+  ).toEqual([]);
 });

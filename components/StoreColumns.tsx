@@ -150,6 +150,15 @@ export default function StoreColumns({
                           : "A nearby store on the map does not confirm this branch's shelf price."}
                       </p>
                     )}
+                    {report.retailer === "The Fresh Market" && (
+                      <a
+                        href={`https://shop.thefreshmarket.com/store/the-fresh-market/s?k=${encodeURIComponent(item.name)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Check this food in The Fresh Market catalog ↗
+                      </a>
+                    )}
                   </div>
                 )}
                 {!product && alternatives.length > 0 && (

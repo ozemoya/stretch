@@ -1,0 +1,24 @@
+[
+  {
+    "storeAddress": "2099 Peachtree Road NE",
+    "id": "20704843",
+    "name": "Organic Valley Organic 2% (Reduced Fat) Milk",
+    "brand": "Organic Valley",
+    "size": "1 gal",
+    "priceCents": 1149,
+    "sourceUrl": "https://shop.thefreshmarket.com/store/the-fresh-market/products/20704843-organic-valley-organic-reduced-fat-2-milk-ultra-pasteurized-128-oz",
+    "imageUrl": "https://www.instacart.com/assets/domains/product-image/file/large_7a314837-aea6-4b01-8826-562e573f89a3.jpg",
+    "retrievedAt": "2026-10-10T04:44:36Z"
+  },
+  {
+    "storeAddress": "2099 Peachtree Road NE",
+    "id": "19476600",
+    "name": "The Fresh Market Whole Milk",
+    "brand": "The Fresh Market",
+    "size": "0.5 gal",
+    "priceCents": 399,
+    "sourceUrl": "https://shop.thefreshmarket.com/store/the-fresh-market/products/19476600-the-fresh-market-rbst-free-whole-milk-64-fl-oz",
+    "imageUrl": "https://d2lnr5mha7bycj.cloudfront.net/product-image/file/large_64cdd293-89d0-423f-9f72-75bede9b12c2.jpeg",
+    "retrievedAt": "2026-10-10T04:44:36Z"
+  }
+]
