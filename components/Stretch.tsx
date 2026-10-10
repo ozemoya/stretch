@@ -9,6 +9,7 @@ import { detectLocation } from "@/lib/detect-location";
 import PriceAgent from "./PriceAgent";
 import { centers, type SearchOrigin } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
+import type { GasStop } from "@/lib/gas-stop";
 const money = (c: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     c / 100,
@@ -60,9 +61,7 @@ export default function Stretch({
   source: "demo" | "supabase";
   error?: string;
 }) {
-  const [basket, setBasket] = useState<BasketItem[]>(
-      [],
-    ),
+  const [basket, setBasket] = useState<BasketItem[]>([]),
     [prefs, setPrefs] = useState(defaults),
     [search, setSearch] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
@@ -70,26 +69,62 @@ export default function Stretch({
     [notice, setNotice] = useState(""),
     [showPlanner, setShowPlanner] = useState(true),
     [previousBasket, setPreviousBasket] = useState<BasketItem[] | null>(null);
-  const [checkoutBasket,setCheckoutBasket] = useState<BasketItem[] | null>(null);
-  const [checkoutBusy,setCheckoutBusy] = useState(false);
-  const [checkoutRun,setCheckoutRun] = useState(0);
+  const [checkoutBasket, setCheckoutBasket] = useState<BasketItem[] | null>(
+    null,
+  );
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutRun, setCheckoutRun] = useState(0);
   async function checkout() {
     if (!basket.length || checkoutBusy) return;
     setCheckoutBusy(true);
-    if (!searchOrigin) { setCheckoutBusy(false); return; }
-    setCheckoutBasket(basket.map(item=>({...item})));
-    setCheckoutRun(run=>run+1);
+    if (!searchOrigin) {
+      setCheckoutBusy(false);
+      return;
+    }
+    setCheckoutBasket(basket.map((item) => ({ ...item })));
+    setCheckoutRun((run) => run + 1);
     setCheckoutBusy(false);
-    setTimeout(()=>document.getElementById("checkout-results")?.scrollIntoView({behavior:"smooth"}),50);
+    setTimeout(
+      () =>
+        document
+          .getElementById("checkout-results")
+          ?.scrollIntoView({ behavior: "smooth" }),
+      50,
+    );
   }
   const [fuelSource, setFuelSource] = useState<FuelQuote | null>(null);
+  const [gasStop, setGasStop] = useState<GasStop | null>(null);
+  const [manualGas, setManualGas] = useState(defaults.gas);
+  const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
+  const [ipArea, setIpArea] = useState(true);
+  const [locationState, setLocationState] = useState("Detecting your IP area…");
+  useEffect(() => {
+    const controller = new AbortController();
+    detectLocation(controller.signal)
+      .then((origin) => {
+        if (!controller.signal.aborted) {
+          setSearchOrigin(origin);
+          setLocationState("Approximate location from your IP");
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setLocationState(
+            "Could not detect your area. Choose a starting area below.",
+          );
+      });
+    return () => controller.abort();
+  }, []);
+  const routeKey = gasStop
+    ? `${gasStop.id}:${gasStop.lat}:${gasStop.lon}:${searchOrigin?.lat ?? ""}:${searchOrigin?.lon ?? ""}`
+    : "no-gas-stop";
 
-  const [routeData, setRouteData] =
-    useState<{
-      area: typeof prefs.area;
-      catalog: Catalog;
-      routes: RouteMeasurements;
-    } | null>(null);
+  const [routeData, setRouteData] = useState<{
+    area: typeof prefs.area;
+    routeKey: string;
+    catalog: Catalog;
+    routes: RouteMeasurements;
+  } | null>(null);
 
   const [routesLoading, setRoutesLoading] = useState(true);
 
@@ -103,11 +138,14 @@ export default function Stretch({
         const routes = await getRouteMeasurements(
           catalog,
           prefs.area,
+          gasStop,
+          searchOrigin,
         );
 
         if (!cancelled) {
           setRouteData({
             area: prefs.area,
+            routeKey,
             catalog,
             routes,
           });
@@ -130,33 +168,26 @@ export default function Stretch({
     return () => {
       cancelled = true;
     };
-  }, [catalog, prefs.area]);
+  }, [catalog, prefs.area, routeKey]);
 
   const currentRoutes =
     routeData?.area === prefs.area &&
+    routeData.routeKey === routeKey &&
     routeData.catalog === catalog
       ? routeData.routes
       : undefined;
 
-
-
-  const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
-  const [ipArea,setIpArea] = useState(true);
-  const [locationState,setLocationState] = useState("Detecting your IP area…");
-  useEffect(()=>{
-    const controller=new AbortController();
-    detectLocation(controller.signal).then(origin=>{if(!controller.signal.aborted){setSearchOrigin(origin);setLocationState("Approximate location from your IP");}}).catch(()=>{if(!controller.signal.aborted)setLocationState("Could not detect your area. Choose a starting area below.");});
-    return ()=>controller.abort();
-  },[]);
   const calculation = useMemo(() => {
     try {
+      if (gasStop && !currentRoutes)
+        return {
+          trips: [],
+          error: routesLoading
+            ? "Calculating the route through your selected gas station…"
+            : "A driving route through this gas station is unavailable. Choose another stop or retry.",
+        };
       return {
-        trips: optimize(
-          catalog,
-          basket,
-          prefs,
-          currentRoutes,
-        ),
+        trips: optimize(catalog, basket, prefs, currentRoutes, !!gasStop),
         error: "",
       };
     } catch (e) {
@@ -165,7 +196,7 @@ export default function Stretch({
         error: (e as Error).message,
       };
     }
-  }, [catalog, basket, prefs, currentRoutes]);
+  }, [catalog, basket, prefs, currentRoutes, gasStop, routesLoading]);
 
   const complete = calculation.trips.filter((t) => !t.missing.length),
     best = complete[0],
@@ -173,16 +204,12 @@ export default function Stretch({
 
   const swaps = useMemo(() => {
     try {
-      return suggestSwaps(
-        catalog,
-        basket,
-        prefs,
-        currentRoutes,
-      );
+      if (gasStop && !currentRoutes) return [];
+      return suggestSwaps(catalog, basket, prefs, currentRoutes, !!gasStop);
     } catch {
       return [];
     }
-  }, [catalog, basket, prefs, currentRoutes]);
+  }, [catalog, basket, prefs, currentRoutes, gasStop]);
 
   const singles = complete.filter((t) => t.stops.length === 1),
     extra =
@@ -207,7 +234,22 @@ export default function Stretch({
     setSelected(null);
   }
   function change<K extends keyof Preferences>(key: K, value: Preferences[K]) {
-    if (key === "gas") setFuelSource(null);
+    if (key === "gas") {
+      setFuelSource(null);
+      setManualGas(value as number);
+    }
+    if (key === "area") {
+      setGasStop(null);
+      setFuelSource(null);
+      setPrefs((old) => ({
+        ...old,
+        area: value as Preferences["area"],
+        gas: manualGas,
+      }));
+      setChecked([]);
+      setSelected(null);
+      return;
+    }
     setPrefs((old) => ({ ...old, [key]: value }));
     setChecked([]);
     setSelected(null);
@@ -218,6 +260,12 @@ export default function Stretch({
       "STRETCH — SHOPPING PLAN",
       `Sample distances · ${active.miles} miles round trip`,
       `Groceries ${money(active.foodCents)} + fuel ${money(active.fuelCents)} = ${money(active.totalCents)}`,
+      ...(gasStop
+        ? [
+            `Gas stop: ${gasStop.name}, ${gasStop.address}`,
+            `Fuel price: $${prefs.gas.toFixed(3)} per gallon${fuelSource ? " (reported)" : " (entered estimate)"}`,
+          ]
+        : []),
       ...active.stops.flatMap((s) => [
         "",
         s.store.name,
@@ -286,100 +334,112 @@ export default function Stretch({
           </div>
           <Route />
         </section>
-        {checkoutBasket && <section className="compare">
-          <div className="comparison-paper">
-            <p className="eyebrow">SAME LIST. DIFFERENT TRIPS.</p>
-            <h2>Find your sweet spot.</h2>
-            <p className="source">
-              {source === "supabase"
-                ? "Catalog connected to Supabase"
-                : "Demo catalog"}{" "}
-              ·{" "}
-              {catalog.offers.every((o) => o.isSample)
-                ? "Fictional sample prices"
-                : "Check individual price sources"}{" "}
-              · illustrative distances
-            </p>
-            <p className="small">
-              {fuelSource
-                ? `Fuel estimate: ${fuelSource.stationName}, reported ${new Date(fuelSource.period).toLocaleString()}. Gas stop detour excluded.`
-                : "Fuel estimate: manually entered gas price."}
-            </p>
-            {error && (
-              <p role="status" className="alert">
-                {error}
+        {checkoutBasket && (
+          <section className="compare">
+            <div className="comparison-paper">
+              <p className="eyebrow">SAME LIST. DIFFERENT TRIPS.</p>
+              <h2>Find your sweet spot.</h2>
+              <p className="source">
+                {source === "supabase"
+                  ? "Catalog connected to Supabase"
+                  : "Demo catalog"}{" "}
+                ·{" "}
+                {catalog.offers.every((o) => o.isSample)
+                  ? "Fictional sample prices"
+                  : "Check individual price sources"}{" "}
+                · illustrative distances
               </p>
-            )}
-            <div className="trip-cards">
-              {complete.slice(0, 3).map((t, i) => (
-                <button
-                  key={t.id}
-                  className={
-                    "trip-card " + (active?.id === t.id ? "chosen" : "")
-                  }
-                  onClick={() => {
-                    setSelected(t.id);
-                    setShowPlanner(true);
-                    setChecked([]);
-                  }}
-                  aria-pressed={active?.id === t.id}
-                >
-                  <span className="eyebrow">
-                    {i === 0 ? "LOWEST TOTAL" : t.stops.length + " STOP OPTION"}
-                  </span>
-                  <h3>{t.stops.map((s) => s.store.name).join(" + ")}</h3>
-                  <strong>{money(t.totalCents)}</strong>
-                  <span>
-                    Food {money(t.foodCents)} + fuel {money(t.fuelCents)}
-                  </span>
-                  <span>
-                    {t.stops.length} stop{t.stops.length > 1 ? "s" : ""} ·{" "}
-                    {t.miles} miles · ~{t.minutes} min
-                  </span>
-                  <b>
-                    {t.totalCents <= prefs.budget * 100
-                      ? money(prefs.budget * 100 - t.totalCents) +
-                        " under budget"
-                      : money(t.totalCents - prefs.budget * 100) +
-                        " over budget"}
-                  </b>
-                </button>
-              ))}
+              <p className="small">
+                {gasStop
+                  ? `Route includes ${gasStop.name} after the grocery stops. Fuel uses ${fuelSource ? `its reported price from ${new Date(fuelSource.period).toLocaleString()}` : "your entered gas price"}. Grocery prices remain sample data.`
+                  : "Fuel estimate: manually entered gas price; no gas station selected."}
+              </p>
+              {error && (
+                <p role="status" className="alert">
+                  {error}
+                </p>
+              )}
+              <div className="trip-cards">
+                {complete.slice(0, 3).map((t, i) => (
+                  <button
+                    key={t.id}
+                    className={
+                      "trip-card " + (active?.id === t.id ? "chosen" : "")
+                    }
+                    onClick={() => {
+                      setSelected(t.id);
+                      setShowPlanner(true);
+                      setChecked([]);
+                    }}
+                    aria-pressed={active?.id === t.id}
+                  >
+                    <span className="eyebrow">
+                      {i === 0
+                        ? "LOWEST TOTAL"
+                        : t.stops.length + " STOP OPTION"}
+                    </span>
+                    <h3>{t.stops.map((s) => s.store.name).join(" + ")}</h3>
+                    <strong>{money(t.totalCents)}</strong>
+                    <span>
+                      Food {money(t.foodCents)} + fuel {money(t.fuelCents)}
+                    </span>
+                    <span>
+                      {t.stops.length} grocery stop
+                      {t.stops.length > 1 ? "s" : ""}
+                      {gasStop ? ` + ${gasStop.name}` : ""} · {t.miles} miles ·
+                      ~{t.minutes} min
+                    </span>
+                    <b>
+                      {t.totalCents <= prefs.budget * 100
+                        ? money(prefs.budget * 100 - t.totalCents) +
+                          " under budget"
+                        : money(t.totalCents - prefs.budget * 100) +
+                          " over budget"}
+                    </b>
+                  </button>
+                ))}
+              </div>
+              {!complete.length && (
+                <p role="status">
+                  {calculation.error ||
+                    (!basket.length
+                      ? "Add items to your list to compare trips."
+                      : "No complete trip matches this list. Review dietary conflicts or substitutions below.")}
+                </p>
+              )}
+              {extra > 0 && (
+                <p className="tradeoff">
+                  One extra stop saves {money(extra)} versus the cheapest single
+                  store. Your call.
+                </p>
+              )}
+              <p className="small">
+                Fuel includes the drive home
+                {gasStop ? " via your selected gas station" : ""}. Time allows
+                12 minutes per grocery stop
+                {gasStop ? " and 5 minutes for fuel" : ""}; tax excluded.
+              </p>
             </div>
-            {!complete.length && (
-              <p role="status">
-                {calculation.error ||
-                  (!basket.length
-                    ? "Add items to your list to compare trips."
-                    : "No complete trip matches this list. Review dietary conflicts or substitutions below.")}
-              </p>
-            )}
-            {extra > 0 && (
-              <p className="tradeoff">
-                One extra stop saves {money(extra)} versus the cheapest single
-                store. Your call.
-              </p>
-            )}
-            <p className="small">
-              Fuel includes the drive home. Time assumes 25 mph plus 12 minutes
-              per stop; tax excluded.
-            </p>
-          </div>
-          <button className="list-banner" onClick={plan}>
-            YOUR NEXT GOOD TRIP STARTS WITH A LIST. <span>BUILD MY LIST ↗</span>
-          </button>
-        </section>}
+            <button className="list-banner" onClick={plan}>
+              YOUR NEXT GOOD TRIP STARTS WITH A LIST.{" "}
+              <span>BUILD MY LIST ↗</span>
+            </button>
+          </section>
+        )}
         <section
           id="planner"
           className={"planner " + (!showPlanner ? "collapsed" : "")}
         >
-
           <div className="section-head">
             <div>
               <p className="eyebrow">LET’S MAKE THE NUMBERS WORK</p>
               <h2>First, pick your food.</h2>
               <p className="small" role="status">
-                {routesLoading || !currentRoutes ? "Loading driving routes…" : "Driving routes ready"}
+                {routesLoading || !currentRoutes
+                  ? "Loading driving routes…"
+                  : gasStop
+                    ? `Route includes ${gasStop.name}`
+                    : "Driving routes ready"}
               </p>
             </div>
 
@@ -397,15 +457,34 @@ export default function Stretch({
                 <label>
                   Starting area
                   <select
-                    value={searchOrigin && ipArea ? "ip" : searchOrigin ? prefs.area : "pending"}
+                    value={
+                      searchOrigin && ipArea
+                        ? "ip"
+                        : searchOrigin
+                          ? prefs.area
+                          : "pending"
+                    }
                     onChange={(e) => {
-                      if(e.target.value === "ip" || e.target.value === "pending") return;
-                      const area=e.target.value as Preferences["area"];
-                      change("area",area);setIpArea(false);setSearchOrigin({...centers[area],label:area});setLocationState("Starting area selected manually");
+                      if (
+                        e.target.value === "ip" ||
+                        e.target.value === "pending"
+                      )
+                        return;
+                      const area = e.target.value as Preferences["area"];
+                      change("area", area);
+                      setIpArea(false);
+                      setSearchOrigin({ ...centers[area], label: area });
+                      setLocationState("Starting area selected manually");
                     }}
                   >
-                    {!searchOrigin && <option value="pending">{locationState}</option>}
-                    {searchOrigin && ipArea && <option value="ip">Current IP area: {searchOrigin.label}</option>}
+                    {!searchOrigin && (
+                      <option value="pending">{locationState}</option>
+                    )}
+                    {searchOrigin && ipArea && (
+                      <option value="ip">
+                        Current IP area: {searchOrigin.label}
+                      </option>
+                    )}
                     <option value="downtown">Downtown Atlanta</option>
                     <option value="midtown">Midtown Atlanta</option>
                     <option value="decatur">Decatur</option>
@@ -494,12 +573,18 @@ export default function Stretch({
                     </button>
                   </div>
                   <div className="products">
-                    {!search.trim() && !basket.length && <p className="empty-list">Your grocery list is empty. Search for a food to add it.</p>}
+                    {!search.trim() && !basket.length && (
+                      <p className="empty-list">
+                        Your grocery list is empty. Search for a food to add it.
+                      </p>
+                    )}
                     {catalog.products
                       .filter((p) =>
-                        search.trim() ? (p.name + " " + p.category)
-                          .toLowerCase()
-                          .includes(search.trim().toLowerCase()) : basket.some(item=>item.productId===p.id),
+                        search.trim()
+                          ? (p.name + " " + p.category)
+                              .toLowerCase()
+                              .includes(search.trim().toLowerCase())
+                          : basket.some((item) => item.productId === p.id),
                       )
                       .map((p) => {
                         const q =
@@ -539,8 +624,24 @@ export default function Stretch({
                 </div>
                 <aside aria-live="polite">
                   <p className="eyebrow">STEP 1 · BUILD YOUR FOOD LIST</p>
-                  <p>{basket.length} different foods selected. Checkout searches nearby groceries and gas stations.</p>
-                  <button className="cta" disabled={!basket.length || !searchOrigin || checkoutBusy || basket.some(i=>i.quantity>20)} onClick={checkout}>{checkoutBusy ? "FINDING YOUR AREA…" : "CHECKOUT · FIND MY STOPS"}</button>
+                  <p>
+                    {basket.length} different foods selected. Checkout searches
+                    nearby groceries and gas stations.
+                  </p>
+                  <button
+                    className="cta"
+                    disabled={
+                      !basket.length ||
+                      !searchOrigin ||
+                      checkoutBusy ||
+                      basket.some((i) => i.quantity > 20)
+                    }
+                    onClick={checkout}
+                  >
+                    {checkoutBusy
+                      ? "FINDING YOUR AREA…"
+                      : "CHECKOUT · FIND MY STOPS"}
+                  </button>
                   <p className="eyebrow">YOUR NEXT GOOD TRIP</p>
                   <h2>
                     {active ? money(active.totalCents) : "Let’s find a way."}
@@ -680,41 +781,61 @@ export default function Stretch({
             </>
           )}
         </section>
-        {checkoutBasket && <div id="checkout-results">
-        <p className="eyebrow">STEP 2 · YOUR STORES & GAS STOPS</p>
-        <button type="button" onClick={plan}>Edit your food list</button>
-        <PriceAgent
-          autoStart
-          key={JSON.stringify([checkoutRun, checkoutBasket, prefs.area])}
-          zip={searchOrigin?.zip ?? centers[prefs.area].zip}
-          area={prefs.area}
-          origin={searchOrigin}
-          items={checkoutBasket.map((item) => {
-            const p = catalog.products.find((p) => p.id === item.productId)!;
-            return {
-              id: p.id,
-              name: p.name,
-              unit: p.unit,
-              quantity: item.quantity,
-            };
-          })}
-        />
-        <LiveSources
-          key={checkoutRun}
-          autoLoad
-          area={prefs.area}
-          origin={searchOrigin}
-          onOrigin={setSearchOrigin}
-          onArea={(area) => change("area", area)}
-          onFuel={(quote) => {
-            change("gas", quote.dollarsPerGallon);
-            setFuelSource(quote);
-            setNotice(
-              `Using ${quote.stationName}'s reported station price. Grocery prices and route distances are still sample data; a gas-station detour is not included.`,
-            );
-          }}
-        />
-        </div>}
+        {checkoutBasket && (
+          <div id="checkout-results">
+            <p className="eyebrow">STEP 2 · YOUR STORES & GAS STOPS</p>
+            <button type="button" onClick={plan}>
+              Edit your food list
+            </button>
+            <PriceAgent
+              autoStart
+              key={JSON.stringify([checkoutRun, checkoutBasket, prefs.area])}
+              zip={searchOrigin?.zip ?? centers[prefs.area].zip}
+              area={prefs.area}
+              origin={searchOrigin}
+              items={checkoutBasket.map((item) => {
+                const p = catalog.products.find(
+                  (p) => p.id === item.productId,
+                )!;
+                return {
+                  id: p.id,
+                  name: p.name,
+                  unit: p.unit,
+                  quantity: item.quantity,
+                };
+              })}
+            />
+            <LiveSources
+              key={checkoutRun}
+              autoLoad
+              area={prefs.area}
+              origin={searchOrigin}
+              onOrigin={(next) => {
+                setSearchOrigin(next);
+                setGasStop(null);
+                setFuelSource(null);
+                setPrefs((previous) => ({ ...previous, gas: manualGas }));
+              }}
+              onArea={(area) => change("area", area)}
+              selectedStation={gasStop}
+              onStation={(stop, quote) => {
+                setGasStop(stop);
+                setFuelSource(quote);
+                setPrefs((previous) => ({
+                  ...previous,
+                  gas: quote?.dollarsPerGallon ?? manualGas,
+                }));
+                setSelected(null);
+                setChecked([]);
+                setNotice(
+                  stop
+                    ? `${stop.name} added to your trip. ${quote ? "Using its reported pump price." : "Using your entered gas price."} Recalculating the route and fuel cost.`
+                    : "Gas stop removed from your trip.",
+                );
+              }}
+            />
+          </div>
+        )}
         <section id="story" className="story">
           <div>
             <p className="eyebrow">FOOD + FUEL + A PLAN</p>
@@ -757,7 +878,8 @@ export default function Stretch({
                   </p>
                   <hr />
                   <p>
-                    {active.stops.length} stops · {active.miles} miles
+                    {active.stops.length} grocery stops
+                    {gasStop ? ` + ${gasStop.name}` : ""} · {active.miles} miles
                   </p>
                 </>
               )}

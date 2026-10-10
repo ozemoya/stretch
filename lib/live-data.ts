@@ -507,6 +507,8 @@ export type StationPrice = {
   id: string;
   name: string;
   address: string;
+  lat: number;
+  lon: number;
   miles: number;
   mapUrl: string;
   dollarsPerGallon: number | null;
@@ -614,6 +616,8 @@ export function normalizeLocalFuel(
           id: p.id,
           name: p.displayName.text,
           address: p.formattedAddress ?? "Address not supplied",
+          lat: p.location.latitude,
+          lon: p.location.longitude,
           mapUrl: p.googleMapsUri,
           miles: Math.round(miles * 10) / 10,
           dollarsPerGallon:

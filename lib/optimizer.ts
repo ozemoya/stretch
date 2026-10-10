@@ -10,12 +10,12 @@ const between = [
   [3, 6, 0],
 ];
 
-
 function getRoute(
   selected: number[],
   catalog: Catalog,
   area: Preferences["area"],
   routes?: RouteMeasurements,
+  requireMeasuredRoute = false,
 ) {
   const fallbackDistances = areas[area];
 
@@ -32,17 +32,13 @@ function getRoute(
     order: selected,
   };
 
-  if (!routes) return fallback;
+  if (!routes) return requireMeasuredRoute ? null : fallback;
 
   const orders =
-    selected.length === 2
-      ? [selected, [...selected].reverse()]
-      : [selected];
+    selected.length === 2 ? [selected, [...selected].reverse()] : [selected];
 
   const candidates = orders.flatMap((order) => {
-    const key = order
-      .map((i) => catalog.stores[i].id)
-      .join("|");
+    const key = order.map((i) => catalog.stores[i].id).join("|");
 
     const route = routes[key];
 
@@ -60,20 +56,17 @@ function getRoute(
   });
 
   return (
-    candidates.sort(
-      (a, b) =>
-        a.miles - b.miles ||
-        a.minutes - b.minutes,
-    )[0] ?? fallback
+    candidates.sort((a, b) => a.miles - b.miles || a.minutes - b.minutes)[0] ??
+    (requireMeasuredRoute ? null : fallback)
   );
 }
-
 
 export function optimize(
   catalog: Catalog,
   basket: BasketItem[],
   p: Preferences,
   routes?: RouteMeasurements,
+  requireMeasuredRoute = false,
 ): Trip[] {
   if (!basket.length) return [];
   if (
@@ -149,7 +142,9 @@ export function optimize(
       catalog,
       p.area,
       routes,
+      requireMeasuredRoute,
     );
+    if (!route) continue;
 
     const miles = route.miles;
 
@@ -162,16 +157,15 @@ export function optimize(
     trips.push({
       id: stops.map((x) => x.store.id).join("-"),
       stops: route.order.map((i) =>
-        stops.find(
-          (s) => s.store.id === catalog.stores[i].id
-        )!
+        stops.find((s) => s.store.id === catalog.stores[i].id)!,
       ),
       missing,
       foodCents,
       fuelCents,
       totalCents: foodCents + fuelCents,
       miles,
-      minutes: route.minutes + stops.length * 12,
+      minutes:
+        route.minutes + stops.length * 12 + (requireMeasuredRoute ? 5 : 0),
     });
   }
   return trips.sort(
@@ -187,9 +181,9 @@ export function suggestSwaps(
   basket: BasketItem[],
   p: Preferences,
   routes?: RouteMeasurements,
+  requireMeasuredRoute = false,
 ) {
-
-  const baseline = optimize(catalog, basket, p, routes);
+  const baseline = optimize(catalog, basket, p, routes, requireMeasuredRoute);
   const best = baseline.find((t) => !t.missing.length);
   const conflicts = Math.min(...baseline.map((t) => t.missing.length));
   return catalog.swaps.flatMap((s) => {
@@ -211,7 +205,13 @@ export function suggestSwaps(
         item.quantity +
         (basket.find((x) => x.productId === s.toId)?.quantity ?? 0),
     });
-    const candidates = optimize(catalog, updated, p, routes);
+    const candidates = optimize(
+      catalog,
+      updated,
+      p,
+      routes,
+      requireMeasuredRoute,
+    );
     const after =
       candidates.find((t) => !t.missing.length) ??
       candidates.sort((a, b) => a.missing.length - b.missing.length)[0];
@@ -222,13 +222,9 @@ export function suggestSwaps(
   });
 }
 
-
 export type RouteMeasurement = {
   miles: number;
   minutes: number;
 };
 
-export type RouteMeasurements = Record<
-  string,
-  RouteMeasurement
->;
+export type RouteMeasurements = Record<string, RouteMeasurement>;

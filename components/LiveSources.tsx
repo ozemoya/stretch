@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { detectLocation } from "@/lib/detect-location";
 import { originQuery, type SearchOrigin } from "@/lib/locations";
 import type { Area, FuelQuote, NearbyPlace } from "@/lib/live-data";
+import type { GasStop } from "@/lib/gas-stop";
 import StopFinder from "./StopFinder";
 import OpenMap from "./OpenMap";
 
@@ -29,14 +30,16 @@ async function request<T>(url: string): Promise<T> {
 }
 export default function LiveSources({
   area,
-  onFuel,
+  onStation,
+  selectedStation,
   onArea,
   origin,
   onOrigin,
   autoLoad = false,
 }: {
   area: Area;
-  onFuel: (quote: FuelQuote) => void;
+  onStation: (stop: GasStop | null, quote: FuelQuote | null) => void;
+  selectedStation: GasStop | null;
   onArea: (area: Area) => void;
   origin: SearchOrigin | null;
   onOrigin: (origin: SearchOrigin | null) => void;
@@ -53,7 +56,11 @@ export default function LiveSources({
   const [detecting, setDetecting] = useState(true);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (origin) { setDetecting(false); setLocationNote(`Using ${origin.label} for your checkout search.`); return; }
+    if (origin) {
+      setDetecting(false);
+      setLocationNote(`Using ${origin.label} for your checkout search.`);
+      return;
+    }
     let active = true;
     const controller = new AbortController();
     setDetecting(true);
@@ -232,7 +239,13 @@ export default function LiveSources({
         and mobile networks can change the result; your IP is not saved by
         Stretch.
       </p>
-      <StopFinder area={area} origin={origin} onFuel={onFuel} autoLoad={autoLoad} />
+      <StopFinder
+        area={area}
+        origin={origin}
+        onStation={onStation}
+        selectedStation={selectedStation}
+        autoLoad={autoLoad}
+      />
       <article className="live-card grocery-connection">
         <span className="live-badge">
           {status?.kroger
