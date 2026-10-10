@@ -27,6 +27,16 @@ import {
   hasVisibleBranchPrice,
   hasVisibleCatalogPrice,
 } from "@/lib/visible-price-results";
+
+function upsertReport(reports: ScrapeReport[], report: ScrapeReport, items: AgentItem[]) {
+  const normalized = normalizeCatalogReport(report, items);
+  const index = reports.findIndex((entry) => entry.retailer === normalized.retailer);
+  if (index < 0) return [...reports, normalized];
+  const next = [...reports];
+  next[index] = normalizeCatalogReport(mergeCatalogReports(next[index], normalized), items);
+  return next;
+}
+
 export default function PriceAgent({
   items,
   zip,
@@ -61,6 +71,8 @@ export default function PriceAgent({
     agent?: { aiConnected: boolean; mode: string; reviewedMatches?: number };
   } | null>(null);
   const [liveReports, setLiveReports] = useState<ScrapeReport[]>([]);
+  const [sourcesBusy, setSourcesBusy] = useState(false);
+  const [sourceError, setSourceError] = useState("");
   const [agentStage, setAgentStage] = useState<
     "waiting" | "planning" | "ready" | "reviewing" | "reviewed" | "unavailable"
   >("waiting");
@@ -75,6 +87,7 @@ export default function PriceAgent({
   const started = useRef(false);
   const epoch = useRef(new SearchEpoch());
   const requestController = useRef<AbortController | null>(null);
+  const providerController = useRef<AbortController | null>(null);
   const inputKey = JSON.stringify([
     zip,
     area,
@@ -88,8 +101,11 @@ export default function PriceAgent({
     if (previousInput.current === inputKey) return;
     previousInput.current = inputKey;
     requestController.current?.abort();
+    providerController.current?.abort();
     epoch.current.cancel();
     setBusy(false);
+    setSourcesBusy(false);
+    setSourceError("");
     setResult(null);
     setLiveReports([]);
     setChoices({});
@@ -97,6 +113,7 @@ export default function PriceAgent({
   useEffect(
     () => () => {
       requestController.current?.abort();
+      providerController.current?.abort();
       epoch.current.cancel();
     },
     [],
@@ -161,8 +178,8 @@ export default function PriceAgent({
   }, [result?.stores, result?.storeCoverage, origin, area, gasStop]);
   useEffect(() => {
     if (
-      busy ||
-      !result?.publicCatalogs.some(
+      busy || sourcesBusy ||
+      !liveReports.some(
         (report) =>
           report.status === "pending" ||
           report.lines.some((line) =>
@@ -175,7 +192,7 @@ export default function PriceAgent({
       return;
     const timer = setTimeout(() => void refreshProvider(), 20000);
     return () => clearTimeout(timer);
-  }, [busy, result]);
+  }, [busy, sourcesBusy, result, liveReports]);
   useEffect(() => {
     if (!busy) return;
     setPhase(0);
@@ -184,15 +201,19 @@ export default function PriceAgent({
   }, [busy]);
   async function check() {
     requestController.current?.abort();
+    providerController.current?.abort();
     const controller = new AbortController();
     requestController.current = controller;
     const requestId = epoch.current.begin();
     setBusy(true);
+    setSourcesBusy(false);
+    setSourceError("");
     setError("");
     setResult(null);
     setLiveReports([]);
     setAgentStage("waiting");
     setChoices({});
+    let initialComplete = false;
     try {
       const response = await fetch("/api/agent/search", {
         method: "POST",
@@ -243,18 +264,33 @@ export default function PriceAgent({
             if (event.type === "report")
               setLiveReports((previous) =>
                 epoch.current.isCurrent(requestId)
-                  ? [
-                      ...previous.filter(
-                        (r) => r.retailer !== event.report.retailer,
-                      ),
-                      normalizeCatalogReport(event.report, items),
-                    ]
+                  ? upsertReport(previous, event.report, items)
                   : previous,
               );
-            if (event.type === "complete")
+            if (event.type === "complete") {
+              initialComplete = true;
+              setLiveReports([]);
               setResult((previous) =>
                 epoch.current.isCurrent(requestId) ? event.result : previous,
               );
+              setBusy(false);
+              setSourcesBusy(true);
+            }
+            if (event.type === "catalog-review")
+              setResult((previous) => previous && epoch.current.isCurrent(requestId)
+                ? {
+                    ...previous,
+                    publicCatalogs: event.reports,
+                    agent: previous.agent
+                      ? { ...previous.agent, reviewedMatches: event.reviewedMatches }
+                      : previous.agent,
+                  }
+                : previous);
+            if (event.type === "sources-complete") setSourcesBusy(false);
+            if (event.type === "sources-error") {
+              setSourcesBusy(false);
+              setSourceError(event.error);
+            }
           }
           if (chunk.done) break;
         }
@@ -271,25 +307,27 @@ export default function PriceAgent({
             ? settlePendingReports(previous, timeout ? "timeout" : "error")
             : previous,
         );
-        setError(
-          timeout
-            ? "Search timed out. Retry the search."
-            : e instanceof Error
-              ? e.message
-              : "Price check unavailable.",
-        );
+        const message = timeout
+          ? initialComplete ? "Some retailer sources timed out. Prices already found are kept." : "Search timed out. Retry the search."
+          : e instanceof Error ? e.message : "Price check unavailable.";
+        if (initialComplete) setSourceError(message);
+        else setError(message);
       }
     } finally {
-      if (epoch.current.isCurrent(requestId)) setBusy(false);
+      if (epoch.current.isCurrent(requestId)) {
+        setBusy(false);
+        setSourcesBusy(false);
+      }
     }
   }
   async function refreshProvider(retailer?: string, retry = false) {
-    if (!result || busy) return;
-    requestController.current?.abort();
+    if (!result || busy || sourcesBusy) return;
+    providerController.current?.abort();
     const controller = new AbortController();
-    requestController.current = controller;
+    providerController.current = controller;
     const requestId = epoch.current.begin();
-    setBusy(true);
+    setSourcesBusy(true);
+    setSourceError("");
     try {
       const response = await fetch("/api/live/provider-status", {
         method: "POST",
@@ -301,7 +339,8 @@ export default function PriceAgent({
             ? [retailer]
             : [...new Set(result.storeCoverage.map((s) => s.retailer))],
           start: retry,
-          broaden: !retry,
+          broaden: false,
+          stream: true,
         }),
         signal: AbortSignal.any([
           controller.signal,
@@ -310,45 +349,42 @@ export default function PriceAgent({
       });
       if (!epoch.current.isCurrent(requestId)) return;
       if (!response.ok) throw new Error("Could not refresh provider prices.");
-      const data = await response.json();
-      setResult((previous) =>
-        previous && epoch.current.isCurrent(requestId)
-          ? {
-              ...previous,
-              publicCatalogs: previous.publicCatalogs.map((report) => {
-                const update = data.reports.find(
-                  (candidate: ScrapeReport) =>
-                    candidate.retailer === report.retailer,
-                );
-                return update
-                  ? normalizeCatalogReport(
-                      mergeCatalogReports(report, update),
-                      items,
-                    )
-                  : report;
-              }),
-            }
-          : previous,
-      );
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Price refresh did not return a stream.");
+      const decoder = new TextDecoder();
+      let pending = "";
+      try {
+        for (;;) {
+          const chunk = await reader.read();
+          if (!epoch.current.isCurrent(requestId)) break;
+          pending += decoder.decode(chunk.value, { stream: !chunk.done });
+          const messages = pending.split("\n");
+          pending = messages.pop() ?? "";
+          for (const message of messages) {
+            if (!message.trim()) continue;
+            const event = JSON.parse(message);
+            if (event.type === "error") throw new Error(event.error);
+            if (event.type === "report")
+              setLiveReports((previous) => epoch.current.isCurrent(requestId)
+                ? upsertReport(previous, event.report, items)
+                : previous);
+          }
+          if (chunk.done) break;
+        }
+      } finally {
+        if (controller.signal.aborted) await reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+      }
     } catch (e) {
       if (epoch.current.isCurrent(requestId)) {
-        setResult((previous) =>
-          previous && epoch.current.isCurrent(requestId)
-            ? {
-                ...previous,
-                publicCatalogs: settlePendingReports(
-                  previous.publicCatalogs,
-                  e instanceof Error && e.name === "TimeoutError"
-                    ? "timeout"
-                    : "error",
-                ),
-              }
-            : previous,
-        );
-        setError(e instanceof Error ? e.message : "Refresh failed.");
+        setLiveReports((previous) => settlePendingReports(
+          previous,
+          e instanceof Error && e.name === "TimeoutError" ? "timeout" : "error",
+        ));
+        setSourceError(e instanceof Error ? e.message : "Refresh failed.");
       }
     } finally {
-      if (epoch.current.isCurrent(requestId)) setBusy(false);
+      if (epoch.current.isCurrent(requestId)) setSourcesBusy(false);
     }
   }
   const totals =
@@ -380,7 +416,13 @@ export default function PriceAgent({
     ? Math.min(...completeTrips.map((trip) => trip.totalCents))
     : null;
   const alternatives = nearbyAlternatives(result?.stores ?? [], choices);
-  const visibleCatalogs = result?.publicCatalogs.filter(hasVisibleCatalogPrice) ?? [];
+  const catalogReports = result
+    ? liveReports.reduce(
+        (reports, report) => upsertReport(reports, report, items),
+        result.publicCatalogs,
+      )
+    : [];
+  const visibleCatalogs = catalogReports.filter(hasVisibleCatalogPrice);
   const visibleBranches = result?.stores.filter(hasVisibleBranchPrice) ?? [];
   return (
     <section
@@ -416,8 +458,10 @@ export default function PriceAgent({
           type="button"
           onClick={() => {
             requestController.current?.abort();
+            providerController.current?.abort();
             epoch.current.cancel();
             setBusy(false);
+            setSourcesBusy(false);
             setLiveReports([]);
             setError("Search canceled. You can retry when ready.");
           }}
@@ -464,11 +508,17 @@ export default function PriceAgent({
                   : [
                       "Finding stores and connected sources…",
                       "Searching products and checking packages…",
-                      "Waiting for sources to respond…",
+                      "Preparing the first comparison…",
                     ][phase]}
-          <small>Live collection can take a few minutes.</small>
+          <small>Available prices will appear as each source responds.</small>
         </div>
       )}
+      {result && sourcesBusy && (
+        <p role="status" aria-live="polite" className="small">
+          Retailer sources are still loading. {visibleCatalogs.length} have a validated online price so far; you can review results as they arrive.
+        </p>
+      )}
+      {sourceError && <p role="alert" className="small">{sourceError}</p>}
       {result && (
         <>
           {result.agent && (
@@ -569,13 +619,13 @@ export default function PriceAgent({
                 </p>
               ))}
           </div>
-          {!!result.publicCatalogs?.length && (
+          {!!(catalogReports.length || result.storeCoverage.length) && (
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || sourcesBusy}
               onClick={() => void refreshProvider()}
             >
-              {busy ? "Checking progress…" : "Refresh background prices"}
+              {sourcesBusy ? "Checking sources…" : "Refresh background prices"}
             </button>
           )}
           {!!visibleCatalogs.length && (

@@ -58,3 +58,19 @@ it("preserves an in-store observation while full-catalog collection runs and ref
   expect(ready.lines[0].error).toBeUndefined();
   expect(ready.detail.match(/Full catalog search/g)).toHaveLength(1);
 });
+
+it("adds streamed lines to an initially unsupported retailer and settles pending status", () => {
+  const empty: ScrapeReport = { retailer: "Target", status: "unsupported", detail: "No public scraper", lines: [] };
+  const pending: ScrapeReport = {
+    retailer: "Target", status: "pending", detail: "Provider collection",
+    lines: [{ item, products: [], searchStatus: "searching" }],
+  };
+  const searching = mergeCatalogReports(empty, pending);
+  expect(searching.status).toBe("pending");
+  expect(searching.lines[0].searchStatus).toBe("searching");
+  const settled = mergeCatalogReports(searching, {
+    ...pending, status: "failed", lines: [{ item, products: [], searchStatus: "timeout", error: "Timed out" }],
+  });
+  expect(settled.status).toBe("failed");
+  expect(settled.lines[0].searchStatus).toBe("timeout");
+});

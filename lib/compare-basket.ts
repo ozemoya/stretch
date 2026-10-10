@@ -46,6 +46,7 @@ export async function compareBasket(
   request: Request,
   onReport?: (report: ScrapeReport) => void,
   agentPlan?: SearchPlan,
+  options: { deferProvider?: boolean } = {},
 ) {
   const parsed = input.safeParse(await request.json().catch(() => null));
   if (
@@ -72,22 +73,21 @@ export async function compareBasket(
         mapped.places,
         agentPlan,
         request.signal,
-      ).then((reports) => {
-        for (const report of reports)
-          onReport?.(normalizeCatalogReport(report, p.items));
-        return reports;
-      }),
-      providerReports(
-        [...new Set(coverage.map((c) => c.retailer))],
-        p.items,
-        p.zip,
-        true,
-        false,
-        onReport,
-        agentPlan,
-        false,
-        request.signal,
+        (report) => onReport?.(normalizeCatalogReport(report, p.items)),
       ),
+      options.deferProvider
+        ? Promise.resolve([] as ScrapeReport[])
+        : providerReports(
+            [...new Set(coverage.map((c) => c.retailer))],
+            p.items,
+            p.zip,
+            true,
+            false,
+            onReport,
+            agentPlan,
+            false,
+            request.signal,
+          ),
     ]);
     for (const rawReport of providerCatalogs) {
       const report = normalizeCatalogReport(rawReport, p.items);
@@ -205,6 +205,7 @@ export async function compareBasket(
               ? "Website search is running; AI planning was unavailable or timed out."
               : "AI planning and the website search provider are unavailable.",
         },
+        providerSearchDeferred: options.deferProvider,
         publicCatalogs,
         storeCoverage: coverage,
         warnings,

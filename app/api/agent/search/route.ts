@@ -114,38 +114,52 @@ export async function POST(request: Request) {
                 report: normalizeCatalogReport(report, p.items),
               }),
             agentPlan ?? undefined,
+            { deferProvider: true },
           );
           const result = await response.json();
-          if (
-            response.ok &&
-            agentPlan &&
-            Array.isArray(result.publicCatalogs)
-          ) {
-            send({ type: "agent", stage: "reviewing" });
-            const reviewSignal = AbortSignal.any([
-              request.signal,
-              AbortSignal.timeout(process.env.OPENAI_API_KEY ? 4500 : 2500),
-            ]);
-            const reviewed = await reviewProductMatches(result.publicCatalogs, reviewSignal);
-            result.publicCatalogs = reviewed.reports;
-            result.publicCatalogs = result.publicCatalogs.map(
-              (report: ScrapeReport) => normalizeCatalogReport(report, p.items),
-            );
-            result.agent = {
-              ...result.agent,
-              reviewedMatches: reviewed.reviewed,
-            };
-            send({
-              type: "agent",
-              stage: "reviewed",
-              reviewedMatches: reviewed.reviewed,
-            });
+          if (!response.ok) {
+            send({ type: "error", error: result.error });
+            return;
           }
-          send(
-            response.ok
-              ? { type: "complete", result }
-              : { type: "error", error: result.error },
-          );
+          // The comparison is usable now; slow retailer collection continues on this stream.
+          send({ type: "complete", result });
+          for (const report of cached)
+            if (report.lines.some((line) => line.products.length))
+              send({ type: "report", report: normalizeCatalogReport(report, p.items), cached: true });
+          const reviewTask = agentPlan && Array.isArray(result.publicCatalogs)
+            ? (async () => {
+                send({ type: "agent", stage: "reviewing" });
+                const reviewSignal = AbortSignal.any([
+                  request.signal,
+                  AbortSignal.timeout(process.env.OPENAI_API_KEY ? 4500 : 2500),
+                ]);
+                const reviewed = await reviewProductMatches(result.publicCatalogs, reviewSignal);
+                send({
+                  type: "catalog-review",
+                  reports: reviewed.reports.map((report: ScrapeReport) => normalizeCatalogReport(report, p.items)),
+                  reviewedMatches: reviewed.reviewed,
+                });
+                send({ type: "agent", stage: "reviewed", reviewedMatches: reviewed.reviewed });
+              })()
+            : Promise.resolve();
+          try {
+            await providerReports(
+              [...new Set((result.storeCoverage as { retailer: string }[]).map((store) => store.retailer))],
+              p.items,
+              p.zip,
+              true,
+              false,
+              (report) => send({ type: "report", report: normalizeCatalogReport(report, p.items) }),
+              agentPlan ?? undefined,
+              false,
+              request.signal,
+            );
+            send({ type: "sources-complete" });
+          } catch {
+            if (!request.signal.aborted)
+              send({ type: "sources-error", error: "Some retailer sources did not finish. Available prices are shown." });
+          }
+          await reviewTask;
         } catch {
           send({
             type: "error",

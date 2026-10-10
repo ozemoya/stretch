@@ -51,6 +51,17 @@ it("rejects unrelated products, unpriced packages, non-USD, unsafe links and var
     parseLidlProducts('<div data-grid-data="bad json"></div>', "milk", time),
   ).toEqual([]);
 });
+it("reports each retailer as soon as its adapter finishes", async () => {
+  const seen: string[] = [];
+  const stores = ["Walmart", "Whole Foods"].map((retailer, index) => ({
+    id: String(index), retailer, name: retailer, address: "", miles: 1,
+    lat: 33.75, lon: -84.39, mapUrl: "", status: "unavailable" as const, detail: "",
+  }));
+  const reports = await scrapeRetailers(stores, [{ id: "milk", name: "Milk", quantity: 1, unit: "1 gal" }], [], undefined, undefined,
+    (report) => seen.push(report.retailer));
+  expect(seen).toEqual(["Walmart", "Whole Foods"]);
+  expect(reports.map((report) => report.retailer)).toEqual(seen);
+});
 it.runIf(process.env.STRETCH_LIVE_SMOKE === "1")(
   "retrieves real public Lidl prices without credentials",
   async () => {

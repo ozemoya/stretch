@@ -212,25 +212,30 @@ export async function scrapeRetailers(
   places: NearbyPlace[] = [],
   plan?: SearchPlan,
   signal?: AbortSignal,
+  onReport?: (report: ScrapeReport) => void,
 ): Promise<ScrapeReport[]> {
   const reports: ScrapeReport[] = [];
+  const emit = (report: ScrapeReport) => {
+    reports.push(report);
+    onReport?.(report);
+  };
   for (const retailer of new Set(stores.map((s) => s.retailer))) {
     signal?.throwIfAborted();
     if (retailer === "Trader Joe’s") {
-      reports.push(await traderJoesReport(items, plan));
+      emit(await traderJoesReport(items, plan));
       continue;
     }
     if (retailer === "The Fresh Market") {
       const observed = freshMarketObservedReport(places, items);
       try {
-        reports.push(
+        emit(
           mergeCatalogReports(
             observed,
             await freshMarketSpecials(places, items),
           ),
         );
       } catch {
-        reports.push({
+        emit({
           ...observed,
           detail: `${observed.detail} Weekly offer source could not be retrieved.`,
         });
@@ -238,7 +243,7 @@ export async function scrapeRetailers(
       continue;
     }
     if (retailer !== "Lidl") {
-      reports.push({
+      emit({
         retailer,
         status: ["ALDI", "Sprouts", "Walmart", "Trader Joe’s"].includes(
           retailer,
@@ -279,7 +284,7 @@ export async function scrapeRetailers(
         }
       }
     }));
-    reports.push({
+    emit({
       retailer,
       status: lines.some((l) => l.products.length) ? "retrieved" : "failed",
       detail:
