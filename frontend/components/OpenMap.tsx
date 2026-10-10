@@ -10,6 +10,7 @@ export default function OpenMap({
   origin,
   onSelectFuel,
   selectedFuelId,
+  selectedPlaceId,
 }: {
   area: Area;
   radius: number;
@@ -17,6 +18,7 @@ export default function OpenMap({
   origin?: SearchOrigin | null;
   onSelectFuel?: (place: NearbyPlace) => void;
   selectedFuelId?: string | null;
+  selectedPlaceId?: string | null;
 }) {
   const container = useRef<HTMLDivElement>(null),
     map = useRef<LeafletMap | null>(null);
@@ -71,12 +73,13 @@ export default function OpenMap({
           .bindPopup(centerLabel)
           .addTo(instance);
         for (const place of places) {
+          const highlighted = selectedPlaceId === place.id;
           const popup = document.createElement("div"),
             name = document.createElement("strong"),
             text = document.createElement("p"),
             link = document.createElement("a");
           name.textContent = place.name;
-          text.textContent = `${place.address || "Address not supplied"} · ${place.miles} miles from area center`;
+          text.textContent = `Address: ${place.address || "Not listed in map data"} · ${place.miles} miles from area center`;
           link.href = place.mapUrl;
           link.target = "_blank";
           link.rel = "noreferrer";
@@ -92,20 +95,24 @@ export default function OpenMap({
             select.addEventListener("click", () => selectFuel.current?.(place));
             popup.append(select);
           }
-          L.circleMarker([place.lat, place.lon], {
-            radius: selectedFuelId === place.id ? 10 : 7,
+          const marker = L.circleMarker([place.lat, place.lon], {
+            radius: selectedFuelId === place.id || highlighted ? 10 : 7,
             color:
-              selectedFuelId === place.id
+              selectedFuelId === place.id || highlighted
                 ? "#382b22"
                 : place.kind === "fuel"
                   ? "#c7563e"
                   : "#647426",
             fillColor: place.kind === "fuel" ? "#c7563e" : "#647426",
             fillOpacity: 0.85,
-            weight: selectedFuelId === place.id ? 4 : 2,
+            weight: selectedFuelId === place.id || highlighted ? 4 : 2,
           })
             .bindPopup(popup)
             .addTo(instance);
+          if (highlighted) {
+            instance.panTo([place.lat, place.lon]);
+            marker.openPopup();
+          }
         }
         observer = new ResizeObserver(() => instance.invalidateSize());
         observer.observe(container.current);
@@ -121,7 +128,7 @@ export default function OpenMap({
       map.current?.remove();
       map.current = null;
     };
-  }, [area, radius, places, origin, selectedFuelId]);
+  }, [area, radius, places, origin, selectedFuelId, selectedPlaceId]);
   return (
     <>
       <div

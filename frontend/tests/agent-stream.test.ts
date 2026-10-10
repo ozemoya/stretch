@@ -61,7 +61,7 @@ it("rejects duplicate items before collection", async () => {
   expect(providerReports).not.toHaveBeenCalled();
 });
 
-it("ends the entire response within four seconds even when AI and a retailer ignore abort", async () => {
+it("ends the entire response at the search deadline even when AI and a retailer ignore abort", async () => {
   vi.useFakeTimers();
   vi.mocked(planBasketSearch).mockImplementation(() => new Promise(() => {}));
   let sourceSignal: AbortSignal | undefined;
@@ -77,7 +77,7 @@ it("ends the entire response within four seconds even when AI and a retailer ign
   await vi.advanceTimersByTimeAsync(SEARCH_WINDOW_MS);
   const events = parse(await text);
   expect(events.at(-1).timedOut).toBe(true);
-  expect(events.at(-1).elapsedMs).toBeLessThan(5000);
+  expect(events.at(-1).elapsedMs).toBeLessThan(SEARCH_WINDOW_MS + 1000);
   expect(sourceSignal?.aborted).toBe(true);
   expect(events.find(event => event.type === "complete").result.publicCatalogs[0].lines[0].products[0].priceCents).toBe(329);
   expect(() => late?.()).not.toThrow();
@@ -112,4 +112,22 @@ it("stops unfinished item loading states while retaining verified matches", asyn
   const result = parse(await text).find(event => event.type === "complete").result;
   expect(result.publicCatalogs[0].lines[0].searchStatus).toBe("timeout");
   expect(result.publicCatalogs[0].status).toBe("failed");
+});
+
+it("checks an existing provider job again and streams its price in the same search", async () => {
+  vi.useFakeTimers();
+  const pending = { ...report, status: "pending" as const, lines: [{ item, products: [], searchStatus: "searching" as const }] };
+  vi.mocked(providerReports).mockImplementation(async (_retailers, _items, _zip, start, cacheOnly, onReport) => {
+    if (cacheOnly) return [];
+    const next = start ? pending : report;
+    onReport?.(next);
+    return [next];
+  });
+  const response = await POST(request());
+  const text = response.text();
+  await vi.advanceTimersByTimeAsync(5_000);
+  const events = parse(await text);
+  expect(vi.mocked(providerReports).mock.calls.some((call) => call[3] === false && call[4] === false)).toBe(true);
+  expect(events.find((event) => event.type === "complete").result.publicCatalogs[0].lines[0].products[0].priceCents).toBe(329);
+  expect(events.at(-1).timedOut).toBe(false);
 });

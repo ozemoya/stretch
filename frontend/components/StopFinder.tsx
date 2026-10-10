@@ -16,6 +16,11 @@ export default function StopFinder({
   selectedStation,
   autoLoad = false,
   compact = false,
+  radius: selectedRadius,
+  onRadiusChange,
+  onPlaces,
+  onPlacesError,
+  selectedPlaceId,
 }: {
   area: Area;
   origin: SearchOrigin | null;
@@ -23,10 +28,16 @@ export default function StopFinder({
   selectedStation: GasStop | null;
   autoLoad?: boolean;
   compact?: boolean;
+  radius?: number;
+  onRadiusChange?: (radius: number) => void;
+  onPlaces?: (places: NearbyPlace[]) => void;
+  onPlacesError?: (error: string) => void;
+  selectedPlaceId?: string | null;
 }) {
   const selectedStationId = selectedStation?.id ?? null;
-  const [radius, setRadius] = useState(5),
-    [kind, setKind] = useState("all"),
+  const [localRadius, setLocalRadius] = useState(5);
+  const radius = selectedRadius ?? localRadius;
+  const [kind, setKind] = useState("all"),
     [places, setPlaces] = useState<NearbyPlace[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -35,13 +46,17 @@ export default function StopFinder({
     [priceError, setPriceError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [gasQuery, setGasQuery] = useState("");
+  const [gasLimit, setGasLimit] = useState(20);
   useEffect(() => {
     if (!autoLoad && !attempt) return;
     const controller = new AbortController();
     setBusy(true);
     setError("");
+    onPlacesError?.("");
     setLoaded(false);
     setPlaces([]);
+    onPlaces?.([]);
     fetch(
       `/api/live/places?area=${area}&radius=${radius}&kind=all${originQuery(origin)}`,
       { signal: controller.signal },
@@ -57,17 +72,24 @@ export default function StopFinder({
       .then((data) => {
         if (!controller.signal.aborted) {
           setPlaces(data.places);
+          onPlaces?.(data.places);
           setLoaded(true);
         }
       })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
+        if (!controller.signal.aborted) {
+          setError(e.message);
+          onPlacesError?.(e.message);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setBusy(false);
       });
     return () => controller.abort();
   }, [area, origin?.lat, origin?.lon, radius, attempt, autoLoad]);
+  useEffect(() => {
+    if (selectedPlaceId) setKind("all");
+  }, [selectedPlaceId]);
   async function checkFuel() {
     setPriceBusy(true);
     setPriceError("");
@@ -88,6 +110,24 @@ export default function StopFinder({
     }
   }
   const visible = places.filter((p) => kind === "all" || p.kind === kind);
+  const gasPlaces = places.filter((place) => place.kind === "fuel");
+  const matchingGasPlaces = gasPlaces.filter((place) => `${place.name} ${place.address}`.toLowerCase().includes(gasQuery.toLowerCase()));
+  const directoryPlaces = compact ? matchingGasPlaces.slice(0, gasLimit) : visible;
+  const stopList = <ul className="stop-results">
+    {directoryPlaces.map((p) => (
+      <li key={p.id}>
+        <span className={p.kind === "fuel" ? "stop-dot fuel" : "stop-dot"} />
+        <div>
+          <a href={p.mapUrl} target="_blank" rel="noreferrer">{p.name} ↗</a>
+          <small>{p.kind === "fuel" ? "Gas station" : "Grocery stop"} · {p.miles} mi · {p.address || "Address not listed"}</small>
+          {p.kind === "fuel" && <button type="button" aria-pressed={selectedStationId === p.id}
+            onClick={() => onStation({ id: p.id, name: p.name, address: p.address, lat: p.lat, lon: p.lon, mapUrl: p.mapUrl }, null)}>
+            {selectedStationId === p.id ? "Selected gas stop ✓" : "Choose this gas stop"}
+          </button>}
+        </div>
+      </li>
+    ))}
+  </ul>;
   return (
     <article
       className={"stop-finder" + (compact ? " compact-stop-finder" : "")}
@@ -102,8 +142,7 @@ export default function StopFinder({
       )}
       {selectedStation && (
         <p className="selected-gas-stop" role="status">
-          <strong>Gas stop selected: {selectedStation.name}</strong> · Route and
-          fuel total include this station.{" "}
+          <strong>Gas stop: {selectedStation.name}</strong>{" "}
           <button type="button" onClick={() => onStation(null, null)}>
             Remove gas stop
           </button>
@@ -115,7 +154,9 @@ export default function StopFinder({
           <select
             value={radius}
             onChange={(e) => {
-              setRadius(Number(e.target.value));
+              const nextRadius = Number(e.target.value);
+              if (onRadiusChange) onRadiusChange(nextRadius);
+              else setLocalRadius(nextRadius);
               setPrices(null);
               onStation(null, null);
             }}
@@ -143,13 +184,13 @@ export default function StopFinder({
             </button>
           ))}
         </div>
-        <button
+        {(!compact || error) && <button
           type="button"
           disabled={busy}
           onClick={() => setAttempt((n) => n + 1)}
         >
           {busy ? "Finding your stops…" : "Refresh stops ↗"}
-        </button>
+        </button>}
       </div>
       {error && <p role="alert">{error}</p>}
       <div className="next-stop-map">
@@ -159,6 +200,7 @@ export default function StopFinder({
           radius={radius}
           places={visible}
           selectedFuelId={selectedStationId}
+          selectedPlaceId={selectedPlaceId}
           onSelectFuel={(place) =>
             onStation(
               {
@@ -180,50 +222,18 @@ export default function StopFinder({
             ? "Loading groceries and gas stations…"
             : `${visible.length} mapped stops within ${radius} miles of ${origin?.label || area}.`}
         </p>
-        {loaded && !visible.length && (
+        {loaded && !places.length && (
           <p>No mapped stops matched this filter. Try a wider radius.</p>
         )}
-        <ul className="stop-results">
-          {visible.map((p) => (
-            <li key={p.id}>
-              <span
-                className={p.kind === "fuel" ? "stop-dot fuel" : "stop-dot"}
-              />
-              <div>
-                <a href={p.mapUrl} target="_blank" rel="noreferrer">
-                  {p.name} ↗
-                </a>
-                <small>
-                  {p.kind === "fuel" ? "Gas station" : "Grocery stop"} ·{" "}
-                  {p.miles} mi · {p.address || "Address not supplied"}
-                </small>
-                {p.kind === "fuel" && (
-                  <button
-                    type="button"
-                    aria-pressed={selectedStationId === p.id}
-                    onClick={() =>
-                      onStation(
-                        {
-                          id: p.id,
-                          name: p.name,
-                          address: p.address,
-                          lat: p.lat,
-                          lon: p.lon,
-                          mapUrl: p.mapUrl,
-                        },
-                        null,
-                      )
-                    }
-                  >
-                    {selectedStationId === p.id
-                      ? "Selected gas stop ✓"
-                      : "Add gas stop to trip"}
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+        {compact ? <details className="gas-station-list">
+          <summary>Choose a gas station from the list · {gasPlaces.length}</summary>
+          <label>Find a station
+            <input type="search" value={gasQuery} onChange={(event) => { setGasQuery(event.target.value); setGasLimit(20); }} placeholder="Name or address" />
+          </label>
+          {stopList}
+          {!matchingGasPlaces.length && !!gasPlaces.length && <p>No gas stations match that search.</p>}
+          {matchingGasPlaces.length > gasLimit && <button type="button" onClick={() => setGasLimit((count) => count + 20)}>Show 20 more stations</button>}
+        </details> : stopList}
         <details>
           <summary>Check reported pump prices</summary>
           <p>
@@ -279,10 +289,10 @@ export default function StopFinder({
             </div>
           ))}
         </details>
-        <p className="small">
+        {!compact && <p className="small">
           OpenStreetMap locations can be incomplete. Distances are straight-line
           estimates; grocery and pump prices require separate verified sources.
-        </p>
+        </p>}
       </div>
     </article>
   );

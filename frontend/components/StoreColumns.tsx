@@ -62,13 +62,11 @@ export default function StoreColumns({
               }{" "}
               of {items.length} {items.length === 1 ? "item" : "items"} priced
             </p>
-            <span className="comparison-status">
-              {report.status === "pending"
-                ? "Searching website…"
-                : report.status === "retrieved"
-                  ? "Local store price not confirmed"
-                  : "Live pricing unavailable"}
-            </span>
+            {report.status !== "retrieved" && (
+              <span className="comparison-status">
+                {report.status === "pending" ? "Searching website…" : "Live pricing unavailable"}
+              </span>
+            )}
             {onRetry &&
               report.lines.some((line) =>
                 ["timeout", "error"].includes(
@@ -171,14 +169,6 @@ export default function StoreColumns({
                     <strong>
                       {searchStatusLabel(catalogLineStatus(report, item.id))}
                     </strong>
-                    {report.status !== "pending" && (
-                      <p>
-                        {report.status === "blocked" ||
-                        report.status === "unsupported"
-                          ? report.detail
-                          : "A nearby store on the map does not confirm this branch's shelf price."}
-                      </p>
-                    )}
                     {report.retailer === "The Fresh Market" && (
                       <a
                         href={`https://shop.thefreshmarket.com/store/the-fresh-market/s?k=${encodeURIComponent(item.name)}`}

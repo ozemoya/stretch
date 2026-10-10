@@ -577,7 +577,7 @@ export async function providerReports(
               ? {
                   ...rawState,
                   status: "timeout",
-                  error: "Search timed out. Retry this store search.",
+                  error: "Timed out. Retry this store search.",
                 }
               : rawState;
           const ownedProducts = (state.products ?? []).filter((product) =>

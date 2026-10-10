@@ -1,4 +1,4 @@
-// Leave time for transport and rendering inside the user's five-second limit.
-export const SEARCH_WINDOW_MS = 4_000;
-export const SEARCH_CLIENT_TIMEOUT_MS = 4_900;
-export const AI_PLAN_WINDOW_MS = 2_200;
+// Give retailer collection jobs time to return while streaming cached prices immediately.
+export const SEARCH_WINDOW_MS = 30_000;
+export const SEARCH_CLIENT_TIMEOUT_MS = SEARCH_WINDOW_MS + 5_000;
+export const AI_PLAN_WINDOW_MS = 5_000;

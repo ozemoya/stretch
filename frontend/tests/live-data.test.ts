@@ -3,9 +3,16 @@ import {
   parseEia,
   normalizePlaces,
   normalizeKrogerProducts,
+  formatOsmAddress,
 } from "../lib/live-data";
 const publication = `<table><caption>U.S. Regular Gasoline Prices*(dollars per gallon)</caption><thead><tr><th></th><th>09/21/26</th><th>09/28/26</th><th>10/05/26</th><th>year ago</th></tr></thead><tbody><tr><td>Lower Atlantic (PADD1C)</td><td>4.163</td><td>4.195</td><td>3.959</td><td>1.062</td></tr></tbody></table><table><caption>Diesel</caption><tbody><tr><td>Lower Atlantic</td><td>8</td></tr></tbody></table>`;
 describe("live data normalization", () => {
+  it("shows complete mapped addresses without inventing missing parts", () => {
+    expect(formatOsmAddress({ "addr:housenumber": "123", "addr:street": "Peachtree St", "addr:city": "Atlanta", "addr:state": "GA", "addr:postcode": "30303" })).toBe("123 Peachtree St, Atlanta, GA 30303");
+    expect(formatOsmAddress({ "addr:full": "456 Main St, Atlanta, GA 30303", "addr:street": "Main St" })).toBe("456 Main St, Atlanta, GA 30303");
+    expect(formatOsmAddress({ "contact:housenumber": "78", "contact:street": "Ponce de Leon Ave", "contact:city": "Atlanta" })).toBe("78 Ponce de Leon Ave, Atlanta");
+    expect(formatOsmAddress({})).toBe("");
+  });
   it("filters requested place kind before limiting results and excludes out-of-radius centers", () => {
     const grocery = Array.from({ length: 65 }, (_, id) => ({
       type: "node",

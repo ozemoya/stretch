@@ -179,7 +179,7 @@ export default function ListsPage({ catalog }: { catalog: Catalog }) {
           {lists.map((list) => (
             <article className="saved-list-card" key={list.id}>
               <div className="saved-list-card-top">
-                <span className="list-symbol"><SketchIcon name="bag" size={32} /></span>
+                <span className="list-symbol"><SketchIcon name="list" size={32} /></span>
                 <span className="status-pill">Saved list</span>
               </div>
               {editingListId === list.id ? (
@@ -228,7 +228,7 @@ export default function ListsPage({ catalog }: { catalog: Catalog }) {
         </div>
       ) : ready ? (
         <section className="lists-empty">
-          <SketchIcon name="bag" size={76} />
+          <SketchIcon name="list" size={76} />
           <h2>No saved lists yet</h2>
           <p>Build a grocery list once, save it here, and reuse it for your next trip.</p>
           <button className="desktop-primary" type="button" onClick={() => setIsCreating(true)}>Create your first list <span>＋</span></button>
