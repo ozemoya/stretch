@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { readCheckoutDraft } from "@/lib/checkout-draft";
 
 const navigation = [
-  ["/", "Dashboard", "◈"], ["/plan", "Find groceries", "⌕"],
+  ["/dashboard", "Dashboard", "◈"], ["/plan", "Find groceries", "⌕"],
   ["/plan?panel=list", "My grocery list", "☷"], ["/plan/results", "Compare stores", "▤"],
   ["/plan/results?view=map", "Trip planner & gas", "⌁"],
   ["/plan?panel=settings", "Trip settings", "⚙"],
@@ -28,6 +28,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
   }, [path]);
+  if (path === "/") return <>{children}</>;
   return <div className={`desktop-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
     <aside className="desktop-sidebar" aria-label="Main navigation">
       <Link href="/" className="desktop-brand"><img src="/assets/stretch-logo.png" alt="Stretch" /></Link>

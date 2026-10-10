@@ -343,6 +343,7 @@ export default function Stretch({
               />
             </a>
             <nav>
+              <button onClick={() => router.push("/dashboard")}>DASHBOARD</button>
               <button onClick={plan}>MY LIST ↗</button>
             </nav>
           </header>
