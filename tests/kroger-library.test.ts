@@ -36,11 +36,13 @@ function fixture({
   limited = false,
   existing = [],
   lookupError = false,
+  dietary = false,
 }: {
   failStore?: boolean;
   limited?: boolean;
   existing?: KrogerProductRow[];
   lookupError?: boolean;
+  dietary?: boolean;
 } = {}) {
   const write = vi.fn((table: string, rows: unknown[]) => ({
     select: async () => ({ data: rows, error: null }),
@@ -67,12 +69,16 @@ function fixture({
       if (failStore && url.searchParams.get("filter.locationId") === "01100695")
         return new Response("unavailable", { status: 503 });
       const term = url.searchParams.get("filter.term");
-      const eggs = term === "eggs";
+      const baseTerm = term?.replace(
+        /\s+(?:gluten free|vegan|nut free)\b/g,
+        "",
+      );
+      const eggs = term?.startsWith("eggs");
       const milk = term === "whole milk";
       const start = Number(url.searchParams.get("filter.start"));
       const product = (id: number, size: string, price: number) => ({
         productId: String(id),
-        description: `Kroger ${term}`,
+        description: `Kroger ${baseTerm}${dietary ? " Gluten Free Vegan Nut Free" : ""}`,
         categories: [eggs || milk ? "Dairy" : "Canned & Packaged"],
         items: [
           {
@@ -89,7 +95,7 @@ function fixture({
           : eggs
             ? [
                 product(1, "12 ct", 2),
-                product(2, "16 ct", 1),
+                { ...product(2, "16 ct", 1), description: "Kroger eggs" },
                 product(3, "12 ct", 3),
               ]
             : [product(1, milk ? "1 gal" : "15.5 oz", milk ? 2.79 : 1)],
@@ -110,6 +116,76 @@ function fixture({
 afterEach(() => vi.restoreAllMocks());
 
 describe("shared Kroger library", () => {
+  it("saves and reuses dietary winners separately from regular searches", async () => {
+    const options = {
+      item: "black beans",
+      amount: "16 oz",
+      origin,
+      glutenFree: true,
+      vegan: true,
+      nutFree: true,
+    };
+    const plain = await saveCheapestKrogerProducts(
+      { item: "black beans", amount: "16 oz", origin },
+      fixture(),
+    );
+    const h = fixture({ dietary: true, existing: plain.products });
+    const result = await saveCheapestKrogerProducts(options, h);
+    expect(result.products).toHaveLength(3);
+    expect(
+      result.products.every(
+        (row) => row.gluten_free && row.vegan && row.nut_free,
+      ),
+    ).toBe(true);
+    expect(result.products.map((row) => row.ID)).not.toEqual(
+      plain.products.map((row) => row.ID),
+    );
+    expect(
+      h.fetcher.mock.calls.some(([input]) =>
+        String(input).includes(
+          "filter.term=black+beans+gluten+free+vegan+nut+free",
+        ),
+      ),
+    ).toBe(true);
+    const cached = fixture({ existing: result.products });
+    const reused = await saveCheapestKrogerProducts(options, cached);
+    expect(reused.products.every((row) => row.source === "database")).toBe(
+      true,
+    );
+    expect(
+      cached.fetcher.mock.calls.some(([input]) =>
+        new URL(String(input)).pathname.endsWith("/products"),
+      ),
+    ).toBe(false);
+    expect(cached.write).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown claims and repairs cached rows that no longer satisfy filters", async () => {
+    const options = {
+      item: "black beans",
+      amount: "16 oz",
+      origin,
+      glutenFree: true,
+    };
+    const unknown = fixture();
+    const empty = await saveCheapestKrogerProducts(options, unknown);
+    expect(empty.products).toHaveLength(0);
+    expect(unknown.write).not.toHaveBeenCalled();
+    const good = await saveCheapestKrogerProducts(
+      options,
+      fixture({ dietary: true }),
+    );
+    const h = fixture({
+      dietary: true,
+      existing: good.products.map((row) => ({ ...row, gluten_free: null })),
+    });
+    const repaired = await saveCheapestKrogerProducts(options, h);
+    expect(
+      repaired.products.every(
+        (row) => row.source === "kroger" && row.gluten_free === true,
+      ),
+    ).toBe(true);
+  });
   it("imports without fetching, logging, loading env files or changing process exit status", async () => {
     vi.resetModules();
     const fetchSpy = vi.spyOn(globalThis, "fetch");
