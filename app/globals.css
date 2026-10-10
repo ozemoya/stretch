@@ -950,3 +950,5 @@ footer {
 @media(min-width:1100px){.store-column{flex-basis:300px}}@media(max-width:600px){.store-column{flex-basis:82vw}}
 
 .store-column-heading{display:block;height:auto;position:static}.store-column-heading .eyebrow{color:inherit;opacity:.8}.store-column-heading h3{line-height:1.15;overflow-wrap:anywhere}.store-column-heading p{margin:12px 0}.comparison-status{display:inline-block;line-height:1.4;padding:5px 9px;border:1px solid currentColor;border-radius:999px}
+
+.comparison-substitute{display:block;font-size:12px;font-weight:700;color:var(--green);margin-bottom:12px}.comparison-fallback{border-top:1px dashed var(--green);padding-top:16px}.comparison-fallback a{display:block}.comparison-fallback .comparison-photo{height:110px}

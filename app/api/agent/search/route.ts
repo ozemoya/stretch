@@ -1,5 +1,6 @@
 import {input, compareBasket as compare} from "../../../../lib/compare-basket";
 import {providerReports} from "../../../../lib/provider-prices";
+import {traderJoesObserved} from "../../../../lib/trader-joes";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   const body = await request.json().catch(()=>null);
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
       try {
         send({type:"started"});
         // No collector is triggered by this cache read. Cached observations retain their timestamps.
+        const tjLines=p.items.map(item=>({item,products:traderJoesObserved(item)}));
+        if(tjLines.some(line=>line.products.length)) send({type:"report",cached:true,report:{retailer:"Trader Joe’s",status:"retrieved",detail:"Dated official website observations. Nearby branch presence is being checked.",lines:tjLines}});
         const cached = await providerReports(["Walmart","Target","Publix","ALDI","Sprouts","Costco","Albertsons family","Whole Foods"],p.items,p.zip,false,true);
         for (const report of cached) if(report.lines.some(line=>line.products.length)) send({type:"report",report,cached:true});
         const response = await compare(new Request(request.url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}),report=>send({type:"report",report}));

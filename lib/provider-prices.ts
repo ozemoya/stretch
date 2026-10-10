@@ -1,3 +1,4 @@
+import { selectFoodMatches } from "./food-alternatives";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -162,7 +163,7 @@ export async function providerReports(retailers: string[], items: AgentItem[], z
       let line: ScrapeReport["lines"][number];
       try {
         const state = await job(retailer as ProviderRetailer,item,zip,start,cacheOnly);
-        line = {item,products:(state.products ?? []).filter(product=>matchesRequestedFood(product.name,item.name)),...(state.status !== "ready" ? {error:state.error ?? `Collection ${state.status}. Refresh to check existing work.`}: {})};
+        line = {item,products:selectFoodMatches(state.products ?? [],item.name,matchesRequestedFood),...(state.status !== "ready" ? {error:state.error ?? `Collection ${state.status}. Refresh to check existing work.`}: {})};
       } catch { line = {item,products:[],error:"Website collection failed. No price assumed."}; }
       const group = lines.get(retailer) ?? []; group.push(line); lines.set(retailer,group);
       onReport?.({retailer,status:group.some(l=>l.products.length)?"retrieved":"pending",detail:"Website search in progress. Branch prices remain unverified.",lines:items.map(i=>group.find(l=>l.item.id===i.id) ?? {item:i,products:[],error:"Waiting for website search."})});

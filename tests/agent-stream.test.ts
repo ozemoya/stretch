@@ -1,5 +1,6 @@
 import {it,expect,vi} from "vitest";
 const report = {retailer:"Target",status:"retrieved",detail:"Catalog price",lines:[{item:{id:"milk",name:"milk",unit:"gallon",quantity:1},products:[{id:"p",name:"Milk",size:"1 gallon",priceCents:329,sourceUrl:"https://www.target.com/p/milk",retrievedAt:"2026-10-09T12:00:00Z"}]}]};
+vi.mock("../lib/trader-joes",()=>({traderJoesObserved:()=>[]}));
 vi.mock("../lib/provider-prices",()=>({providerReports:vi.fn(async()=>[report])}));
 vi.mock("../lib/compare-basket",async()=>{
  const {z}=await import("zod");
