@@ -84,7 +84,12 @@ describe("Kroger catalog batch", () => {
     });
     const checkpoint = vi.fn();
     const result = await runCatalog(
-      { origin: { latitude: 33.75, longitude: -84.39 } },
+      {
+        origin: { latitude: 33.75, longitude: -84.39 },
+        glutenFree: true,
+        vegan: true,
+        nutFree: true,
+      },
       {
         env: {
           SUPABASE_URL: "https://example.supabase.co",
@@ -99,6 +104,11 @@ describe("Kroger catalog batch", () => {
       },
     );
     expect(runSearch).toHaveBeenCalledTimes(3);
+    expect(
+      runSearch.mock.calls.every(
+        ([options]) => options.glutenFree && options.vegan && options.nutFree,
+      ),
+    ).toBe(true);
     expect(result.results.map((row) => row.catalog_id)).toEqual([
       "eggs",
       "milk",

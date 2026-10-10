@@ -1,0 +1,232 @@
+{
+  "date": "2026-10-10",
+  "origin": {
+    "latitude": 33.7485894,
+    "longitude": -84.3879752
+  },
+  "dryRun": false,
+  "total": 1,
+  "results": [
+    {
+      "catalog_id": "bread",
+      "name": "Bread",
+      "catalog_unit": "1 loaf",
+      "search": {
+        "item": "Bread",
+        "dryRun": false,
+        "glutenFree": true,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "category": "Bakery"
+      },
+      "rows": [
+        {
+          "search_term": "Bread",
+          "requested_dietary": {
+            "glutenFree": true
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111011625",
+          "item_id": "0001111011625",
+          "description": "Kroger® Gluten Free 7 Grain Bread",
+          "gluten_free": true,
+          "vegan": null,
+          "nut_free": null,
+          "brand": "Kroger",
+          "upc": "0001111011625",
+          "package_size": "18 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 599,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 18,
+          "package_count": 1,
+          "unit_price_cents": 33.27777777777778,
+          "price_basis": "unit",
+          "matched_category": "Bakery",
+          "provider_categories": [
+            "Bakery"
+          ],
+          "retrieved_at": "2026-10-10T05:47:42.675Z"
+        },
+        {
+          "search_term": "Bread",
+          "requested_dietary": {
+            "glutenFree": true
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111011625",
+          "item_id": "0001111011625",
+          "description": "Kroger® Gluten Free 7 Grain Bread",
+          "gluten_free": true,
+          "vegan": null,
+          "nut_free": null,
+          "brand": "Kroger",
+          "upc": "0001111011625",
+          "package_size": "18 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 599,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 18,
+          "package_count": 1,
+          "unit_price_cents": 33.27777777777778,
+          "price_basis": "unit",
+          "matched_category": "Bakery",
+          "provider_categories": [
+            "Bakery"
+          ],
+          "retrieved_at": "2026-10-10T05:47:44.122Z"
+        },
+        {
+          "search_term": "Bread",
+          "requested_dietary": {
+            "glutenFree": true
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111011625",
+          "item_id": "0001111011625",
+          "description": "Kroger® Gluten Free 7 Grain Bread",
+          "gluten_free": true,
+          "vegan": null,
+          "nut_free": null,
+          "brand": "Kroger",
+          "upc": "0001111011625",
+          "package_size": "18 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 599,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 18,
+          "package_count": 1,
+          "unit_price_cents": 33.27777777777778,
+          "price_basis": "unit",
+          "matched_category": "Bakery",
+          "provider_categories": [
+            "Bakery"
+          ],
+          "retrieved_at": "2026-10-10T05:47:46.030Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 4135063007719859,
+          "category": "bread",
+          "count": 1,
+          "price": 5.99,
+          "unit_price": 0.3327777777777778,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "gluten_free": true,
+          "vegan": null,
+          "nut_free": null,
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 509893876495251,
+          "category": "bread",
+          "count": 1,
+          "price": 5.99,
+          "unit_price": 0.3327777777777778,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "gluten_free": true,
+          "vegan": null,
+          "nut_free": null,
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 38698881701326,
+          "category": "bread",
+          "count": 1,
+          "price": 5.99,
+          "unit_price": 0.3327777777777778,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "gluten_free": true,
+          "vegan": null,
+          "nut_free": null,
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": true,
+      "issues": []
+    }
+  ],
+  "completed": 1,
+  "partial": 0,
+  "failed": 0,
+  "finished_at": "2026-10-10T05:47:46.288Z"
+}

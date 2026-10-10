@@ -126,6 +126,30 @@ that time zone, rather than after 24 hours. Existing undated rows are also refre
 their original counts, prices and IDs remain untouched by the column migration.
 Failed searches leave the previous price and date unchanged, so the next request retries.
 Apply `supabase/migrations/202610100001_product_date.sql` before running this version.
+Also apply `supabase/migrations/202610100002_product_dietary.sql` to add nullable
+`gluten_free`, `vegan`, and `nut_free` booleans to the singular `product` table.
+Historical rows stay unknown (`null`); the sample dietary tags in the plural catalog
+are not evidence about a real Kroger package.
+
+Use `glutenFree: true`, `vegan: true`, or `nutFree: true` in either library function,
+or `--gluten-free`, `--vegan`, and `--nut-free` in either CLI. Combined flags require
+every criterion. False/omitted flags mean no restriction, rather than requiring the
+opposite diet. For example:
+
+```sh
+npm run kroger:save -- --item bread --unit oz --category Bakery --gluten-free --vegan
+npm run kroger:catalog -- --only bread,pasta --gluten-free
+```
+
+Dietary words narrow the Kroger query, then explicit claims in the returned product
+description are checked before price ranking. The compact API does not supply a
+complete dietary/allergen record: missing claims remain `null` and are excluded when
+required. Vegetarian, dairy-free, plant-based, peanut-free or tree-nut-free labels
+alone do not establish the requested vegan/nut-free claim. These columns record
+provider name claims, not independent ingredient or manufacturing verification.
+No dietary suitability is inferred from item/category names or the lack of an allergen.
+Requested dietary combinations get distinct stable IDs; normal searches retain
+their existing IDs. Cached rows must satisfy all requested flags and today's date.
 
 Both functions return `{ products, rows, complete, issues }`. `products` contains all
 available database-shaped results in nearest-store order, with nested store metadata
