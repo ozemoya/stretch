@@ -62,7 +62,11 @@ export async function POST(request: Request) {
     const p = parsed.data;
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
     const coverage = groceryCoverage(mapped.places);
-    const publicCatalogs = await scrapeRetailers(coverage, p.items);
+    const publicCatalogs = await scrapeRetailers(
+      coverage,
+      p.items,
+      mapped.places,
+    );
     const checkedStores = [] as Awaited<ReturnType<typeof checkStores>>;
     const warnings: string[] = [];
     try {

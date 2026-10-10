@@ -2,6 +2,8 @@ import { load } from "cheerio";
 import { z } from "zod";
 import type { AgentItem } from "./price-agent";
 import type { StoreCoverage } from "./retailer-coverage";
+import type { NearbyPlace } from "./live-data";
+import { freshMarketSpecials } from "./fresh-market-specials";
 
 export type ScrapedProduct = {
   id: string;
@@ -178,17 +180,44 @@ async function searchLidl(term: string): Promise<ScrapedProduct[]> {
 export async function scrapeRetailers(
   stores: StoreCoverage[],
   items: AgentItem[],
+  places: NearbyPlace[] = [],
 ): Promise<ScrapeReport[]> {
   const reports: ScrapeReport[] = [];
   for (const retailer of new Set(stores.map((s) => s.retailer))) {
+    if (retailer === "The Fresh Market") {
+      try {
+        reports.push(await freshMarketSpecials(places, items));
+      } catch {
+        reports.push({
+          retailer,
+          status: "failed",
+          detail:
+            "Weekly offer source could not be retrieved. Prices remain unknown.",
+          lines: [],
+        });
+      }
+      continue;
+    }
     if (retailer !== "Lidl") {
       reports.push({
         retailer,
-        status: retailer === "ALDI" ? "blocked" : "unsupported",
+        status: ["ALDI", "Sprouts", "Walmart", "Trader Joe’s"].includes(
+          retailer,
+        )
+          ? "blocked"
+          : "unsupported",
         detail:
           retailer === "ALDI"
             ? "ALDI's generic robots rules disallow automated crawling. No prices scraped."
-            : "No working public scraper connected for this retailer. Local prices remain unknown.",
+            : retailer === "Sprouts"
+              ? "Sprouts' online shop restricts automated crawling. A permitted feed or retailer access is required."
+              : retailer === "Walmart"
+                ? "Public product page returned a bot challenge. No prices scraped; store-selected access is required."
+                : retailer === "Trader Joe’s"
+                  ? "Public catalog endpoint denied automated access. No prices scraped."
+                  : retailer === "Kroger family"
+                    ? "Branch-specific product integration is implemented. Activate it with a Kroger developer client ID and secret."
+                    : "No working public scraper connected for this retailer. Local prices remain unknown.",
         lines: [],
       });
       continue;

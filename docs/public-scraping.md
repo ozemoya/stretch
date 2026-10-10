@@ -15,3 +15,10 @@ Remove-Item Env:STRETCH_LIVE_SMOKE
 ```
 
 The optional smoke test fetches live milk and egg searches and requires priced packages for both. It prints source evidence; no credentials are required.
+
+## Additional working source
+
+The Fresh Market weekly features are connected. The adapter reads public page data, checks offer start/end dates, and matches applicable branches to mapped coordinates plus street number. It returns only explicit dollar-per-each or dollar-per-pound offers, preserving the rate and expiration. BOGO, percentage discounts, multibuy and starting-at offers are not converted to prices. These partial weekly offers remain separate from full basket rankings. Tested live for 2099 Peachtree Rd NW, Atlanta on October 9, 2026.
+
+Live source checks: Sprouts' delivery shop disallows generic automated crawling; Walmart returned a bot challenge; Trader Joe's catalog endpoint returned access denied. Kroger's existing integration needs developer credentials. Instacart's public shopping-list API generates an external shopping link; it does not supply comparison prices (https://docs.instacart.com/developer_platform_api/api/products/create_shopping_list_page). No missing source is treated as zero-priced.
+
