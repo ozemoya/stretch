@@ -11,6 +11,7 @@ import {
 } from "./fresh-market-specials";
 import { mergeCatalogReports } from "./merge-catalog-reports";
 import { robotsAllows } from "./robots-rules";
+import type { SearchStatus } from "./search-state";
 
 export type ScrapedProduct = {
   id: string;
@@ -23,12 +24,25 @@ export type ScrapedProduct = {
   matchKind?: "alternative";
   verification?: "official-page-observation";
   retrievedAt: string;
+  retailerId?: string;
+  storeLocationId?: string | null;
+  productId?: string;
+  productName?: string;
+  price?: number;
+  priceSource?: string;
+  verifiedAt?: string;
+  productUrl?: string;
 };
 export type ScrapeReport = {
   retailer: string;
   status: "retrieved" | "pending" | "failed" | "unsupported" | "blocked";
   detail: string;
-  lines: { item: AgentItem; products: ScrapedProduct[]; error?: string }[];
+  lines: {
+    item: AgentItem;
+    products: ScrapedProduct[];
+    error?: string;
+    searchStatus?: SearchStatus;
+  }[];
 };
 const product = z.object({
   productId: z.union([z.number(), z.string()]),
@@ -102,7 +116,12 @@ let windowStart = 0,
   dayCount = 0;
 let robotsUntil = 0;
 let robotsText = "";
-async function publicHtml(path: string, maxBytes = 6_000_000) {
+async function publicHtml(
+  path: string,
+  maxBytes = 6_000_000,
+  signal?: AbortSignal,
+) {
+  signal?.throwIfAborted();
   const now = Date.now();
   if (now - windowStart >= 60_000) {
     windowStart = now;
@@ -121,7 +140,9 @@ async function publicHtml(path: string, maxBytes = 6_000_000) {
       "User-Agent": "Stretch/1.0 (+https://github.com/ozemoya/stretch)",
       Accept: "text/html,text/plain",
     },
-    signal: AbortSignal.timeout(15000),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+      : AbortSignal.timeout(15000),
     redirect: "error",
     cache: "no-store",
   });
@@ -147,7 +168,10 @@ async function publicHtml(path: string, maxBytes = 6_000_000) {
     await reader.cancel().catch(() => undefined);
   }
 }
-async function searchLidl(term: string): Promise<ScrapedProduct[]> {
+async function searchLidl(
+  term: string,
+  signal?: AbortSignal,
+): Promise<ScrapedProduct[]> {
   const key = term.toLowerCase().trim();
   const cached = cache.get(key);
   if (cached && cached.expires > Date.now()) return cached.products;
@@ -155,13 +179,13 @@ async function searchLidl(term: string): Promise<ScrapedProduct[]> {
   if (existing) return existing;
   const task = (async () => {
     if (robotsUntil < Date.now()) {
-      robotsText = await publicHtml("/robots.txt", 100_000);
+      robotsText = await publicHtml("/robots.txt", 100_000, signal);
       robotsUntil = Date.now() + 600_000;
     }
     const path = `/q/search?q=${encodeURIComponent(key)}`;
     if (!robotsAllows(robotsText, `https://www.lidl.com${path}`))
       throw new Error("Retailer crawling rules disallow this search path.");
-    const html = await publicHtml(path);
+    const html = await publicHtml(path, 6_000_000, signal);
     if (!html.includes("data-grid-data"))
       throw new Error("Retailer did not return readable product tiles.");
     const products = parseLidlProducts(html, key, new Date().toISOString());
@@ -181,9 +205,11 @@ export async function scrapeRetailers(
   items: AgentItem[],
   places: NearbyPlace[] = [],
   plan?: SearchPlan,
+  signal?: AbortSignal,
 ): Promise<ScrapeReport[]> {
   const reports: ScrapeReport[] = [];
   for (const retailer of new Set(stores.map((s) => s.retailer))) {
+    signal?.throwIfAborted();
     if (retailer === "Trader Joe’s") {
       reports.push(await traderJoesReport(items, plan));
       continue;
@@ -231,6 +257,7 @@ export async function scrapeRetailers(
     }
     const lines: ScrapeReport["lines"] = [];
     for (const [index, item] of items.entries()) {
+      signal?.throwIfAborted();
       if (index >= 12) {
         lines.push({
           item,
@@ -240,7 +267,7 @@ export async function scrapeRetailers(
         continue;
       }
       try {
-        lines.push({ item, products: await searchLidl(item.name) });
+        lines.push({ item, products: await searchLidl(item.name, signal) });
       } catch (e) {
         lines.push({
           item,

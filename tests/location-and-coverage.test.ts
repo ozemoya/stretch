@@ -34,9 +34,7 @@ it("falls back to the visitor IP when direct browser geolocation fails", async (
     .mockResolvedValueOnce(Response.json({ ip: "8.8.8.8" }))
     .mockResolvedValueOnce(Response.json(normalizeIpLocation(city)));
   vi.stubGlobal("fetch", fetcher);
-  expect((await detectLocation(new AbortController().signal)).lat).toBe(
-    40.713,
-  );
+  expect((await detectLocation(new AbortController().signal)).lat).toBe(40.713);
   expect(fetcher.mock.calls[2][0]).toBe("/api/location");
   expect(JSON.parse(fetcher.mock.calls[2][1].body)).toEqual({ ip: "8.8.8.8" });
 });
@@ -135,6 +133,9 @@ it("accepts only local store IDs and fresh in-store USD price feed packages", ()
     soldBy: "UNIT",
     regularCents: 400,
     retrievedAt: "2026-10-09T12:00:00Z",
+    retailerId: "Independent / other retailer",
+    storeLocationId: "node/1",
+    productUrl: "https://local.example/products/milk",
   };
   const raw = {
     source: "Test fixture",
@@ -166,6 +167,32 @@ it("accepts only local store IDs and fresh in-store USD price feed packages", ()
   expect(result.stores).toHaveLength(1);
   expect(result.stores[0].lines[0].candidates).toHaveLength(1);
   expect(reviewedTotal(result.stores[0], { milk: "p" })).toBe(800);
+  const wrongRetailer = normalizeFeed(
+    {
+      ...raw,
+      stores: [
+        {
+          id: "node/1",
+          lines: [
+            {
+              itemId: "milk",
+              candidates: [
+                {
+                  ...offer,
+                  productUrl:
+                    "https://www.instacart.com/store/aldi/products/123",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    groceryCoverage([place]),
+    items,
+    new Date("2026-10-09T14:00:00Z"),
+  );
+  expect(wrongRetailer.stores[0].lines[0].candidates).toEqual([]);
   expect(() =>
     normalizeFeed(
       { ...raw, priceType: "delivery" },

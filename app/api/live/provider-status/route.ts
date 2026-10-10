@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { providerReports } from "@/lib/provider-prices";
+import { normalizeCatalogReport } from "@/lib/product-ownership";
 const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   start: z.boolean().default(false),
@@ -27,16 +28,19 @@ export async function POST(request: Request) {
   const p = parsed.data;
   return Response.json(
     {
-      reports: await providerReports(
-        p.retailers,
-        p.items,
-        p.zip,
-        p.start,
-        false,
-        undefined,
-        undefined,
-        p.broaden,
-      ),
+      reports: (
+        await providerReports(
+          p.retailers,
+          p.items,
+          p.zip,
+          p.start,
+          false,
+          undefined,
+          undefined,
+          p.broaden,
+          request.signal,
+        )
+      ).map((report) => normalizeCatalogReport(report, p.items)),
     },
     { headers: { "Cache-Control": "no-store" } },
   );

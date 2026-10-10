@@ -8,6 +8,8 @@ import {
   planBasketSearch,
   reviewProductMatches,
 } from "../../../../lib/local-search-agent";
+import { normalizeCatalogReport } from "../../../../lib/product-ownership";
+import type { ScrapeReport } from "../../../../lib/retailer-scraper";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -49,13 +51,16 @@ export async function POST(request: Request) {
             send({
               type: "report",
               cached: true,
-              report: {
-                retailer: "Trader Joe’s",
-                status: "retrieved",
-                detail:
-                  "Dated official website observations. Nearby branch presence is being checked.",
-                lines: tjLines,
-              },
+              report: normalizeCatalogReport(
+                {
+                  retailer: "Trader Joe’s",
+                  status: "retrieved",
+                  detail:
+                    "Dated official website observations. Nearby branch presence is being checked.",
+                  lines: tjLines,
+                },
+                p.items,
+              ),
             });
           const cached = await providerReports(
             [
@@ -69,7 +74,6 @@ export async function POST(request: Request) {
               "Sprouts",
               "Costco",
               "Albertsons family",
-              "Whole Foods",
             ],
             p.items,
             p.zip,
@@ -78,9 +82,14 @@ export async function POST(request: Request) {
           );
           for (const report of cached)
             if (report.lines.some((line) => line.products.length))
-              send({ type: "report", report, cached: true });
+              send({
+                type: "report",
+                report: normalizeCatalogReport(report, p.items),
+                cached: true,
+              });
           send({ type: "agent", stage: "planning" });
           const agentPlan = await planBasketSearch(p.items);
+          request.signal.throwIfAborted();
           send({
             type: "agent",
             stage: agentPlan ? "ready" : "unavailable",
@@ -92,8 +101,13 @@ export async function POST(request: Request) {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(p),
+              signal: request.signal,
             }),
-            (report) => send({ type: "report", report }),
+            (report) =>
+              send({
+                type: "report",
+                report: normalizeCatalogReport(report, p.items),
+              }),
             agentPlan ?? undefined,
           );
           const result = await response.json();
@@ -105,6 +119,9 @@ export async function POST(request: Request) {
             send({ type: "agent", stage: "reviewing" });
             const reviewed = await reviewProductMatches(result.publicCatalogs);
             result.publicCatalogs = reviewed.reports;
+            result.publicCatalogs = result.publicCatalogs.map(
+              (report: ScrapeReport) => normalizeCatalogReport(report, p.items),
+            );
             result.agent = {
               ...result.agent,
               reviewedMatches: reviewed.reviewed,

@@ -14,6 +14,7 @@ import type { ScrapeReport } from "@/lib/retailer-scraper";
 import { providerReports } from "@/lib/provider-prices";
 import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
 import type { SearchPlan } from "@/lib/local-search-agent";
+import { normalizeCatalogReport } from "@/lib/product-ownership";
 export const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   area: z.enum(["downtown", "midtown", "decatur"]).default("downtown"),
@@ -41,17 +42,11 @@ export const input = z.object({
     .min(1)
     .max(30),
 });
-let running = false;
 export async function compareBasket(
   request: Request,
   onReport?: (report: ScrapeReport) => void,
   agentPlan?: SearchPlan,
 ) {
-  if (running)
-    return Response.json(
-      { error: "A price check is already running. Please try again shortly." },
-      { status: 429 },
-    );
   const parsed = input.safeParse(await request.json().catch(() => null));
   if (
     !parsed.success ||
@@ -65,18 +60,23 @@ export async function compareBasket(
       },
       { status: 400 },
     );
-  running = true;
   try {
+    request.signal.throwIfAborted();
     const p = parsed.data;
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([
-      scrapeRetailers(coverage, p.items, mapped.places, agentPlan).then(
-        (reports) => {
-          for (const report of reports) onReport?.(report);
-          return reports;
-        },
-      ),
+      scrapeRetailers(
+        coverage,
+        p.items,
+        mapped.places,
+        agentPlan,
+        request.signal,
+      ).then((reports) => {
+        for (const report of reports)
+          onReport?.(normalizeCatalogReport(report, p.items));
+        return reports;
+      }),
       providerReports(
         [...new Set(coverage.map((c) => c.retailer))],
         p.items,
@@ -85,9 +85,12 @@ export async function compareBasket(
         false,
         onReport,
         agentPlan,
+        false,
+        request.signal,
       ),
     ]);
-    for (const report of providerCatalogs) {
+    for (const rawReport of providerCatalogs) {
+      const report = normalizeCatalogReport(rawReport, p.items);
       const index = publicCatalogs.findIndex(
         (r) => r.retailer === report.retailer,
       );
@@ -98,6 +101,8 @@ export async function compareBasket(
             : report;
       } else publicCatalogs.push(report);
     }
+    for (const [index, report] of publicCatalogs.entries())
+      publicCatalogs[index] = normalizeCatalogReport(report, p.items);
     const checkedStores = [] as Awaited<ReturnType<typeof checkStores>>;
     const warnings: string[] = [];
     try {
@@ -139,12 +144,15 @@ export async function compareBasket(
                   s.coordinates!.lon,
               ) < 0.001,
           );
-          return row ? [{ ...s, coverageId: row.id }] : [];
+          return row
+            ? [{ ...s, retailerId: "Kroger family", coverageId: row.id }]
+            : [];
         });
         const checked = await checkStores(
           p.items.slice(0, 10),
           matched,
           krogerProducts,
+          request.signal,
         );
         for (const store of checked) {
           const row = coverage.find(
@@ -157,7 +165,19 @@ export async function compareBasket(
             ...store,
             id: row.id,
             lines: [
-              ...store.lines,
+              ...store.lines.map((line) => ({
+                ...line,
+                candidates: line.candidates
+                  .filter(
+                    (candidate) =>
+                      candidate.storeLocationId === store.id &&
+                      candidate.retailerId === row.retailer,
+                  )
+                  .map((candidate) => ({
+                    ...candidate,
+                    storeLocationId: row.id,
+                  })),
+              })),
               ...p.items.slice(10).map((item) => ({
                 item,
                 candidates: [],
@@ -168,6 +188,7 @@ export async function compareBasket(
           });
         }
       } catch {
+        request.signal.throwIfAborted();
         warnings.push(
           "Kroger price search failed. Affected stores remain unpriced.",
         );
@@ -195,7 +216,5 @@ export async function compareBasket(
     );
   } catch (e) {
     return errorResponse(e);
-  } finally {
-    running = false;
   }
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { foodAlternatives } from "@/lib/food-alternatives";
 import { normalizedUnitPrice, packageMatches } from "@/lib/package-match";
+import { ownedCatalogProducts } from "@/lib/product-ownership";
+import { catalogLineStatus, searchStatusLabel } from "@/lib/search-state";
 import type { AgentItem } from "@/lib/price-agent";
 import type { ScrapeReport, ScrapedProduct } from "@/lib/retailer-scraper";
 
@@ -25,61 +26,66 @@ function ProductPhoto({ product }: { product: ScrapedProduct }) {
   );
 }
 
-function missingPriceReason(report: ScrapeReport, error?: string) {
-  if (report.status === "pending") return "This store search is still running.";
-  if (report.status === "blocked" || report.status === "unsupported")
-    return "No connected price source for this store.";
-  if (/not searched|limit reached|collection limited/i.test(error ?? ""))
-    return "This item was not searched in this run.";
-  if (/verified product url|source_needed/i.test(error ?? ""))
-    return "No usable product page was found for this item.";
-  if (/blocked|crawling rules|denied/i.test(error ?? ""))
-    return "The store website blocked this price check.";
-  if (report.status === "failed" || error)
-    return "The search did not return a priced matching package.";
-  return "No priced matching package was found at this store.";
-}
-
 export default function StoreColumns({
   reports,
   items,
+  onRetry,
 }: {
   reports: ScrapeReport[];
   items: AgentItem[];
+  onRetry?: (retailerId: string) => void;
 }) {
   return (
     <div
       className="store-comparison"
       role="region"
-      aria-label="Compare foods across grocery stores"
+      aria-label="Compare online retailer catalog listings"
       tabIndex={0}
     >
       {reports.map((report) => (
         <article className="store-column" key={report.retailer}>
           <div className="store-column-heading">
-            <span className="eyebrow">GROCERY STORE</span>
+            <span className="eyebrow">
+              ONLINE RETAILER CATALOG · BRANCH UNVERIFIED
+            </span>
             <h3>{report.retailer}</h3>
             <p>
-              {report.lines.filter((line) => line.products.length).length} of{" "}
-              {items.length} {items.length === 1 ? "item" : "items"} priced
+              {
+                items.filter(
+                  (item) =>
+                    ownedCatalogProducts(
+                      report,
+                      report.lines.find((line) => line.item.id === item.id)
+                        ?.products ?? [],
+                    ).length,
+                ).length
+              }{" "}
+              of {items.length} {items.length === 1 ? "item" : "items"} priced
             </p>
             <span className="comparison-status">
               {report.status === "pending"
                 ? "Searching website…"
                 : report.status === "retrieved"
-                  ? "Online listing found"
-                  : "No usable store price"}
+                  ? "Online listing found · no branch price"
+                  : "Live pricing unavailable"}
             </span>
+            {onRetry &&
+              report.lines.some((line) =>
+                ["timeout", "error"].includes(
+                  catalogLineStatus(report, line.item.id),
+                ),
+              ) && (
+                <button type="button" onClick={() => onRetry(report.retailer)}>
+                  Retry search
+                </button>
+              )}
           </div>
           {items.map((item) => {
             const line = report.lines.find(
               (entry) => entry.item.id === item.id,
             );
-            const products = line?.products ?? [];
+            const products = ownedCatalogProducts(report, line?.products ?? []);
             const product = products[0];
-            const alternatives = product
-              ? []
-              : foodAlternatives(reports, report.retailer, item.id, item.name);
             return (
               <div className="comparison-food" key={item.id}>
                 <div className="comparison-request">
@@ -132,7 +138,8 @@ export default function StoreColumns({
                       </p>
                     )}
                     <p className="small">
-                      Recorded {new Date(product.retrievedAt).toLocaleString()}
+                      {product.priceSource} · updated{" "}
+                      {new Date(product.verifiedAt).toLocaleString()}
                     </p>
                     {products.length > 1 && (
                       <details>
@@ -161,7 +168,9 @@ export default function StoreColumns({
                   </>
                 ) : (
                   <div className="comparison-missing">
-                    <strong>{missingPriceReason(report, line?.error)}</strong>
+                    <strong>
+                      {searchStatusLabel(catalogLineStatus(report, item.id))}
+                    </strong>
                     {report.status !== "pending" && (
                       <p>
                         {report.status === "blocked" ||
@@ -179,32 +188,6 @@ export default function StoreColumns({
                         Check this food in The Fresh Market catalog ↗
                       </a>
                     )}
-                  </div>
-                )}
-                {!product && alternatives.length > 0 && (
-                  <div className="comparison-fallback">
-                    <p className="comparison-substitute">
-                      Similar options at other stores
-                    </p>
-                    <p className="small">
-                      These are not {report.retailer} prices.
-                    </p>
-                    {alternatives.map((other) => (
-                      <div key={other.sourceRetailer + other.id}>
-                        <ProductPhoto product={other} />
-                        <strong>{other.sourceRetailer}</strong>
-                        <a
-                          href={other.sourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {other.name} ↗
-                        </a>
-                        <p>
-                          {other.size} · ${(other.priceCents / 100).toFixed(2)}
-                        </p>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>

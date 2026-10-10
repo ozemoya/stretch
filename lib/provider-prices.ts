@@ -9,6 +9,12 @@ import { reserveRecords } from "./provider-budget";
 import { discoverSources, validDiscoveredSource } from "./ai-source-search";
 import type { SearchPlan } from "./local-search-agent";
 import { packageMatches, prioritizePackageMatches } from "./package-match";
+import { catalogSourceBelongsToRetailer } from "./product-ownership";
+import {
+  SEARCH_TIMEOUT_MS,
+  boundedJobStatus,
+  type SearchStatus,
+} from "./search-state";
 
 type ProviderConfig = {
   id: string;
@@ -40,11 +46,6 @@ const providers: Record<string, ProviderConfig> = {
   },
   "Food Lion": { id: "gd_mljhotxi146iliaa3d", host: "www.instacart.com" },
   "Sam’s Club": { id: "gd_mljhotxi146iliaa3d", host: "www.instacart.com" },
-  "Whole Foods": { id: "gd_mju3omd7fdyi32u0j", host: "www.instacart.com" },
-  "Independent / other retailer": {
-    id: "gd_mju3omd7fdyi32u0j",
-    host: "www.instacart.com",
-  },
 };
 export type ProviderRetailer = keyof typeof providers;
 type Job = {
@@ -83,7 +84,8 @@ export function needsBroaderCatalogSearch(
       packageMatches(item.unit, product.size),
   );
 }
-async function api(endpoint: string, body?: unknown) {
+async function api(endpoint: string, body?: unknown, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   if (body && endpoint.startsWith("trigger?")) {
     const request = body as { input: unknown[]; limit_per_input: number };
     await reserveRecords(request.input.length * request.limit_per_input);
@@ -99,7 +101,9 @@ async function api(endpoint: string, body?: unknown) {
         "Content-Type": "application/json",
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(25000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(25000)])
+        : AbortSignal.timeout(25000),
     },
   );
   if (!response.ok)
@@ -148,10 +152,7 @@ export function parseProviderProducts(
       url.username ||
       url.password ||
       url.hostname.replace(/^www\./, "") !== host.replace(/^www\./, "") ||
-      (retailer &&
-        host === "www.instacart.com" &&
-        retailer !== "Whole Foods" &&
-        !validDiscoveredSource(retailer, url.href))
+      (retailer && !catalogSourceBelongsToRetailer(retailer, url.href))
     )
       return [];
     const specs = Array.isArray(p.specifications)
@@ -213,7 +214,9 @@ async function job(
   cacheOnly = false,
   plan?: SearchPlan,
   broadenUnmatched = false,
+  signal?: AbortSignal,
 ): Promise<Job> {
+  signal?.throwIfAborted();
   const config = providers[retailer];
   let configuredUrls: string[] = [];
   if (!config.keyword) {
@@ -262,7 +265,9 @@ async function job(
     // fallbacks, not a replacement for searching the wider product catalog.
     if (!discoveryCached && start && !cacheOnly) {
       try {
-        discoveredUrls = await discoverSources(retailer, item, zip, plan);
+        discoveredUrls = await discoverSources(retailer, item, zip, plan, {
+          signal,
+        });
         await writeFile(
           sourceFile,
           JSON.stringify({ at: Date.now(), urls: discoveredUrls }),
@@ -299,6 +304,13 @@ async function job(
     if (cacheOnly)
       return saved ?? { started: now, checked: now, status: "not_requested" };
     if (
+      start &&
+      saved?.id &&
+      ["running", "starting", "pending"].includes(saved.status) &&
+      now - saved.started >= SEARCH_TIMEOUT_MS
+    )
+      saved = undefined;
+    if (
       (start || broadenUnmatched) &&
       (saved?.status === "ready" || saved?.status === "failed") &&
       !saved.packageFallback &&
@@ -309,6 +321,7 @@ async function job(
       const extraUrls = await discoverSources(retailer, item, zip, plan, {
         broader: true,
         exclude: saved.sourceUrls ?? configuredUrls,
+        signal,
       }).catch(() => []);
       if (extraUrls.length) {
         const next = await api(
@@ -317,6 +330,7 @@ async function job(
             input: extraUrls.map((url) => ({ url })),
             limit_per_input: 1,
           },
+          signal,
         );
         if (/^s[d]?_[a-z0-9]+$/.test(next.snapshot_id ?? "")) {
           saved.id = next.snapshot_id;
@@ -352,11 +366,15 @@ async function job(
           (saved.fallback || !["Walmart", "Target"].includes(retailer)))
       )
         return saved;
-      const state = await api(`progress/${saved.id}`);
+      const state = await api(`progress/${saved.id}`, undefined, signal);
       saved.checked = now;
       saved.status = state.status;
       if (state.status === "ready") {
-        const raw = await api(`snapshot/${saved.id}?format=json`);
+        const raw = await api(
+          `snapshot/${saved.id}?format=json`,
+          undefined,
+          signal,
+        );
         const freshProducts = parseProviderProducts(
           raw,
           config.host,
@@ -416,6 +434,7 @@ async function job(
                 })),
                 limit_per_input: 1,
               },
+              signal,
             );
             if (!/^s[d]?_[a-z0-9]+$/.test(next.snapshot_id ?? ""))
               throw new Error("Invalid product job.");
@@ -446,6 +465,7 @@ async function job(
         const next = await api(
           `trigger?dataset_id=${fallbackId}&type=discover_new&discover_by=${config.method}&format=json&include_errors=true`,
           { input: [fallbackInput], limit_per_input: 3 },
+          signal,
         );
         if (!/^s[d]?_[a-z0-9]+$/.test(next.snapshot_id ?? ""))
           throw new Error("Invalid fallback collection job.");
@@ -482,6 +502,7 @@ async function job(
     const result = await api(
       `trigger?dataset_id=${config.id}${config.method ? `&type=discover_new&discover_by=${config.method}` : ""}&format=json&include_errors=true`,
       { input, limit_per_input: 3 },
+      signal,
     );
     if (!/^s[d]?_[a-z0-9]+$/.test(result.snapshot_id ?? ""))
       throw new Error("Provider did not return a valid job.");
@@ -513,6 +534,7 @@ export async function providerReports(
   onReport?: (report: ScrapeReport) => void,
   plan?: SearchPlan,
   broadenUnmatched = false,
+  signal?: AbortSignal,
 ): Promise<ScrapeReport[]> {
   if (!providerConfigured()) return [];
   const supported = [...new Set(retailers)].filter((retailer) =>
@@ -527,10 +549,11 @@ export async function providerReports(
   await Promise.all(
     Array.from({ length: Math.min(6, tasks.length) }, async () => {
       while (cursor < tasks.length) {
+        if (signal?.aborted) break;
         const { retailer, item } = tasks[cursor++];
         let line: ScrapeReport["lines"][number];
         try {
-          const state = await job(
+          const rawState = await job(
             retailer as ProviderRetailer,
             item,
             zip,
@@ -538,22 +561,40 @@ export async function providerReports(
             cacheOnly,
             plan,
             broadenUnmatched,
+            signal,
           );
+          const state =
+            boundedJobStatus(rawState.status, rawState.started) === "timeout"
+              ? {
+                  ...rawState,
+                  status: "timeout",
+                  error: "Search timed out. Retry this store search.",
+                }
+              : rawState;
+          const ownedProducts = (state.products ?? []).filter((product) =>
+            catalogSourceBelongsToRetailer(retailer, product.sourceUrl),
+          );
+          const products = prioritizePackageMatches(
+            selectFoodMatches(ownedProducts, item.name, matchesRequestedFood),
+            item.unit,
+          );
+          const searchStatus: SearchStatus = products.length
+            ? "completed"
+            : state.status === "timeout"
+              ? "timeout"
+              : ["running", "starting", "pending"].includes(state.status)
+                ? "searching"
+                : state.status === "ready"
+                  ? "no_results"
+                  : ["source_needed", "not_requested"].includes(state.status)
+                    ? "integration_unavailable"
+                    : state.status === "limited"
+                      ? "price_unavailable"
+                      : "error";
           line = {
             item,
-            products: prioritizePackageMatches(
-              selectFoodMatches(
-                (state.products ?? []).filter(
-                  (product) =>
-                    providers[retailer].host !== "www.instacart.com" ||
-                    retailer === "Whole Foods" ||
-                    validDiscoveredSource(retailer, product.sourceUrl),
-                ),
-                item.name,
-                matchesRequestedFood,
-              ),
-              item.unit,
-            ),
+            products,
+            searchStatus,
             ...((state.status === "ready" || state.status === "failed") &&
             !state.packageFallback &&
             needsBroaderCatalogSearch(state.products ?? [], item) &&
@@ -575,6 +616,7 @@ export async function providerReports(
             item,
             products: [],
             error: "Website collection failed. No price assumed.",
+            searchStatus: "error",
           };
         }
         const group = lines.get(retailer) ?? [];
@@ -584,7 +626,10 @@ export async function providerReports(
           retailer,
           status: group.some((l) => l.products.length)
             ? "retrieved"
-            : "pending",
+            : group.length < items.length ||
+                group.some((l) => l.searchStatus === "searching")
+              ? "pending"
+              : "failed",
           detail:
             "Website search in progress. Branch prices remain unverified.",
           lines: items.map(
@@ -593,12 +638,14 @@ export async function providerReports(
                 item: i,
                 products: [],
                 error: "Waiting for website search.",
+                searchStatus: "searching",
               },
           ),
         });
       }
     }),
   );
+  signal?.throwIfAborted();
   return supported.map((retailer) => {
     const ordered = items.map((item) =>
       lines.get(retailer)!.find((line) => line.item.id === item.id)!,
@@ -607,7 +654,7 @@ export async function providerReports(
       retailer,
       status: ordered.some((l) => l.products.length)
         ? "retrieved"
-        : ordered.some((l) => /running|starting/.test(l.error ?? ""))
+        : ordered.some((l) => l.searchStatus === "searching")
           ? "pending"
           : "failed",
       detail: `Website collection for ZIP ${zip}. Advertised online prices; branch, stock and in-store price equivalence are unverified. Excluded from trip rankings.`,

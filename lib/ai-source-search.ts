@@ -49,7 +49,7 @@ export async function discoverSources(
   item: AgentItem,
   zip: string,
   plan?: SearchPlan,
-  options?: { broader?: boolean; exclude?: string[] },
+  options?: { broader?: boolean; exclude?: string[]; signal?: AbortSignal },
 ): Promise<string[]> {
   if (
     process.env.BRIGHT_DATA_SERP_ZONE &&
@@ -77,10 +77,13 @@ export async function discoverSources(
     const found = new Set<string>();
     for (const [queryIndex, query] of queries.entries()) {
       await reserveRecords(1);
+      options?.signal?.throwIfAborted();
       const response = await fetch("https://api.brightdata.com/request", {
         method: "POST",
         redirect: "error",
-        signal: AbortSignal.timeout(45000),
+        signal: options?.signal
+          ? AbortSignal.any([options.signal, AbortSignal.timeout(45000)])
+          : AbortSignal.timeout(45000),
         headers: {
           Authorization: `Bearer ${process.env.BRIGHT_DATA_API_KEY}`,
           "Content-Type": "application/json",
@@ -126,7 +129,9 @@ export async function discoverSources(
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     redirect: "error",
-    signal: AbortSignal.timeout(45000),
+    signal: options?.signal
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(45000)])
+      : AbortSignal.timeout(45000),
     headers: {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       "Content-Type": "application/json",

@@ -2,7 +2,11 @@
 import StoreColumns from "./StoreColumns";
 import { useState, useEffect, useRef } from "react";
 import type { AgentItem, StoreCheck } from "@/lib/price-agent";
-import { reviewedTotal } from "@/lib/price-agent";
+import {
+  reviewedTotal,
+  ownedCandidate,
+  pricedItemCount,
+} from "@/lib/price-agent";
 import type { SearchOrigin } from "@/lib/locations";
 import type { StoreCoverage } from "@/lib/retailer-coverage";
 import type { ScrapeReport } from "@/lib/retailer-scraper";
@@ -11,6 +15,14 @@ import { centers } from "@/lib/locations";
 import type { GasStop } from "@/lib/gas-stop";
 import { fuelCostCents } from "@/lib/live-trip";
 import { normalizedUnitPrice } from "@/lib/package-match";
+import { packageMatches } from "@/lib/package-match";
+import { nearbyAlternatives } from "@/lib/nearby-alternatives";
+import {
+  SearchEpoch,
+  searchStatusLabel,
+  settlePendingReports,
+} from "@/lib/search-state";
+import { normalizeCatalogReport } from "@/lib/product-ownership";
 export default function PriceAgent({
   items,
   zip,
@@ -57,6 +69,34 @@ export default function PriceAgent({
   const [routeBusy, setRouteBusy] = useState(false);
   const [radius, setRadius] = useState(5);
   const started = useRef(false);
+  const epoch = useRef(new SearchEpoch());
+  const requestController = useRef<AbortController | null>(null);
+  const inputKey = JSON.stringify([
+    zip,
+    area,
+    origin?.lat,
+    origin?.lon,
+    radius,
+    items.map((item) => [item.id, item.name, item.unit, item.quantity]),
+  ]);
+  const previousInput = useRef(inputKey);
+  useEffect(() => {
+    if (previousInput.current === inputKey) return;
+    previousInput.current = inputKey;
+    requestController.current?.abort();
+    epoch.current.cancel();
+    setBusy(false);
+    setResult(null);
+    setLiveReports([]);
+    setChoices({});
+  }, [inputKey]);
+  useEffect(
+    () => () => {
+      requestController.current?.abort();
+      epoch.current.cancel();
+    },
+    [],
+  );
   useEffect(() => {
     if (autoStart && !started.current) {
       started.current = true;
@@ -140,6 +180,10 @@ export default function PriceAgent({
     return () => clearInterval(timer);
   }, [busy]);
   async function check() {
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
+    const requestId = epoch.current.begin();
     setBusy(true);
     setError("");
     setResult(null);
@@ -157,8 +201,21 @@ export default function PriceAgent({
           origin: origin ?? undefined,
           radius,
         }),
-        signal: AbortSignal.timeout(240000),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(
+            Math.min(
+              240000,
+              Math.max(
+                5000,
+                Number(process.env.NEXT_PUBLIC_STRETCH_SEARCH_TIMEOUT_MS) ||
+                  120000,
+              ),
+            ),
+          ),
+        ]),
       });
+      if (!epoch.current.isCurrent(requestId)) return;
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error);
@@ -170,6 +227,7 @@ export default function PriceAgent({
       try {
         for (;;) {
           const chunk = await reader.read();
+          if (!epoch.current.isCurrent(requestId)) break;
           pending += decoder.decode(chunk.value, { stream: !chunk.done });
           const messages = pending.split("\n");
           pending = messages.pop() ?? "";
@@ -177,27 +235,57 @@ export default function PriceAgent({
             if (!message.trim()) continue;
             const event = JSON.parse(message);
             if (event.type === "error") throw new Error(event.error);
+            if (!epoch.current.isCurrent(requestId)) break;
             if (event.type === "agent") setAgentStage(event.stage);
             if (event.type === "report")
-              setLiveReports((previous) => [
-                ...previous.filter((r) => r.retailer !== event.report.retailer),
-                event.report,
-              ]);
-            if (event.type === "complete") setResult(event.result);
+              setLiveReports((previous) =>
+                epoch.current.isCurrent(requestId)
+                  ? [
+                      ...previous.filter(
+                        (r) => r.retailer !== event.report.retailer,
+                      ),
+                      normalizeCatalogReport(event.report, items),
+                    ]
+                  : previous,
+              );
+            if (event.type === "complete")
+              setResult((previous) =>
+                epoch.current.isCurrent(requestId) ? event.result : previous,
+              );
           }
           if (chunk.done) break;
         }
       } finally {
+        if (controller.signal.aborted)
+          await reader.cancel().catch(() => undefined);
         reader.releaseLock();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Price check unavailable.");
+      if (epoch.current.isCurrent(requestId)) {
+        const timeout = e instanceof Error && e.name === "TimeoutError";
+        setLiveReports((previous) =>
+          epoch.current.isCurrent(requestId)
+            ? settlePendingReports(previous, timeout ? "timeout" : "error")
+            : previous,
+        );
+        setError(
+          timeout
+            ? "Search timed out. Retry the search."
+            : e instanceof Error
+              ? e.message
+              : "Price check unavailable.",
+        );
+      }
     } finally {
-      setBusy(false);
+      if (epoch.current.isCurrent(requestId)) setBusy(false);
     }
   }
-  async function refreshProvider() {
+  async function refreshProvider(retailer?: string, retry = false) {
     if (!result || busy) return;
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
+    const requestId = epoch.current.begin();
     setBusy(true);
     try {
       const response = await fetch("/api/live/provider-status", {
@@ -206,15 +294,22 @@ export default function PriceAgent({
         body: JSON.stringify({
           zip,
           items,
-          retailers: [...new Set(result.storeCoverage.map((s) => s.retailer))],
-          broaden: true,
+          retailers: retailer
+            ? [retailer]
+            : [...new Set(result.storeCoverage.map((s) => s.retailer))],
+          start: retry,
+          broaden: !retry,
         }),
-        signal: AbortSignal.timeout(120000),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(120000),
+        ]),
       });
+      if (!epoch.current.isCurrent(requestId)) return;
       if (!response.ok) throw new Error("Could not refresh provider prices.");
       const data = await response.json();
       setResult((previous) =>
-        previous
+        previous && epoch.current.isCurrent(requestId)
           ? {
               ...previous,
               publicCatalogs: previous.publicCatalogs.map((report) => {
@@ -222,17 +317,35 @@ export default function PriceAgent({
                   (candidate: ScrapeReport) =>
                     candidate.retailer === report.retailer,
                 );
-                return update?.retailer === "The Fresh Market"
-                  ? mergeCatalogReports(report, update)
-                  : (update ?? report);
+                return update
+                  ? normalizeCatalogReport(
+                      mergeCatalogReports(report, update),
+                      items,
+                    )
+                  : report;
               }),
             }
           : previous,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Refresh failed.");
+      if (epoch.current.isCurrent(requestId)) {
+        setResult((previous) =>
+          previous && epoch.current.isCurrent(requestId)
+            ? {
+                ...previous,
+                publicCatalogs: settlePendingReports(
+                  previous.publicCatalogs,
+                  e instanceof Error && e.name === "TimeoutError"
+                    ? "timeout"
+                    : "error",
+                ),
+              }
+            : previous,
+        );
+        setError(e instanceof Error ? e.message : "Refresh failed.");
+      }
     } finally {
-      setBusy(false);
+      if (epoch.current.isCurrent(requestId)) setBusy(false);
     }
   }
   const totals =
@@ -263,6 +376,7 @@ export default function PriceAgent({
   const cheapestTrip = completeTrips.length
     ? Math.min(...completeTrips.map((trip) => trip.totalCents))
     : null;
+  const alternatives = nearbyAlternatives(result?.stores ?? [], choices);
   return (
     <section
       className="live-sources search-workspace"
@@ -292,6 +406,20 @@ export default function PriceAgent({
       >
         {busy ? "SEARCH IN PROGRESS…" : "SEARCH STORES & PRICES ↗"}
       </button>
+      {busy && (
+        <button
+          type="button"
+          onClick={() => {
+            requestController.current?.abort();
+            epoch.current.cancel();
+            setBusy(false);
+            setLiveReports([]);
+            setError("Search canceled. You can retry when ready.");
+          }}
+        >
+          Cancel search
+        </button>
+      )}
       <label className="live-area">
         Store search radius
         <select
@@ -313,7 +441,8 @@ export default function PriceAgent({
       <p className="small">
         Discovers mapped grocery stores from every retailer in the radius. Each
         is checked for a supported public scraper or connected price source.
-        These results do not include travel, tax, or verified stock.
+        Online catalog listings do not establish branch prices. Complete
+        branch-priced baskets include driving; tax and stock remain unverified.
       </p>
       {error && <p role="alert">{error}</p>}
       {busy && (
@@ -389,13 +518,14 @@ export default function PriceAgent({
           <p>
             <strong>
               {
-                result.storeCoverage.filter((s) => s.status === "checked")
-                  .length
+                result.stores.filter(
+                  (store) => pricedItemCount(store) === items.length,
+                ).length
               }{" "}
               / {result.foundStores ?? result.storeCoverage.length} locations
-              have prices eligible for trip ranking.
+              have every item priced.
             </strong>{" "}
-            Unpriced stores cannot be ranked as cheapest.
+            Only complete reviewed baskets with a driving route can be ranked.
           </p>
           <p className="small">
             Retailers found:{" "}
@@ -480,13 +610,22 @@ export default function PriceAgent({
               ))}
           </div>
           {!!result.publicCatalogs?.length && (
-            <button type="button" disabled={busy} onClick={refreshProvider}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void refreshProvider()}
+            >
               {busy ? "Checking progress…" : "Refresh background prices"}
             </button>
           )}
           {!!result.publicCatalogs?.length && (
             <StoreColumns
               items={items}
+              onRetry={(retailerId) =>
+                void (["Lidl", "Trader Joe’s"].includes(retailerId)
+                  ? check()
+                  : refreshProvider(retailerId, true))
+              }
               reports={result.publicCatalogs
                 .filter(
                   (report) =>
@@ -532,60 +671,132 @@ export default function PriceAgent({
             </p>
           )}
           <div className="live-grid">
-            {result.stores.map((store) => {
-              const total = reviewedTotal(store, choices[store.id] ?? {});
+            {result.storeCoverage.map((location) => {
+              const store = result.stores.find(
+                (entry) => entry.id === location.id,
+              );
+              const total = store
+                ? reviewedTotal(store, choices[store.id] ?? {})
+                : null;
+              const pricedCount = store ? pricedItemCount(store) : 0;
               return (
-                <article className="live-card" key={store.id}>
-                  <h3>{store.name}</h3>
-                  <p>{store.address}</p>
-                  {store.lines.map((line) => (
-                    <label
-                      key={line.item.id}
-                      style={{ display: "block", marginBottom: 16 }}
-                    >
-                      {line.item.quantity} × {line.item.name} · requested{" "}
-                      {line.item.unit}
-                      <select
-                        aria-label={`${store.name}: ${line.item.name}`}
-                        value={choices[store.id]?.[line.item.id] ?? ""}
-                        onChange={(e) =>
-                          setChoices((c) => ({
-                            ...c,
-                            [store.id]: {
-                              ...c[store.id],
-                              [line.item.id]: e.target.value,
-                            },
-                          }))
-                        }
+                <article className="live-card" key={location.id}>
+                  <h3>{location.name}</h3>
+                  <p>
+                    {location.address ||
+                      "Exact street address not supplied by map source"}
+                  </p>
+                  <p>
+                    <strong>
+                      {pricedCount} of {items.length} items priced
+                    </strong>{" "}
+                    ·{" "}
+                    {location.status === "checked"
+                      ? "Branch source checked"
+                      : location.status === "failed"
+                        ? "Search failed"
+                        : "Live pricing unavailable"}
+                  </p>
+                  {location.status === "failed" && (
+                    <button type="button" onClick={() => void check()}>
+                      Retry search
+                    </button>
+                  )}
+                  {items.map((item) => {
+                    const line = store?.lines.find(
+                      (entry) => entry.item.id === item.id,
+                    );
+                    const products = store
+                      ? (line?.candidates ?? []).filter((candidate) =>
+                          ownedCandidate(store, candidate),
+                        )
+                      : [];
+                    const selected = products.find(
+                      (candidate) =>
+                        candidate.id === choices[store!.id]?.[item.id],
+                    );
+                    return (
+                      <label
+                        key={item.id}
+                        style={{ display: "block", marginBottom: 16 }}
                       >
-                        <option value="">Review a matching package</option>
-                        {line.candidates.map((p) => (
-                          <option
-                            key={p.id}
-                            value={p.id}
-                            disabled={!p.regularCents || p.soldBy !== "UNIT"}
+                        {item.quantity} × {item.name} · requested {item.unit}
+                        {products.length ? (
+                          <select
+                            aria-label={`${location.name}: ${item.name}`}
+                            value={choices[store!.id]?.[item.id] ?? ""}
+                            onChange={(e) =>
+                              setChoices((c) => ({
+                                ...c,
+                                [store!.id]: {
+                                  ...c[store!.id],
+                                  [item.id]: e.target.value,
+                                },
+                              }))
+                            }
                           >
-                            {p.name} · {p.size} ·{" "}
-                            {p.regularCents
-                              ? `$${(p.regularCents / 100).toFixed(2)}`
-                              : "Price unknown"}{" "}
-                            {p.regularCents &&
-                            normalizedUnitPrice(p.regularCents, p.size)
-                              ? `· $${(normalizedUnitPrice(p.regularCents, p.size)!.displayCents / 100).toFixed(2)}/${normalizedUnitPrice(p.regularCents, p.size)!.displayUnit} `
-                              : ""}
-                            · {p.soldBy}
-                          </option>
-                        ))}
-                      </select>
-                      {line.error && <span>{line.error}</span>}
-                      {!line.error && !line.candidates.length && (
-                        <span>No matching search results.</span>
-                      )}
-                    </label>
-                  ))}
+                            <option value="">Review a matching package</option>
+                            {products.map((p) => (
+                              <option
+                                key={p.id}
+                                value={p.id}
+                                disabled={
+                                  !p.regularCents ||
+                                  p.soldBy !== "UNIT" ||
+                                  !packageMatches(item.unit, p.size)
+                                }
+                              >
+                                {p.name} · {p.size} ·{" "}
+                                {p.regularCents
+                                  ? `$${(p.regularCents / 100).toFixed(2)}`
+                                  : "Price unknown"}{" "}
+                                {p.regularCents &&
+                                normalizedUnitPrice(p.regularCents, p.size)
+                                  ? `· $${(normalizedUnitPrice(p.regularCents, p.size)!.displayCents / 100).toFixed(2)}/${normalizedUnitPrice(p.regularCents, p.size)!.displayUnit} `
+                                  : ""}
+                                · {p.soldBy}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span>
+                            {" "}
+                            ·{" "}
+                            {location.status === "unavailable"
+                              ? "Live pricing unavailable"
+                              : line?.error ||
+                                searchStatusLabel(
+                                  line?.searchStatus ?? "no_results",
+                                )}
+                          </span>
+                        )}
+                        {selected && (
+                          <p className="small">
+                            {selected.priceSource} · updated{" "}
+                            {new Date(selected.verifiedAt).toLocaleString()}
+                            {selected.productUrl ? (
+                              <>
+                                {" "}
+                                ·{" "}
+                                <a
+                                  href={selected.productUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Product ↗
+                                </a>
+                              </>
+                            ) : (
+                              " · product URL not supplied by source"
+                            )}
+                          </p>
+                        )}
+                      </label>
+                    );
+                  })}
                   <strong>
                     {total === null
-                      ? "Incomplete — review every item"
+                      ? "Incomplete basket — missing or unreviewed prices"
                       : `Reviewed groceries: $${(total / 100).toFixed(2)}`}
                   </strong>
                   {total !== null &&
@@ -600,6 +811,62 @@ export default function PriceAgent({
               );
             })}
           </div>
+          <section
+            className="live-card"
+            aria-label="Cheaper alternatives at nearby stores"
+          >
+            <h3>Cheaper alternatives at nearby stores</h3>
+            {!alternatives.length && (
+              <p>
+                No cheaper branch-verified equivalent has been found for your
+                selected products.
+              </p>
+            )}
+            {[
+              ...new Map(
+                alternatives.map((entry) => [
+                  `${entry.store.retailerId}:${entry.store.id}`,
+                  entry.store,
+                ]),
+              ).values(),
+            ].map((store) => (
+              <div key={`${store.retailerId}:${store.id}`}>
+                <h4>{store.name}</h4>
+                <p>
+                  {store.address} · {store.retailerId}
+                </p>
+                {alternatives
+                  .filter(
+                    (entry) =>
+                      entry.store.id === store.id &&
+                      entry.store.retailerId === store.retailerId,
+                  )
+                  .map((entry) => (
+                    <p key={`${entry.item.id}:${entry.product.productId}`}>
+                      {entry.item.name}: {entry.product.productName} ·{" "}
+                      {entry.product.size} · $
+                      {(entry.product.regularCents! / 100).toFixed(2)} · save $
+                      {(entry.savingsCents / 100).toFixed(2)} on this item ·{" "}
+                      {entry.product.priceSource} · updated{" "}
+                      {new Date(entry.product.verifiedAt).toLocaleString()}
+                      {entry.product.productUrl && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          <a
+                            href={entry.product.productUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Product ↗
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  ))}
+              </div>
+            ))}
+          </section>
         </>
       )}
     </section>

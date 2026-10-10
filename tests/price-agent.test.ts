@@ -4,6 +4,7 @@ import { areaFromIp } from "../lib/ip-area";
 it("keeps failed searches incomplete and bounds store coverage", async () => {
   const stores = [1, 2, 3].map((n) => ({
     id: String(n),
+    retailerId: "Test retailer",
     name: `Store ${n}`,
     address: "",
   }));
@@ -21,7 +22,7 @@ it("keeps failed searches incomplete and bounds store coverage", async () => {
 it("requires reviewed priced unit packages before totaling quantities", async () => {
   const result = await checkStores(
     [{ id: "milk", name: "Milk", unit: "1 gal", quantity: 2 }],
-    [{ id: "1", name: "Store", address: "" }],
+    [{ id: "1", retailerId: "Test retailer", name: "Store", address: "" }],
     async () => [
       {
         id: "p",
@@ -31,6 +32,14 @@ it("requires reviewed priced unit packages before totaling quantities", async ()
         soldBy: "UNIT",
         regularCents: 300,
         retrievedAt: new Date().toISOString(),
+        retailerId: "Test retailer",
+        storeLocationId: "1",
+        productId: "p",
+        productName: "Milk",
+        price: 3,
+        priceSource: "Test source",
+        verifiedAt: new Date().toISOString(),
+        productUrl: "https://example.com/milk",
       },
     ],
   );

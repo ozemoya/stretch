@@ -5,6 +5,8 @@ export function mergeCatalogReports(
   base: ScrapeReport,
   incoming: ScrapeReport,
 ): ScrapeReport {
+  if (base.retailer !== incoming.retailer)
+    throw new Error("Cannot merge catalogs from different retailers.");
   const lines = base.lines.map((line) => {
     const update = incoming.lines.find(
       (other) => other.item.id === line.item.id,

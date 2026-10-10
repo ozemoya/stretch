@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AgentItem, StoreCheck } from "./price-agent";
 import type { StoreCoverage } from "./retailer-coverage";
+import { knownRetailerForUrl } from "./product-ownership";
 const candidate = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -9,6 +10,10 @@ const candidate = z.object({
   soldBy: z.enum(["UNIT", "WEIGHT"]),
   regularCents: z.number().int().positive().nullable(),
   retrievedAt: z.string().datetime(),
+  productUrl: z.url().startsWith("https://"),
+  retailerId: z.string().min(1),
+  storeLocationId: z.string().min(1),
+  upc: z.string().optional(),
 });
 const feedSchema = z.object({
   currency: z.literal("USD"),
@@ -45,16 +50,45 @@ export function normalizeFeed(
     seen.add(s.id);
     stores.push({
       id: s.id,
+      retailerId: local.retailer,
       name: local.name,
       address: local.address,
+      requestedItemIds: items.map((item) => item.id),
       lines: items.map((item) => {
         const line = s.lines.find((l) => l.itemId === item.id);
+        const candidates = (line?.candidates ?? []).flatMap((p) => {
+          const age = now.getTime() - Date.parse(p.retrievedAt);
+          if (
+            age < -300000 ||
+            age > 24 * 3600000 ||
+            p.retailerId !== local.retailer ||
+            p.storeLocationId !== local.id ||
+            (knownRetailerForUrl(p.productUrl) &&
+              knownRetailerForUrl(p.productUrl) !== local.retailer)
+          )
+            return [];
+          return [
+            {
+              ...p,
+              retailerId: local.retailer,
+              storeLocationId: local.id,
+              productId: p.id,
+              productName: p.name,
+              price: p.regularCents === null ? null : p.regularCents / 100,
+              priceSource: data.source,
+              verifiedAt: p.retrievedAt,
+              productUrl: p.productUrl,
+            },
+          ];
+        });
         return {
           item,
-          candidates: (line?.candidates ?? []).filter((p) => {
-            const age = now.getTime() - Date.parse(p.retrievedAt);
-            return age >= -300000 && age <= 24 * 3600000;
-          }),
+          candidates,
+          searchStatus: candidates.some((candidate) => candidate.price !== null)
+            ? ("completed" as const)
+            : candidates.length
+              ? ("price_unavailable" as const)
+              : ("no_results" as const),
         };
       }),
     });
