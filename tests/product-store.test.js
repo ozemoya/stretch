@@ -10,6 +10,10 @@ const metadataMigration = readFileSync(
   "supabase/migrations/202610090003_store_metadata.sql",
   "utf8",
 );
+const dateMigration = readFileSync(
+  "supabase/migrations/202610100001_product_date.sql",
+  "utf8",
+);
 async function fixture() {
   const db = new PGlite();
   await db.exec(`create role anon; create role authenticated; create role service_role;
@@ -21,6 +25,41 @@ async function fixture() {
       (3,'whole milk',128,3.29,3.29/128,1100695,'Kroger','Ponce');`);
   return db;
 }
+
+it("adds a real date column without inventing update dates or changing existing product values", async () => {
+  const db = await fixture();
+  try {
+    const before = (await db.query('select * from product order by "ID"')).rows;
+    await db.exec(dateMigration);
+    const after = (await db.query('select * from product order by "ID"')).rows;
+    expect(after.map(({ date, ...row }) => row)).toEqual(before);
+    expect(after.every((row) => row.date === null)).toBe(true);
+    const column = (
+      await db.query(
+        "select data_type from information_schema.columns where table_schema='public' and table_name='product' and column_name='date'",
+      )
+    ).rows[0];
+    expect(column.data_type).toBe("date");
+    await db.query('update product set date=$1 where "ID"=1', ["2026-10-09"]);
+    await db.query('update product set date=$1,price=$2 where "ID"=1', [
+      "2026-10-10",
+      2.19,
+    ]);
+    const updated = (
+      await db.query('select "ID",date::text,price from product where "ID"=1')
+    ).rows[0];
+    expect(updated).toMatchObject({
+      ID: "1",
+      date: "2026-10-10",
+      price: "2.19",
+    });
+    await expect(
+      db.exec("update product set date='not-a-date'"),
+    ).rejects.toThrow();
+  } finally {
+    await db.close();
+  }
+}, 20000);
 
 it("moves names once per location, preserves products, and enforces the store link", async () => {
   const db = await fixture();

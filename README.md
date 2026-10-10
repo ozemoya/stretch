@@ -85,6 +85,113 @@ Checkout opens one large map for both groceries and gas stations. The shared rad
 Checkout website search now streams newline-delimited JSON: cached observations first, then bounded parallel collector updates, followed by the complete comparison. Six item collection workers run concurrently; public catalog scraping and provider collectors run together. Existing collector jobs are reused and polled rather than repeatedly started. Retailer APIs are not required by the website collection adapters, but hosted scraping/search infrastructure still requires its server credentials. Branch, stock, and in-store equivalence remain unverified unless explicitly supplied by a branch-specific source.
 Keep credentials in local environment files. Never commit Supabase secret or service-role keys.
 
+## Kroger search and save library
+
+Import from `@/lib/kroger` in Next.js Route Handlers, Server Actions or Server Components
+using the Node.js runtime. This entry point is marked `server-only`; importing it into a
+Client Component produces a Next.js build error. No additional packages are required.
+
+```ts
+import {
+  findCheapestKrogerProducts,
+  saveCheapestKrogerProducts,
+  type KrogerSearchOptions,
+} from "@/lib/kroger";
+
+// Pass the visitor's IP-derived coordinates from the existing location flow.
+const options: KrogerSearchOptions = {
+  item: "eggs",
+  amount: 12,
+  category: "Dairy",
+  origin: { latitude: 33.7486, longitude: -84.3880 },
+};
+
+// Reads saved results first, then searches missing stores. Never writes.
+const preview = await findCheapestKrogerProducts(options);
+
+// Reuses saved results and upserts newly searched winners into store/product.
+// An optional logger receives the same step-by-step progress as the CLI.
+const saved = await saveCheapestKrogerProducts(options, { log: console.log });
+```
+
+Both functions check Supabase before calling Kroger's products API. A saved record for
+the same normalized item, store and requested amount is returned immediately for that
+store when its `date` is today; it is not searched or written again. Equivalent amounts such as `1 gal` and
+`128 fl oz` reuse the same ID. A different requested amount remains a separate search.
+The Kroger locations API still determines the three nearest stores. Failed database
+lookups stop execution before any product search. Yesterday's or older records are
+searched again and upserted under the same ID. The `date` column records the price
+retrieval day as `YYYY-MM-DD` in America/New_York. Freshness changes at midnight in
+that time zone, rather than after 24 hours. Existing undated rows are also refreshed;
+their original counts, prices and IDs remain untouched by the column migration.
+Failed searches leave the previous price and date unchanged, so the next request retries.
+Apply `supabase/migrations/202610100001_product_date.sql` before running this version.
+
+Both functions return `{ products, rows, complete, issues }`. `products` contains all
+available database-shaped results in nearest-store order, with nested store metadata
+and `source: "database" | "kroger"`. Use this array in application code so saved hits
+appear alongside new results. `rows` contains **only newly searched** winners, including
+description, package size, physical item count, comparison quantity, price in cents,
+store metadata and retrieval time. Cached records do not invent provider metadata or a
+fresh retrieval timestamp. `complete` is false if a store failed, no match
+was found, fewer than three stores were available, or Kroger capped a search at 300 products.
+`issues` explains those cases without requiring a logger. Available winners can still be
+saved on partial searches. Configuration and database failures throw errors. Stores are
+saved before products in separate requests; a product-save failure can leave updated store
+metadata, and repeating the same search safely updates the same product IDs.
+
+The library keeps the script's matching rules: exact category and item-name checks,
+regular prices per normalized unit, an exact requested package size preferred over the
+±1/3 fallback range, and separate stable IDs for each requested amount. `package_count`
+(and saved `product.count`) means physical items: 12 eggs, one gallon jug, or one bean can.
+`package_quantity` remains 12 each, 128 fl-oz, or 15.5 oz respectively for unit pricing.
+Use `amount: "1 gal"` for whole milk, or `{ item: "black beans", unit: "oz" }` without an
+amount to compare all eligible bean package sizes. `productRow` and `storeRow` map a
+winner to the database row shapes; package parsers and TypeScript types are also exported.
+
+Next.js loads `.env.local` automatically. Both functions require server-only
+`KROGER_CLIENT_ID` and `KROGER_CLIENT_SECRET`, plus `SUPABASE_URL` (or
+`NEXT_PUBLIC_SUPABASE_URL`) for the existing-record lookup. Saving requires
+`SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`). Search-only calls can instead
+use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` with SELECT
+permission on the product and store tables.
+The `env`, `fetcher`, `makeClient`, `log` and `now` dependencies can be supplied for testing or
+custom execution. Importing the library does not load env files, fetch, log or write.
+
+Supply `origin` for a visitor's current location. `zip` is an alternative; with neither,
+IP lookup resolves the **executing machine's** public IP, which is the hosting server in
+a deployed app. The local CLI keeps that IP default and the same commands:
+
+```sh
+npm run kroger:save -- --item eggs --amount 12 --category Dairy
+npm run kroger:save -- --item "whole milk" --amount "1 gal" --category Dairy
+npm run kroger:save -- --item "black beans" --unit oz --category "Canned & Packaged"
+```
+
+Add `--dry-run` to search without saving. Standalone Node scripts can import the same
+functions from `lib/kroger/core.mjs` and load their environment explicitly. The CLI is now
+a thin argument/env/progress wrapper around that shared implementation.
+
+Run `npm run kroger:catalog` to read every ID from the plural `products` catalog and
+run the same search/save library sequentially for each product's name and package unit.
+Measurable catalog units become preferred amounts. Non-measurable units such as
+`1 bunch` or `1 loaf` are logged and searched without a package-size constraint.
+Known catalog items use Kroger category mappings (including Dairy, Produce, Bakery,
+Frozen and Canned & Packaged); remaining categories are inferred from matching products.
+Chickpeas search under the equivalent name garbanzo beans, bread is compared by weight,
+and the olive-oil bottle's oz shorthand is interpreted as fluid ounces. The catalog remains unchanged, and winners
+are saved to the singular `product`/`store` tables with the existing stable IDs and daily
+freshness rule. The runner resolves IP location once, continues after individual failures,
+and checkpoints each catalog ID with its result to `reports/kroger-catalog-YYYY-MM-DD.json`.
+Use `--dry-run`, `--lat N --lng N`, `--zip ZIP`, or `--report PATH` after `--` to override
+execution options. Partial searches and unavailable items remain explicit in the report.
+`--refresh-only cheddar` explicitly repairs that item's same-day records; other IDs
+still follow normal daily reuse. The library exposes the equivalent `forceRefresh`
+option for deliberate match corrections, defaulting to false.
+Use `--only bread,cheddar` to retry a specific set of catalog IDs. Dual count/weight
+labels (for example `14 ct / 7.41 oz`) preserve the count while using the total package
+weight for unit prices; explicit `x`/`pack` multipacks still multiply package quantities.
+
 ## Mobile app
 
 The Expo frontend is preserved in `mobile/`, with its own dependency configuration. From that directory, install dependencies and run `npm start` (or `npm run web`). The root remains the Next.js + Supabase application. OSRM driving-route work from the remote branch is included in the web app.

@@ -368,6 +368,32 @@ describe("Kroger cheapest CLI", () => {
       expect(parsePackageSize(size), String(size)).toBeNull();
   });
 
+  it("uses total package weight for dual count/weight labels when ranking bread", () => {
+    expect(parsePackageSize("14 ct / 7.41 oz", "oz")).toEqual({
+      unit: "oz",
+      amount: 7.41,
+    });
+    expect(parsePackageSize("14 ct / 7.41 oz", "each")).toEqual({
+      unit: "each",
+      amount: 14,
+    });
+    expect(parsePackageCount("14 ct / 7.41 oz", "oz")).toBe(14);
+    const toast = {
+      ...product("toast", 3.29, { size: "14 ct / 7.41 oz" }),
+      description: "Toasted Bread",
+      categories: ["Bakery"],
+    };
+    const loaf = {
+      ...product("loaf", 1.5, { size: "20 oz" }),
+      description: "White Bread",
+      categories: ["Bakery"],
+    };
+    expect(
+      cheapestPackage([toast, loaf], "bread", "oz", () => {}, "Bakery")
+        .product_id,
+    ).toBe("loaf");
+  });
+
   it("chooses a gallon over a cheaper carton and uses the entire multipack", () => {
     const products = [
       product("carton", 1.5, { size: "8 fl oz" }),
@@ -633,13 +659,10 @@ describe("Kroger cheapest CLI", () => {
     );
     expect(h.log.mock.calls.flat().join("\n")).not.toContain("secret-token");
   });
-  it("supports a dry run without database credentials or writes", async () => {
+  it("checks the database during a dry run without performing writes", async () => {
     const h = harness();
-    await run(
-      { ...options, dryRun: true },
-      { ...h, env: { KROGER_CLIENT_ID: "a", KROGER_CLIENT_SECRET: "b" } },
-    );
-    expect(h.makeClient).not.toHaveBeenCalled();
+    await run({ ...options, dryRun: true }, h);
+    expect(h.makeClient).toHaveBeenCalledOnce();
     expect(h.upsert).not.toHaveBeenCalled();
     expect(h.storeUpsert).not.toHaveBeenCalled();
   });

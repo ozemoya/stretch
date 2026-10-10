@@ -1,0 +1,1649 @@
+{
+  "date": "2026-10-10",
+  "origin": {
+    "latitude": 33.7485894,
+    "longitude": -84.3879752
+  },
+  "dryRun": false,
+  "total": 30,
+  "results": [
+    {
+      "catalog_id": "apples",
+      "name": "Apples",
+      "catalog_unit": "3 lb",
+      "search": {
+        "item": "Apples",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "category": "Produce",
+        "amount": {
+          "unit": "oz",
+          "amount": 48
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Apples",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 48
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111091829",
+          "item_id": "0001111091829",
+          "description": "Kroger® Granny Smith Apples – 3 Pound Bag",
+          "brand": null,
+          "upc": "0001111091829",
+          "package_size": "3 lb",
+          "sold_by": "UNIT",
+          "regular_price_cents": 399,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 48,
+          "package_count": 1,
+          "unit_price_cents": 8.3125,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:06.350Z"
+        },
+        {
+          "search_term": "Apples",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 48
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111091829",
+          "item_id": "0001111091829",
+          "description": "Kroger® Granny Smith Apples – 3 Pound Bag",
+          "brand": null,
+          "upc": "0001111091829",
+          "package_size": "3 lb",
+          "sold_by": "UNIT",
+          "regular_price_cents": 399,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 48,
+          "package_count": 1,
+          "unit_price_cents": 8.3125,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:10.615Z"
+        },
+        {
+          "search_term": "Apples",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 48
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111091829",
+          "item_id": "0001111091829",
+          "description": "Kroger® Granny Smith Apples – 3 Pound Bag",
+          "brand": null,
+          "upc": "0001111091829",
+          "package_size": "3 lb",
+          "sold_by": "UNIT",
+          "regular_price_cents": 399,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 48,
+          "package_count": 1,
+          "unit_price_cents": 8.3125,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:14.471Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 1462618742263198,
+          "category": "apples",
+          "count": 1,
+          "price": 3.99,
+          "unit_price": 0.083125,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 2217878538972660,
+          "category": "apples",
+          "count": 1,
+          "price": 3.99,
+          "unit_price": 0.083125,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 725299609064909,
+          "category": "apples",
+          "count": 1,
+          "price": 3.99,
+          "unit_price": 0.083125,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    },
+    {
+      "catalog_id": "bananas",
+      "name": "Bananas",
+      "catalog_unit": "1 bunch",
+      "search": {
+        "item": "Bananas",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "category": "Produce"
+      },
+      "rows": [],
+      "products": [],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "no-match",
+          "locationId": "01100672",
+          "message": "No eligible unit-priced package matched this item, category and amount."
+        },
+        {
+          "kind": "no-match",
+          "locationId": "01100695",
+          "message": "No eligible unit-priced package matched this item, category and amount."
+        },
+        {
+          "kind": "no-match",
+          "locationId": "01100461",
+          "message": "No eligible unit-priced package matched this item, category and amount."
+        }
+      ]
+    },
+    {
+      "catalog_id": "black-beans",
+      "name": "Black beans",
+      "catalog_unit": "15 oz",
+      "search": {
+        "item": "Black beans",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "amount": {
+          "unit": "oz",
+          "amount": 15
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Black beans",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 15
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111008285",
+          "item_id": "0001111008285",
+          "description": "Simple Truth Organic® Seasoned Black Beans",
+          "brand": "Simple Truth Organic",
+          "upc": "0001111008285",
+          "package_size": "15 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 125,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 15,
+          "package_count": 1,
+          "unit_price_cents": 8.333333333333334,
+          "price_basis": "unit",
+          "matched_category": "Canned & Packaged",
+          "provider_categories": [
+            "Natural & Organic",
+            "Canned & Packaged"
+          ],
+          "retrieved_at": "2026-10-10T05:03:24.377Z"
+        },
+        {
+          "search_term": "Black beans",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 15
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111008285",
+          "item_id": "0001111008285",
+          "description": "Simple Truth Organic® Seasoned Black Beans",
+          "brand": "Simple Truth Organic",
+          "upc": "0001111008285",
+          "package_size": "15 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 125,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 15,
+          "package_count": 1,
+          "unit_price_cents": 8.333333333333334,
+          "price_basis": "unit",
+          "matched_category": "Canned & Packaged",
+          "provider_categories": [
+            "Natural & Organic",
+            "Canned & Packaged"
+          ],
+          "retrieved_at": "2026-10-10T05:03:25.414Z"
+        },
+        {
+          "search_term": "Black beans",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 15
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111008285",
+          "item_id": "0001111008285",
+          "description": "Simple Truth Organic® Seasoned Black Beans",
+          "brand": "Simple Truth Organic",
+          "upc": "0001111008285",
+          "package_size": "15 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 125,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 15,
+          "package_count": 1,
+          "unit_price_cents": 8.333333333333334,
+          "price_basis": "unit",
+          "matched_category": "Canned & Packaged",
+          "provider_categories": [
+            "Natural & Organic",
+            "Canned & Packaged"
+          ],
+          "retrieved_at": "2026-10-10T05:03:26.867Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 3599861948562854,
+          "category": "black beans",
+          "count": 1,
+          "price": 1.25,
+          "unit_price": 0.08333333333333334,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 2072653030287660,
+          "category": "black beans",
+          "count": 1,
+          "price": 1.25,
+          "unit_price": 0.08333333333333334,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 3354131118152027,
+          "category": "black beans",
+          "count": 1,
+          "price": 1.25,
+          "unit_price": 0.08333333333333334,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": true,
+      "issues": []
+    },
+    {
+      "catalog_id": "bread",
+      "name": "Bread",
+      "catalog_unit": "1 loaf",
+      "search": {
+        "item": "Bread",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        }
+      },
+      "rows": [],
+      "products": [],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "store-search-failed",
+          "locationId": "01100672",
+          "message": "Matches mix volume, weight, or count. Choose --unit fl-oz, oz, or each; these cannot be ranked together."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "store-search-failed",
+          "locationId": "01100695",
+          "message": "Matches mix volume, weight, or count. Choose --unit fl-oz, oz, or each; these cannot be ranked together."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "store-search-failed",
+          "locationId": "01100461",
+          "message": "Matches mix volume, weight, or count. Choose --unit fl-oz, oz, or each; these cannot be ranked together."
+        }
+      ]
+    },
+    {
+      "catalog_id": "broccoli",
+      "name": "Broccoli",
+      "catalog_unit": "1 lb",
+      "search": {
+        "item": "Broccoli",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "category": "Produce",
+        "amount": {
+          "unit": "oz",
+          "amount": 16
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Broccoli",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111061355",
+          "item_id": "0001111061355",
+          "description": "Simple Truth Organic® Broccoli Slaw",
+          "brand": "Simple Truth Organic",
+          "upc": "0001111061355",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 419,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 26.1875,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:42.152Z"
+        },
+        {
+          "search_term": "Broccoli",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111061355",
+          "item_id": "0001111061355",
+          "description": "Simple Truth Organic® Broccoli Slaw",
+          "brand": "Simple Truth Organic",
+          "upc": "0001111061355",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 419,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 26.1875,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:46.411Z"
+        },
+        {
+          "search_term": "Broccoli",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111061355",
+          "item_id": "0001111061355",
+          "description": "Simple Truth Organic® Broccoli Slaw",
+          "brand": "Simple Truth Organic",
+          "upc": "0001111061355",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 419,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 26.1875,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:50.542Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 2495950253543568,
+          "category": "broccoli",
+          "count": 1,
+          "price": 4.19,
+          "unit_price": 0.261875,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 411338498086098,
+          "category": "broccoli",
+          "count": 1,
+          "price": 4.19,
+          "unit_price": 0.261875,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 647095027699189,
+          "category": "broccoli",
+          "count": 1,
+          "price": 4.19,
+          "unit_price": 0.261875,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    },
+    {
+      "catalog_id": "carrots",
+      "name": "Carrots",
+      "catalog_unit": "1 lb",
+      "search": {
+        "item": "Carrots",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "category": "Produce",
+        "amount": {
+          "unit": "oz",
+          "amount": 16
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Carrots",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111091620",
+          "item_id": "0001111091620",
+          "description": "Kroger® Cut and Peeled Baby Carrots",
+          "brand": null,
+          "upc": "0001111091620",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 149,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 9.3125,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:52.923Z"
+        },
+        {
+          "search_term": "Carrots",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111091620",
+          "item_id": "0001111091620",
+          "description": "Kroger® Cut and Peeled Baby Carrots",
+          "brand": null,
+          "upc": "0001111091620",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 149,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 9.3125,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:54.540Z"
+        },
+        {
+          "search_term": "Carrots",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111091659",
+          "item_id": "0001111091659",
+          "description": "Simple Truth Organic® Cut and Peeled Baby Carrots Bag",
+          "brand": "Simple Truth Organic",
+          "upc": "0001111091659",
+          "package_size": "1 lb",
+          "sold_by": "UNIT",
+          "regular_price_cents": 199,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 12.4375,
+          "price_basis": "unit",
+          "matched_category": "Produce",
+          "provider_categories": [
+            "Natural & Organic",
+            "Produce"
+          ],
+          "retrieved_at": "2026-10-10T05:03:56.063Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 1579357445425489,
+          "category": "carrots",
+          "count": 1,
+          "price": 1.49,
+          "unit_price": 0.093125,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 2703706893839817,
+          "category": "carrots",
+          "count": 1,
+          "price": 1.49,
+          "unit_price": 0.093125,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 1521587614220494,
+          "category": "carrots",
+          "count": 1,
+          "price": 1.99,
+          "unit_price": 0.124375,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": true,
+      "issues": []
+    },
+    {
+      "catalog_id": "cheddar",
+      "name": "Cheddar",
+      "catalog_unit": "8 oz",
+      "search": {
+        "item": "Cheddar",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "amount": {
+          "unit": "oz",
+          "amount": 8
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Cheddar",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 8
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111009478",
+          "item_id": "0001111009478",
+          "description": "Kroger® Go Cheese! Cheddar Spray Cheese",
+          "brand": "Kroger",
+          "upc": "0001111009478",
+          "package_size": "8 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 319,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 8,
+          "package_count": 1,
+          "unit_price_cents": 39.875,
+          "price_basis": "unit",
+          "matched_category": "Snacks",
+          "provider_categories": [
+            "Snacks"
+          ],
+          "retrieved_at": "2026-10-10T05:03:59.971Z"
+        },
+        {
+          "search_term": "Cheddar",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 8
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001600021555",
+          "item_id": "0001600021555",
+          "description": "Chex Mix™ Cheddar Snack Mix",
+          "brand": "Chex Mix",
+          "upc": "0001600021555",
+          "package_size": "8 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 359,
+          "promo_price_cents": 299,
+          "comparison_unit": "oz",
+          "package_quantity": 8,
+          "package_count": 1,
+          "unit_price_cents": 44.875,
+          "price_basis": "unit",
+          "matched_category": "Snacks",
+          "provider_categories": [
+            "Snacks"
+          ],
+          "retrieved_at": "2026-10-10T05:04:03.225Z"
+        },
+        {
+          "search_term": "Cheddar",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 8
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001600021555",
+          "item_id": "0001600021555",
+          "description": "Chex Mix™ Cheddar Snack Mix",
+          "brand": "Chex Mix",
+          "upc": "0001600021555",
+          "package_size": "8 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 359,
+          "promo_price_cents": 299,
+          "comparison_unit": "oz",
+          "package_quantity": 8,
+          "package_count": 1,
+          "unit_price_cents": 44.875,
+          "price_basis": "unit",
+          "matched_category": "Snacks",
+          "provider_categories": [
+            "Snacks"
+          ],
+          "retrieved_at": "2026-10-10T05:04:06.980Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 2684271670454916,
+          "category": "cheddar",
+          "count": 1,
+          "price": 3.19,
+          "unit_price": 0.39875,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 403598239871976,
+          "category": "cheddar",
+          "count": 1,
+          "price": 3.59,
+          "unit_price": 0.44875,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 3378970492494551,
+          "category": "cheddar",
+          "count": 1,
+          "price": 3.59,
+          "unit_price": 0.44875,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    },
+    {
+      "catalog_id": "chicken",
+      "name": "Chicken",
+      "catalog_unit": "1 lb",
+      "search": {
+        "item": "Chicken",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "amount": {
+          "unit": "oz",
+          "amount": 16
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Chicken",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001394100691",
+          "item_id": "0001394100691",
+          "description": "Springer Mountain Farms Fresh Chicken Burgers",
+          "brand": "Springer Mountain Farms",
+          "upc": "0001394100691",
+          "package_size": "1 lb",
+          "sold_by": "UNIT",
+          "regular_price_cents": 400,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 25,
+          "price_basis": "unit",
+          "matched_category": "Meat & Seafood",
+          "provider_categories": [
+            "Meat & Seafood"
+          ],
+          "retrieved_at": "2026-10-10T05:04:11.958Z"
+        },
+        {
+          "search_term": "Chicken",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001394100692",
+          "item_id": "0001394100692",
+          "description": "Springer Mountain Farms™ 92% Lean / 8% Fat Fresh Ground Chicken",
+          "brand": "Springer Mountain Farms",
+          "upc": "0001394100692",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 449,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 28.0625,
+          "price_basis": "unit",
+          "matched_category": "Meat & Seafood",
+          "provider_categories": [
+            "Meat & Seafood"
+          ],
+          "retrieved_at": "2026-10-10T05:04:16.378Z"
+        },
+        {
+          "search_term": "Chicken",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001394100691",
+          "item_id": "0001394100691",
+          "description": "Springer Mountain Farms Fresh Chicken Burgers",
+          "brand": "Springer Mountain Farms",
+          "upc": "0001394100691",
+          "package_size": "1 lb",
+          "sold_by": "UNIT",
+          "regular_price_cents": 400,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 25,
+          "price_basis": "unit",
+          "matched_category": "Meat & Seafood",
+          "provider_categories": [
+            "Meat & Seafood"
+          ],
+          "retrieved_at": "2026-10-10T05:04:22.715Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 790379526294030,
+          "category": "chicken",
+          "count": 1,
+          "price": 4,
+          "unit_price": 0.25,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 550213679110712,
+          "category": "chicken",
+          "count": 1,
+          "price": 4.49,
+          "unit_price": 0.280625,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 4071751521854037,
+          "category": "chicken",
+          "count": 1,
+          "price": 4,
+          "unit_price": 0.25,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    },
+    {
+      "catalog_id": "chickpeas",
+      "name": "Chickpeas",
+      "catalog_unit": "15 oz",
+      "search": {
+        "item": "Chickpeas",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "amount": {
+          "unit": "oz",
+          "amount": 15
+        }
+      },
+      "rows": [],
+      "products": [],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "no-match",
+          "locationId": "01100672",
+          "message": "No eligible unit-priced package matched this item, category and amount."
+        },
+        {
+          "kind": "no-match",
+          "locationId": "01100695",
+          "message": "No eligible unit-priced package matched this item, category and amount."
+        },
+        {
+          "kind": "no-match",
+          "locationId": "01100461",
+          "message": "No eligible unit-priced package matched this item, category and amount."
+        }
+      ]
+    },
+    {
+      "catalog_id": "eggs",
+      "name": "Eggs",
+      "catalog_unit": "12 count",
+      "search": {
+        "item": "Eggs",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "each",
+        "amount": {
+          "unit": "each",
+          "amount": 12
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Eggs",
+          "requested_amount": {
+            "unit": "each",
+            "amount": 12
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111060903",
+          "item_id": "0001111060903",
+          "description": "Kroger® Grade A Large White Eggs",
+          "brand": "Kroger",
+          "upc": "0001111060903",
+          "package_size": "12 ct",
+          "sold_by": "UNIT",
+          "regular_price_cents": 179,
+          "promo_price_cents": null,
+          "comparison_unit": "each",
+          "package_quantity": 12,
+          "package_count": 12,
+          "unit_price_cents": 14.916666666666666,
+          "price_basis": "unit",
+          "matched_category": "Dairy",
+          "provider_categories": [
+            "Dairy",
+            "Breakfast"
+          ],
+          "retrieved_at": "2026-10-10T05:04:30.622Z"
+        },
+        {
+          "search_term": "Eggs",
+          "requested_amount": {
+            "unit": "each",
+            "amount": 12
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111060903",
+          "item_id": "0001111060903",
+          "description": "Kroger® Grade A Large White Eggs",
+          "brand": "Kroger",
+          "upc": "0001111060903",
+          "package_size": "12 ct",
+          "sold_by": "UNIT",
+          "regular_price_cents": 219,
+          "promo_price_cents": null,
+          "comparison_unit": "each",
+          "package_quantity": 12,
+          "package_count": 12,
+          "unit_price_cents": 18.25,
+          "price_basis": "unit",
+          "matched_category": "Dairy",
+          "provider_categories": [
+            "Dairy",
+            "Breakfast"
+          ],
+          "retrieved_at": "2026-10-10T05:04:34.598Z"
+        },
+        {
+          "search_term": "Eggs",
+          "requested_amount": {
+            "unit": "each",
+            "amount": 12
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111060903",
+          "item_id": "0001111060903",
+          "description": "Kroger® Grade A Large White Eggs",
+          "brand": "Kroger",
+          "upc": "0001111060903",
+          "package_size": "12 ct",
+          "sold_by": "UNIT",
+          "regular_price_cents": 179,
+          "promo_price_cents": null,
+          "comparison_unit": "each",
+          "package_quantity": 12,
+          "package_count": 12,
+          "unit_price_cents": 14.916666666666666,
+          "price_basis": "unit",
+          "matched_category": "Dairy",
+          "provider_categories": [
+            "Dairy",
+            "Breakfast"
+          ],
+          "retrieved_at": "2026-10-10T05:04:38.519Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 2603579828678065,
+          "category": "eggs",
+          "count": 12,
+          "price": 1.79,
+          "unit_price": 0.14916666666666667,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 3172139300720889,
+          "category": "eggs",
+          "count": 12,
+          "price": 2.19,
+          "unit_price": 0.1825,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 3172844278342575,
+          "category": "eggs",
+          "count": 12,
+          "price": 1.79,
+          "unit_price": 0.14916666666666667,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    }
+  ]
+}

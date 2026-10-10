@@ -1,0 +1,772 @@
+{
+  "date": "2026-10-10",
+  "origin": {
+    "latitude": 33.7485894,
+    "longitude": -84.3879752
+  },
+  "dryRun": false,
+  "total": 4,
+  "results": [
+    {
+      "catalog_id": "bread",
+      "name": "Bread",
+      "catalog_unit": "1 loaf",
+      "search": {
+        "item": "Bread",
+        "dryRun": false,
+        "forceRefresh": true,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "category": "Bakery"
+      },
+      "rows": [
+        {
+          "search_term": "Bread",
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111015125",
+          "item_id": "0001111015125",
+          "description": "Smart Way® Enriched White Bread",
+          "brand": "Smart Way",
+          "upc": "0001111015125",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 119,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 7.4375,
+          "price_basis": "unit",
+          "matched_category": "Bakery",
+          "provider_categories": [
+            "Bakery"
+          ],
+          "retrieved_at": "2026-10-10T05:17:07.912Z"
+        },
+        {
+          "search_term": "Bread",
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111015125",
+          "item_id": "0001111015125",
+          "description": "Smart Way® Enriched White Bread",
+          "brand": "Smart Way",
+          "upc": "0001111015125",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 119,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 7.4375,
+          "price_basis": "unit",
+          "matched_category": "Bakery",
+          "provider_categories": [
+            "Bakery"
+          ],
+          "retrieved_at": "2026-10-10T05:17:12.632Z"
+        },
+        {
+          "search_term": "Bread",
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111015126",
+          "item_id": "0001111015126",
+          "description": "Smart Way® Wheat Bread",
+          "brand": "Smart Way",
+          "upc": "0001111015126",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 119,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 7.4375,
+          "price_basis": "unit",
+          "matched_category": "Bakery",
+          "provider_categories": [
+            "Bakery"
+          ],
+          "retrieved_at": "2026-10-10T05:17:17.452Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 4296722334596544,
+          "category": "bread",
+          "count": 1,
+          "price": 1.19,
+          "unit_price": 0.074375,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 1980338850909770,
+          "category": "bread",
+          "count": 1,
+          "price": 1.19,
+          "unit_price": 0.074375,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 4045864267913414,
+          "category": "bread",
+          "count": 1,
+          "price": 1.19,
+          "unit_price": 0.074375,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    },
+    {
+      "catalog_id": "peanut-butter",
+      "name": "Peanut butter",
+      "catalog_unit": "16 oz",
+      "search": {
+        "item": "Peanut butter",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "amount": {
+          "unit": "oz",
+          "amount": 16
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Peanut butter",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0001111012319",
+          "item_id": "0001111012319",
+          "description": "Smart Way™ Creamy Peanut Butter",
+          "brand": "Smart Way",
+          "upc": "0001111012319",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 199,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 12.4375,
+          "price_basis": "unit",
+          "matched_category": "Condiment & Sauces",
+          "provider_categories": [
+            "Condiment & Sauces"
+          ],
+          "retrieved_at": "2026-10-10T05:17:22.975Z"
+        },
+        {
+          "search_term": "Peanut butter",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111012319",
+          "item_id": "0001111012319",
+          "description": "Smart Way™ Creamy Peanut Butter",
+          "brand": "Smart Way",
+          "upc": "0001111012319",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 199,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 12.4375,
+          "price_basis": "unit",
+          "matched_category": "Condiment & Sauces",
+          "provider_categories": [
+            "Condiment & Sauces"
+          ],
+          "retrieved_at": "2026-10-10T05:17:29.544Z"
+        },
+        {
+          "search_term": "Peanut butter",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 16
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111012319",
+          "item_id": "0001111012319",
+          "description": "Smart Way™ Creamy Peanut Butter",
+          "brand": "Smart Way",
+          "upc": "0001111012319",
+          "package_size": "16 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 199,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 16,
+          "package_count": 1,
+          "unit_price_cents": 12.4375,
+          "price_basis": "unit",
+          "matched_category": "Condiment & Sauces",
+          "provider_categories": [
+            "Condiment & Sauces"
+          ],
+          "retrieved_at": "2026-10-10T05:17:34.445Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 1512009296686892,
+          "category": "peanut butter",
+          "count": 1,
+          "price": 1.99,
+          "unit_price": 0.124375,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 4289570326563631,
+          "category": "peanut butter",
+          "count": 1,
+          "price": 1.99,
+          "unit_price": 0.124375,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 2032401115558810,
+          "category": "peanut butter",
+          "count": 1,
+          "price": 1.99,
+          "unit_price": 0.124375,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100672",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100695",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        },
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    },
+    {
+      "catalog_id": "plant-cheese",
+      "name": "Plant cheese",
+      "catalog_unit": "8 oz",
+      "search": {
+        "item": "Plant cheese",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "oz",
+        "category": "Dairy",
+        "amount": {
+          "unit": "oz",
+          "amount": 8
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Plant cheese",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 8
+          },
+          "location_id": "01100672",
+          "store_name": "Kroger - Glenwood Kroger",
+          "store_address": {
+            "addressLine1": "800 Glenwood Ave SE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30316",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "latLng": "33.742558,-84.35962"
+          },
+          "distance_miles": 1.6815213450778352,
+          "store_rank": 1,
+          "product_id": "0002100008143",
+          "item_id": "0002100008143",
+          "description": "Philadelphia Plant-Based Dairy Free Original Cream Cheese Spread",
+          "brand": "Philadelphia",
+          "upc": "0002100008143",
+          "package_size": "8 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 529,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 8,
+          "package_count": 1,
+          "unit_price_cents": 66.125,
+          "price_basis": "unit",
+          "matched_category": "Dairy",
+          "provider_categories": [
+            "Dairy"
+          ],
+          "retrieved_at": "2026-10-10T05:17:35.471Z"
+        },
+        {
+          "search_term": "Plant cheese",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 8
+          },
+          "location_id": "01100695",
+          "store_name": "Kroger - Ponce",
+          "store_address": {
+            "addressLine1": "725 Ponce de Leon Ave NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30306",
+            "county": "FULTON COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "latLng": "33.771651,-84.363357"
+          },
+          "distance_miles": 2.1304203787056304,
+          "store_rank": 2,
+          "product_id": "0001111008928",
+          "item_id": "0001111008928",
+          "description": "Simple Truth™ Plant-Based Dairy Free Mozzarella Shredded Cheese",
+          "brand": "Simple Truth",
+          "upc": "0001111008928",
+          "package_size": "8 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 349,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 8,
+          "package_count": 1,
+          "unit_price_cents": 43.625,
+          "price_basis": "unit",
+          "matched_category": "Dairy",
+          "provider_categories": [
+            "Dairy"
+          ],
+          "retrieved_at": "2026-10-10T05:17:36.173Z"
+        },
+        {
+          "search_term": "Plant cheese",
+          "requested_amount": {
+            "unit": "oz",
+            "amount": 8
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111008928",
+          "item_id": "0001111008928",
+          "description": "Simple Truth™ Plant-Based Dairy Free Mozzarella Shredded Cheese",
+          "brand": "Simple Truth",
+          "upc": "0001111008928",
+          "package_size": "8 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 349,
+          "promo_price_cents": null,
+          "comparison_unit": "oz",
+          "package_quantity": 8,
+          "package_count": 1,
+          "unit_price_cents": 43.625,
+          "price_basis": "unit",
+          "matched_category": "Dairy",
+          "provider_categories": [
+            "Dairy"
+          ],
+          "retrieved_at": "2026-10-10T05:17:37.178Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 1818079117266097,
+          "category": "plant cheese",
+          "count": 1,
+          "price": 5.29,
+          "unit_price": 0.66125,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 2551790750547030,
+          "category": "plant cheese",
+          "count": 1,
+          "price": 3.49,
+          "unit_price": 0.43625,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 2370296296575542,
+          "category": "plant cheese",
+          "count": 1,
+          "price": 3.49,
+          "unit_price": 0.43625,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": true,
+      "issues": []
+    },
+    {
+      "catalog_id": "tortillas",
+      "name": "Tortillas",
+      "catalog_unit": "10 count",
+      "search": {
+        "item": "Tortillas",
+        "dryRun": false,
+        "origin": {
+          "latitude": 33.7485894,
+          "longitude": -84.3879752
+        },
+        "unit": "each",
+        "amount": {
+          "unit": "each",
+          "amount": 10
+        }
+      },
+      "rows": [
+        {
+          "search_term": "Tortillas",
+          "requested_amount": {
+            "unit": "each",
+            "amount": 10
+          },
+          "location_id": "01100461",
+          "store_name": "Kroger - Edgewood",
+          "store_address": {
+            "addressLine1": "1225 Caroline St NE",
+            "city": "Atlanta",
+            "state": "GA",
+            "zipCode": "30307",
+            "county": "DEKALB COUNTY"
+          },
+          "store_geolocation": {
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "latLng": "33.756079,-84.3480363"
+          },
+          "distance_miles": 2.352023709502272,
+          "store_rank": 3,
+          "product_id": "0001111005265",
+          "item_id": "0001111005265",
+          "description": "Kroger® Soft Taco Size Flour Tortillas",
+          "brand": "Kroger",
+          "upc": "0001111005265",
+          "package_size": "10 ct / 17.5 oz",
+          "sold_by": "UNIT",
+          "regular_price_cents": 199,
+          "promo_price_cents": null,
+          "comparison_unit": "each",
+          "package_quantity": 10,
+          "package_count": 10,
+          "unit_price_cents": 19.9,
+          "price_basis": "unit",
+          "matched_category": "International",
+          "provider_categories": [
+            "International"
+          ],
+          "retrieved_at": "2026-10-10T05:17:42.022Z"
+        }
+      ],
+      "products": [
+        {
+          "ID": 391518603374798,
+          "category": "tortillas",
+          "count": 10,
+          "price": 1.99,
+          "unit_price": 0.19899999999999998,
+          "locationID": 1100672,
+          "date": "2026-10-10",
+          "source": "database",
+          "store": {
+            "locationID": 1100672,
+            "store": "Kroger",
+            "sub-location": "Glenwood",
+            "latitude": 33.742558,
+            "longitude": -84.35962,
+            "address": "800 Glenwood Ave SE, Atlanta, GA 30316"
+          }
+        },
+        {
+          "ID": 1568189619387548,
+          "category": "tortillas",
+          "count": 10,
+          "price": 1.99,
+          "unit_price": 0.19899999999999998,
+          "locationID": 1100695,
+          "date": "2026-10-10",
+          "source": "database",
+          "store": {
+            "locationID": 1100695,
+            "store": "Kroger",
+            "sub-location": "Ponce",
+            "latitude": 33.771651,
+            "longitude": -84.363357,
+            "address": "725 Ponce de Leon Ave NE, Atlanta, GA 30306"
+          }
+        },
+        {
+          "ID": 3729097680937039,
+          "category": "tortillas",
+          "count": 10,
+          "price": 1.99,
+          "unit_price": 0.19899999999999998,
+          "locationID": 1100461,
+          "date": "2026-10-10",
+          "source": "kroger",
+          "store": {
+            "locationID": 1100461,
+            "store": "Kroger",
+            "sub-location": "Edgewood",
+            "latitude": 33.756079,
+            "longitude": -84.3480363,
+            "address": "1225 Caroline St NE, Atlanta, GA 30307"
+          }
+        }
+      ],
+      "complete": false,
+      "issues": [
+        {
+          "kind": "search-limited",
+          "locationId": "01100461",
+          "message": "Kroger capped this query at 300 products; the winner is limited to returned products."
+        }
+      ]
+    }
+  ],
+  "completed": 1,
+  "partial": 3,
+  "failed": 0,
+  "finished_at": "2026-10-10T05:17:42.203Z"
+}
