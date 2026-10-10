@@ -20,8 +20,6 @@ Hacklanta prototype. The app is now an Expo / React Native application. It keeps
 
 Install dependencies with `npm install`, then run `npm start`. Use the Expo terminal shortcuts to open the app on iOS, Android, or web.
 
-The previous static prototype files remain available as `index.html`, `style.css`, and `app.js` for visual reference.
-
 ## Planned MVP
 
 - Grocery list with quantities and dietary preferences.

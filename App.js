@@ -12,7 +12,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import HowItWorksPage from './pages/HowItWorksPage';
 import MyListPage from './pages/MyListPage';
 import PlanTripPage from './pages/PlanTripPage';
-import { starterList } from './pages/pageData';
+import { getItemPrice, starterList } from './pages/pageData';
 
 const colors = {
   cream: '#FFF9E8',
@@ -296,12 +296,24 @@ export default function App() {
     }
   };
 
-  const handleAddItem = (label, qty) => {
-    setGroceryList((currentList) => [{ id: Date.now(), label, qty, checked: false }, ...currentList]);
+  const handleAddItem = (label, quantityText) => {
+    const quantityMatch = quantityText.match(/^\s*(\d+)/);
+    const quantity = Math.max(1, Number(quantityMatch?.[1] || 1));
+    setGroceryList((currentList) => [{
+      id: Date.now(),
+      label,
+      quantity,
+      unitPrice: getItemPrice(label),
+      checked: false,
+    }, ...currentList]);
   };
 
   const handleToggleItem = (id) => {
     setGroceryList((currentList) => currentList.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item)));
+  };
+
+  const handleChangeQuantity = (id, quantity) => {
+    setGroceryList((currentList) => currentList.map((item) => (item.id === id ? { ...item, quantity } : item)));
   };
 
   const handleRemoveItem = (id) => {
@@ -331,7 +343,14 @@ export default function App() {
         {currentPage === 'plan' && <PlanTripPage selectedTrip={selectedTrip} onSelectTrip={setSelectedTrip} />}
         {currentPage === 'how' && <HowItWorksPage />}
         {currentPage === 'list' && (
-          <MyListPage groceryList={groceryList} onToggleItem={handleToggleItem} onRemoveItem={handleRemoveItem} onAddItem={handleAddItem} />
+          <MyListPage
+            groceryList={groceryList}
+            onToggleItem={handleToggleItem}
+            onChangeQuantity={handleChangeQuantity}
+            onRemoveItem={handleRemoveItem}
+            onAddItem={handleAddItem}
+            onNavigate={handleNavigate}
+          />
         )}
       </ScrollView>
     </View>
