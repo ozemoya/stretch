@@ -8,7 +8,8 @@
     "start": "next start --port 3000",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "db:seed": "node scripts/generate-seed.mjs"
+    "db:seed": "node scripts/generate-seed.mjs",
+    "kroger:save": "node scripts/kroger-cheapest.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.3",
