@@ -114,3 +114,17 @@ GET /api/live/prices?locationId=1100672
 Returned prices include their source, observation time, package, and branch or
 catalog scope, plus `latitude` and `longitude`. A missing row means no eligible
 saved price; it is not zero.
+
+After the first four-second comparison, the browser automatically checks slower
+sources every three seconds for up to 90 seconds. Each check has the same bounded
+response window. Existing hosted collection jobs are polled without restarting
+them; sources missed while map discovery was still running are initialized once
+they are discovered. Branch results are merged without clearing reviewed package
+choices. Catalog and branch prices returned by these checks use the same Supabase
+persistence and ownership validation as the initial search.
+
+The retailer status panel includes nearby stores with no returned price and shows
+pending, failed, unavailable, timed-out and no-match sources. Cancellation, a new
+search, input changes and leaving the page stop automatic checks. Three consecutive
+request failures also stop polling and expose a manual retry message. Unknown
+prices remain excluded from comparisons and trip totals.

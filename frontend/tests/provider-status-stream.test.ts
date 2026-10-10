@@ -45,3 +45,12 @@ it("ends a stuck manual refresh within the same four-second window", async () =>
   expect(events.at(-1).timedOut).toBe(true);
   expect(events.at(-1).reports[0].lines[0].searchStatus).toBe("timeout");
 });
+
+it("keeps hosted jobs searching during automatic polling without starting another job", async () => {
+  const response = await POST(new Request("http://localhost/api/live/provider-status", {
+    method: "POST", body: JSON.stringify({ zip: "30303", items: [item], retailers: ["Target"], stream: true, poll: true }),
+  }));
+  const events = (await response.text()).trim().split("\n").map(line => JSON.parse(line));
+  expect(events.at(-1).reports[0].lines[0].searchStatus).toBe("searching");
+  expect(vi.mocked(providerReports).mock.calls.at(-1)?.[3]).toBe(false);
+});

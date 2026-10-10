@@ -23,6 +23,7 @@ import { packageMatches } from "@/lib/package-match";
 import { nearbyAlternatives } from "@/lib/nearby-alternatives";
 import {
   SearchEpoch,
+  catalogLineStatus,
   searchStatusLabel,
   settlePendingReports,
 } from "@/lib/search-state";
@@ -106,6 +107,12 @@ export default function PriceAgent({
   const epoch = useRef(new SearchEpoch());
   const requestController = useRef<AbortController | null>(null);
   const providerController = useRef<AbortController | null>(null);
+  const automaticController = useRef<AbortController | null>(null);
+  const automaticInput = useRef("");
+  const [automaticRun, setAutomaticRun] = useState(0);
+  const [automaticallyChecking, setAutomaticallyChecking] = useState(false);
+  const latestResult = useRef(result);
+  latestResult.current = result;
   const inputKey = JSON.stringify([
     zip,
     area,
@@ -132,6 +139,7 @@ export default function PriceAgent({
     previousInput.current = inputKey;
     requestController.current?.abort();
     providerController.current?.abort();
+    automaticController.current?.abort();
     epoch.current.cancel();
     setBusy(false);
     setSourcesBusy(false);
@@ -144,6 +152,7 @@ export default function PriceAgent({
     () => () => {
       requestController.current?.abort();
       providerController.current?.abort();
+      automaticController.current?.abort();
       epoch.current.cancel();
     },
     [],
@@ -220,6 +229,8 @@ export default function PriceAgent({
   async function check() {
     requestController.current?.abort();
     providerController.current?.abort();
+    automaticController.current?.abort();
+    setAutomaticallyChecking(false);
     const controller = new AbortController();
     requestController.current = controller;
     const requestId = epoch.current.begin();
@@ -299,6 +310,8 @@ export default function PriceAgent({
               );
               setBusy(false);
               setSourcesBusy(false);
+              automaticInput.current = inputKey;
+              setAutomaticRun(run => run + 1);
             }
             if (event.type === "catalog-review")
               setResult((previous) => previous && epoch.current.isCurrent(requestId)
@@ -349,6 +362,8 @@ export default function PriceAgent({
   }
   async function refreshProvider(retailer?: string, retry = false) {
     if (!result || busy || sourcesBusy) return;
+    automaticController.current?.abort();
+    setAutomaticallyChecking(false);
     providerController.current?.abort();
     const controller = new AbortController();
     providerController.current = controller;
@@ -421,6 +436,96 @@ export default function PriceAgent({
       if (epoch.current.isCurrent(requestId)) setSourcesBusy(false);
     }
   }
+  useEffect(() => {
+    if (!automaticRun || automaticInput.current !== inputKey || !latestResult.current) return;
+    const controller = new AbortController();
+    automaticController.current = controller;
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(90_000)]);
+    const active = () => !signal.aborted;
+    setAutomaticallyChecking(true);
+    void (async () => {
+      let failures = 0;
+      while (active()) {
+        await new Promise<void>(resolve => {
+          const done = () => { clearTimeout(timer); signal.removeEventListener("abort", done); resolve(); };
+          const timer = setTimeout(done, 3_000);
+          signal.addEventListener("abort", done, { once: true });
+          if (signal.aborted) done();
+        });
+        if (!active()) break;
+        const current = latestResult.current;
+        if (!current) break;
+        const retailers = [...new Set(current.storeCoverage.map(store => store.retailer))];
+        const missingRetailers = retailers.filter(retailer => !current.publicCatalogs.some(report => report.retailer === retailer));
+        let pending = false, finished = false;
+        try {
+          const response = await fetch("/api/live/provider-status", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ zip, items, retailers: retailers.slice(0, 20), missingRetailers: missingRetailers.slice(0, 20),
+              stream: true, poll: true, start: false, location: { area, radius, origin: origin ?? undefined } }),
+            signal: AbortSignal.any([signal, AbortSignal.timeout(SEARCH_CLIENT_TIMEOUT_MS)]),
+          });
+          if (!response.ok || !response.body) throw new Error("Price status unavailable.");
+          const reader = response.body.getReader(), decoder = new TextDecoder();
+          let buffer = "";
+          try {
+            for (;;) {
+              const chunk = await reader.read();
+              buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+              const messages = buffer.split("\n"); buffer = messages.pop() ?? "";
+              for (const message of messages) {
+                if (!message.trim() || !active()) continue;
+                const event = JSON.parse(message);
+                if (event.type === "report") {
+                  pending ||= event.report.lines.some((line: ScrapeReport["lines"][number]) => line.searchStatus === "searching");
+                  setResult(previous => active() && previous ? { ...previous,
+                    publicCatalogs: upsertReport(previous.publicCatalogs, event.report, items) } : previous);
+                }
+                if (event.type === "coverage") setResult(previous => {
+                  if (!active() || !previous) return previous;
+                  const coverage = (event.storeCoverage as StoreCoverage[]).map(store => previous.stores.some(branch => branch.id === store.id)
+                    ? { ...store, status: "checked" as const, detail: "Branch source checked. Review each package and source." } : store);
+                  return { ...previous, storeCoverage: JSON.stringify(coverage) === JSON.stringify(previous.storeCoverage)
+                    ? previous.storeCoverage : coverage, foundStores: coverage.length };
+                });
+                if (event.type === "branches") setResult(previous => {
+                  if (!active() || !previous) return previous;
+                  const stores = new Map(previous.stores.map(store => [store.id, store]));
+                  for (const store of event.stores as StoreCheck[]) stores.set(store.id, store);
+                  const updated = [...stores.values()];
+                  const coverage = previous.storeCoverage.map(location => updated.some(store => store.id === location.id)
+                    ? { ...location, status: "checked" as const, detail: "Branch source checked. Review each package and source." } : location);
+                  return { ...previous, stores: JSON.stringify(updated) === JSON.stringify(previous.stores) ? previous.stores : updated,
+                    storeCoverage: JSON.stringify(coverage) === JSON.stringify(previous.storeCoverage) ? previous.storeCoverage : coverage,
+                    warnings: [...new Set([...previous.warnings, ...event.warnings])] };
+                });
+                if (event.type === "complete") {
+                  finished = true;
+                  pending = event.timedOut || !event.branchesFinished || event.reports.some((report: ScrapeReport) =>
+                    report.lines.some(line => line.searchStatus === "searching"));
+                }
+              }
+              if (chunk.done) break;
+            }
+          } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+          failures = 0;
+          // A newly received map can expose sources which weren't started in the first search.
+          const discovered = latestResult.current?.storeCoverage.some(store =>
+            !latestResult.current?.publicCatalogs.some(report => report.retailer === store.retailer));
+          if (finished && !pending && !discovered) break;
+        } catch {
+          if (!active()) break;
+          if (++failures >= 3) { setSourceError("Automatic price checks could not finish. Use Check for new prices to retry."); break; }
+        }
+      }
+      if (!controller.signal.aborted) {
+        setAutomaticallyChecking(false);
+        setResult(previous => previous ? { ...previous,
+          publicCatalogs: settlePendingReports(previous.publicCatalogs, "timeout") } : previous);
+      }
+    })();
+    return () => { controller.abort(); setAutomaticallyChecking(false); };
+  }, [automaticRun, inputKey]);
   const totals =
     result?.stores
       .map((s) => reviewedTotal(s, choices[s.id] ?? {}))
@@ -490,12 +595,14 @@ export default function PriceAgent({
       >
         {busy ? "SEARCH IN PROGRESS…" : "SEARCH STORES & PRICES ↗"}
       </button>
-      {(busy || sourcesBusy) && (
+      {(busy || sourcesBusy || automaticallyChecking) && (
         <button
           type="button"
           onClick={() => {
             requestController.current?.abort();
             providerController.current?.abort();
+            automaticController.current?.abort();
+            setAutomaticallyChecking(false);
             epoch.current.cancel();
             setBusy(false);
             setSourcesBusy(false);
@@ -553,10 +660,11 @@ export default function PriceAgent({
           Checking for new prices — up to five seconds. Your current results stay available.
         </p>
       )}
+      {automaticallyChecking && <p role="status" className="small">Automatically checking slower stores for up to 90 seconds. Prices appear as they arrive.</p>}
       {result?.search && !sourcesBusy && (
         <p role="status" className="small">
           Search finished in {(result.search.elapsedMs / 1000).toFixed(1)} seconds.
-          {result.search.partial ? " Some stores haven’t returned prices. You can check again." : " Results are below."}
+          {result.search.partial ? automaticallyChecking ? " Slower stores are still being checked." : " Some stores haven’t returned prices. You can check again." : " Results are below."}
         </p>
       )}
       {sourceError && <p role="alert" className="small">{sourceError}</p>}
@@ -589,6 +697,25 @@ export default function PriceAgent({
             </label>
           </div>
           <details className="small"><summary>Store coverage</summary><p>{result.coverage}</p></details>
+          <div className="live-card" aria-label="Retailer search status">
+            <h3>Store search status</h3>
+            <p className="small">Nearby stores stay listed here even when their source has no price.</p>
+            {!result.storeCoverage.length && <p className="small">{automaticallyChecking
+              ? "Still finding nearby store locations…" : "Nearby store lookup did not return any locations. Try refreshing the map or searching again."}</p>}
+            {[...new Set([...result.storeCoverage.map(store => store.retailer), ...catalogReports.map(report => report.retailer)])]
+              .filter(retailer => retailer.toLowerCase().includes(query.toLowerCase())).sort().map(retailer => {
+                const report = catalogReports.find(report => report.retailer === retailer);
+                const localStores = result.storeCoverage.filter(store => store.retailer === retailer);
+                const pricedBranches = visibleBranches.filter(store => localStores.some(location => location.id === store.id));
+                return <details key={retailer} className="small"><summary>{retailer} · {pricedBranches.length
+                  ? `${pricedBranches.length} local stores priced` : report
+                    ? [...new Set(items.map(item => searchStatusLabel(catalogLineStatus(report, item.id))))].join(" · ")
+                    : automaticallyChecking ? "Waiting for source" : "No connected price returned"}</summary>
+                  {report && <><p>{report.detail}</p><ul>{report.lines.map(line => <li key={line.item.id}>{line.item.name}: {searchStatusLabel(catalogLineStatus(report, line.item.id))}{line.error ? ` — ${line.error}` : ""}</li>)}</ul></>}
+                  {localStores.length > 0 && <ul>{localStores.map(store => <li key={store.id}>{store.name} · {store.address || "Address unavailable"} · {pricedBranches.some(branch => branch.id === store.id) ? "Local price found" : "Local price unavailable"}</li>)}</ul>}
+                </details>;
+              })}
+          </div>
           {result.warnings.map((w) => (
             <p role="alert" key={w}>
               {w}
