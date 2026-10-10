@@ -1,5 +1,6 @@
 "use client";
 import StoreColumns from "./StoreColumns";
+import SketchIcon from "./SketchIcon";
 import { useState, useEffect, useRef } from "react";
 import type { AgentItem, StoreCheck } from "@/lib/price-agent";
 import {
@@ -508,7 +509,7 @@ export default function PriceAgent({
       {error && <p role="alert">{error}</p>}
       {busy && (
         <div className="search-progress" role="status" aria-live="polite">
-          <span className="search-spinner" />
+          <SketchIcon name="cart" size={34} className="sketch-state-icon" />
           {agentStage === "planning"
             ? "AI is planning food searches…"
             : agentStage === "ready"

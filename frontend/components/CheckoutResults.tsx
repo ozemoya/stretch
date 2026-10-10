@@ -13,6 +13,7 @@ import {
   type CheckoutDraft,
 } from "@/lib/checkout-draft";
 import { createTripReview, writeTripReview } from "@/lib/trip-review";
+import SketchIcon from "./SketchIcon";
 
 export default function CheckoutResults() {
   const router = useRouter();
@@ -63,6 +64,7 @@ export default function CheckoutResults() {
           <p role="status">Opening your trip…</p>
         ) : !draft?.items.length ? (
           <section className="results-empty">
+            <SketchIcon name="bag" size={96} className="sketch-state-icon" />
             <p className="eyebrow">NO GROCERIES ADDED</p>
             <h1>Add groceries to compare stores</h1>
             <p>

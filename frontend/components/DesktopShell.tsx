@@ -29,9 +29,9 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
     return () => window.removeEventListener("keydown", shortcut);
   }, [path]);
   if (path === "/") return <>{children}</>;
-  return <div className={`desktop-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
+  return <div className={`desktop-shell ${collapsed ? "sidebar-collapsed" : ""} ${path === "/dashboard" ? "dashboard-shell" : ""}`}>
     <aside className="desktop-sidebar" aria-label="Main navigation">
-      <Link href="/" className="desktop-brand"><img src="/assets/stretch-logo.png" alt="Stretch" /></Link>
+      <Link href="/" className="desktop-brand"><img src="/assets/stretch-logo-transparent.png" alt="Stretch" /></Link>
       <button className="sidebar-toggle" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? "→" : "←"}</button>
       <span className="nav-caption">SHOPPING</span>
       <nav>{navigation.map(([href, label, icon]) => <Link key={href} href={href} title={label} className={path === href ? "active" : ""} aria-current={path === href ? "page" : undefined}><span aria-hidden="true">{icon}</span><span>{label}</span></Link>)}</nav>

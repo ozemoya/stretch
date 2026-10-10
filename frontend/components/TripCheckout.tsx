@@ -7,6 +7,7 @@ import { readCheckoutDraft, type CheckoutDraft } from "@/lib/checkout-draft";
 import { readTripReview, type TripReview } from "@/lib/trip-review";
 import { canCreateInstacartList, copyableShoppingList, retailerShoppingUrl, shopifyCartUrl } from "@/lib/cart-handoff";
 import { tripDirectionsUrl } from "@/lib/trip-directions";
+import SketchIcon from "./SketchIcon";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
@@ -24,6 +25,7 @@ export default function TripCheckout() {
       <main id="checkout-main" className="trip-checkout-page">
         {data === undefined ? <p role="status">Opening your trip review…</p> : !data ? (
           <section className="trip-checkout-empty">
+            <SketchIcon name="map" size={88} className="sketch-state-icon" />
             <p className="eyebrow">TRIP INCOMPLETE</p>
             <h1>Choose a store and gas station</h1>
             <p>Pick a store with a verified price for every food and select a gas station. Your review will appear here once the route is ready.</p>
@@ -102,6 +104,7 @@ function TripSummary({ draft, review }: { draft: CheckoutDraft; review: TripRevi
         <Link href="/plan" className="results-edit">Edit food list</Link>
       </section>
       <aside className="trip-checkout-total" aria-label="Trip estimate">
+        <SketchIcon name="coin" size={55} className="review-sticker" />
         <p className="eyebrow">ESTIMATED TOTAL</p>
         <h2>{money(review.totalCents)}</h2>
         <p className="trip-checkout-total-caption">Estimated groceries + fuel used to drive</p>
@@ -111,7 +114,7 @@ function TripSummary({ draft, review }: { draft: CheckoutDraft; review: TripRevi
           <div className="trip-checkout-total-row"><dt>Estimated trip total</dt><dd>{money(review.totalCents)}</dd></div>
         </dl>
         <div className="trip-checkout-stop">
-          <span className="trip-checkout-stop-icon" aria-hidden="true">⛽</span>
+          <span className="trip-checkout-stop-icon" aria-hidden="true"><SketchIcon name="pump" size={32} /></span>
           <div><strong>Gas stop: {station.name}</strong><small>{station.address}</small>
             <small>${review.gasPrice.toFixed(2)}/gal · {review.gasPriceReported ? "reported price" : "your entered estimate"}</small>
             {draft.fuelSource && <small>Reported {new Date(draft.fuelSource.period).toLocaleString()} · <a href={draft.fuelSource.sourceUrl} target="_blank" rel="noreferrer">Price source ↗</a></small>}

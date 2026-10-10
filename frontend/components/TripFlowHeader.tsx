@@ -8,7 +8,7 @@ export default function TripFlowHeader({ step }: { step: 1 | 2 | 3 }) {
       </a>
       <header className="trip-header">
         <Link href="/" aria-label="Stretch home">
-          <img className="logo" src="/assets/stretch-logo.png" alt="Stretch" />
+          <img className="logo" src="/assets/stretch-logo-transparent.png" alt="Stretch" />
         </Link>
         <Link className="trip-home-link" href="/">
           ← Back to home

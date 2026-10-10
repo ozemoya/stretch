@@ -5,13 +5,15 @@ import TripFlowHeader from "./TripFlowHeader";
 import OpenMap from "./OpenMap";
 import type { NearbyPlace } from "@/lib/live-data";
 const emptyMapPlaces: NearbyPlace[] = [];
-import type { BasketItem, Catalog, Preferences, Trip } from "@/lib/types";
+import type { BasketItem, Catalog, Preferences } from "@/lib/types";
 import { detectLocation } from "@/lib/detect-location";
 import { centers, type SearchOrigin } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
 import type { GasStop } from "@/lib/gas-stop";
 import { readCheckoutDraft, writeCheckoutDraft } from "@/lib/checkout-draft";
 import { createSavedList, readSavedLists, readSavedSettings, writeSavedLists, writeSavedSettings, type SavedList } from "@/lib/saved-plans";
+import SketchIcon, { type SketchIconName } from "./SketchIcon";
+import HomeStory from "./HomeStory";
 const defaults: Preferences = {
   area: "downtown",
   budget: 35,
@@ -22,31 +24,73 @@ const defaults: Preferences = {
   glutenFree: false,
   nutFree: false,
 };
-function Route({ trip }: { trip?: Trip }) {
+const sampleTrips = {
+  a: { label: "Market A", groceries: 52, driving: 3 },
+  b: { label: "Market B", groceries: 47, driving: 9 },
+  both: { label: "Two stores", groceries: 43, driving: 5 },
+} as const;
+type SampleTrip = keyof typeof sampleTrips;
+
+function foodIcon(name: string): SketchIconName {
+  if (/milk|cream|yogurt|cheese/i.test(name)) return "milk";
+  if (/egg/i.test(name)) return "eggs";
+  if (/bread|bagel|toast|bun/i.test(name)) return "bread";
+  if (/apple|banana|berry|fruit|vegetable|tomato|lettuce|potato|onion|carrot/i.test(name)) return "produce";
+  return "bag";
+}
+
+function Route() {
+  const [selected, setSelected] = useState<SampleTrip>("both");
+  const trip = sampleTrips[selected];
   return (
     <div
       className="route-illustration"
-      aria-label={trip ? "Selected trip route" : "Illustrative two-stop route"}
+      role="region"
+      aria-label="Sample grocery trip comparison"
     >
-      <span className="hand route-note">
-        a little detour.
-        <br />a lot more dinner.
-      </span>
-      <svg viewBox="0 0 440 330" aria-hidden="true">
-        <path d="M80 220 C35 120 110 50 200 60 S405 120 360 225 S175 330 80 220" />
-        <path className="arrows" d="m200 60 15 5-10 12m145 235-15 2 3-15" />
-      </svg>
-      <span className="pin home">
-        ⌂<small>HOME</small>
-      </span>
-      <span className="pin first">
-        1<small>{trip?.stops[0]?.store.name ?? "MARKET A"}</small>
-      </span>
-      {(!trip || trip.stops.length > 1) && (
-        <span className="pin second">
-          2<small>{trip?.stops[1]?.store.name ?? "MARKET B"}</small>
+      <div className="route-map" data-selected={selected}>
+        <SketchIcon name="bag" size={86} className="route-sticker route-sticker-bag" />
+        <SketchIcon name="car" size={88} className="route-sticker route-sticker-car" />
+        <SketchIcon name="star" size={40} className="route-sticker route-sticker-star" />
+        <span className="hand route-note">
+          a little detour.
+          <br />a lot more dinner.
         </span>
-      )}
+        <svg viewBox="0 0 440 330" aria-hidden="true">
+          <defs>
+            <filter id="stretch-route-sketch" x="-15%" y="-15%" width="130%" height="130%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="1" result="noise">
+                <animate attributeName="seed" values="1;2;3;1" dur="0.55s" repeatCount="indefinite" />
+              </feTurbulence>
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </defs>
+          <path d={selected === "a"
+            ? "M80 220 C35 120 110 50 200 60 C290 90 170 320 80 220"
+            : selected === "b"
+              ? "M80 220 C150 135 275 145 360 225 C295 325 175 330 80 220"
+              : "M80 220 C35 120 110 50 200 60 S405 120 360 225 S175 330 80 220"} />
+          <path className="arrows" d="m200 60 15 5-10 12m145 235-15 2 3-15" />
+        </svg>
+        <span className="pin home" aria-hidden="true">⌂<small>HOME</small></span>
+        <button type="button" className="pin first" aria-label="1 Market A — show sample trip" aria-pressed={selected === "a"} onClick={() => setSelected("a")}>1<small>MARKET A</small></button>
+        <button type="button" className="pin second" aria-label="2 Market B — show sample trip" aria-pressed={selected === "b"} onClick={() => setSelected("b")}>2<small>MARKET B</small></button>
+      </div>
+      <div className="route-preview" aria-label="Try a sample trip">
+        <div className="route-options" role="group" aria-label="Sample routes">
+          {(Object.keys(sampleTrips) as SampleTrip[]).map((option) => (
+            <button key={option} type="button" aria-pressed={selected === option} onClick={() => setSelected(option)}>{sampleTrips[option].label}</button>
+          ))}
+        </div>
+        <p className="route-total" aria-live="polite">
+          <span><strong>${trip.groceries}</strong> food</span>
+          <span aria-hidden="true">+</span>
+          <span><strong>${trip.driving}</strong> driving</span>
+          <span aria-hidden="true">=</span>
+          <strong className="route-grand-total">${trip.groceries + trip.driving}</strong>
+        </p>
+        <small>Sample prices to show how trip cost works.</small>
+      </div>
     </div>
   );
 }
@@ -62,6 +106,7 @@ export default function Stretch({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [homeArea, setHomeArea] = useState("ip");
   useEffect(() => {
     if (searchParams.has("q")) setSearch(searchParams.get("q") ?? "");
     const panel = searchParams.get("panel");
@@ -201,6 +246,9 @@ export default function Stretch({
     if (mode !== "planner") return;
     setSavedLists(readSavedLists(window.localStorage));
     setRestored(true);
+    const requestedArea = searchParams.get("area");
+    const selectedArea = requestedArea && Object.prototype.hasOwnProperty.call(centers, requestedArea)
+      ? requestedArea as Preferences["area"] : null;
     const previous = readCheckoutDraft(window.sessionStorage);
     if (previous) {
       setBasket(previous.basket);
@@ -210,6 +258,13 @@ export default function Stretch({
       setGasStop(previous.gasStop);
       setFuelSource(previous.fuelSource);
       setManualGas(previous.manualGas);
+      if (selectedArea) {
+        setPrefs({ ...previous.prefs, area: selectedArea });
+        setSearchOrigin({ ...centers[selectedArea], label: selectedArea });
+        setIpArea(false);
+        setLocationState("Starting area selected manually");
+        return;
+      }
       if (!previous.ipArea) {
         setSearchOrigin(
           previous.origin ?? {
@@ -229,12 +284,26 @@ export default function Stretch({
     if (!previous && savedSettings) {
       setPrefs(savedSettings.prefs);
       setManualGas(savedSettings.prefs.gas);
+      if (selectedArea) {
+        setPrefs({ ...savedSettings.prefs, area: selectedArea });
+        setSearchOrigin({ ...centers[selectedArea], label: selectedArea });
+        setIpArea(false);
+        setLocationState("Starting area selected manually");
+        return;
+      }
       if (savedSettings.manualOrigin) {
         setIpArea(false);
         setSearchOrigin(savedSettings.manualOrigin);
         setLocationState("Starting area selected manually");
         return;
       }
+    }
+    if (selectedArea) {
+      setPrefs({ ...defaults, area: selectedArea });
+      setSearchOrigin({ ...centers[selectedArea], label: selectedArea });
+      setIpArea(false);
+      setLocationState("Starting area selected manually");
+      return;
     }
     const controller = new AbortController();
     detectLocation(controller.signal)
@@ -332,17 +401,13 @@ export default function Stretch({
             Skip to main content
           </a>
           <header>
-            <span aria-hidden="true" style={{ width: "35%" }} />
             <a href="#" aria-label="Stretch home">
               <img
                 className="logo"
-                src="/assets/stretch-logo.png"
+                src="/assets/stretch-logo-transparent.png"
                 alt="Stretch"
               />
             </a>
-            <nav aria-label="Home navigation">
-              <button onClick={() => router.push("/dashboard")}>Start Here!</button>
-            </nav>
           </header>
         </>
       )}
@@ -368,29 +433,50 @@ export default function Stretch({
         className={mode === "planner" ? "trip-planner-page" : undefined}
       >
         {mode === "home" && (
-          <section className="hero">
-            <div>
+          <section className="hero" aria-labelledby="home-title">
+            <div className="home-hero-copy">
               <p className="eyebrow">MADE FOR EVERYDAY ATLANTA ADVENTURES</p>
-              <h1>
+              <h1 id="home-title">
                 The little trip
                 <br />
                 that stretches
                 <br />
-                your budget.
+                <span className="hero-scribble">your budget.</span>
               </h1>
               <p>
                 Your list, a smarter route, and more left over.
                 <br />
                 Compare verified local baskets and the drive home.
               </p>
-              <p className="small">Atlanta-area pilot · store prices appear only where a connected source verifies them.</p>
-              <button className="cta" onClick={plan}>
-                PLOT MY TRIP ↗
-              </button>
+              <form className="home-search" onSubmit={(event) => {
+                event.preventDefault();
+                const params = new URLSearchParams();
+                params.set("q", search.trim());
+                if (homeArea !== "ip") params.set("area", homeArea);
+                router.push(`/plan?${params.toString()}`);
+              }}>
+                <label htmlFor="home-food-search">What do you need?</label>
+                <div className="home-search-row">
+                  <SketchIcon name="cart" size={34} />
+                  <input id="home-food-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search groceries, like milk or bread" required />
+                  <button type="submit" aria-label="Search groceries">↗</button>
+                </div>
+                <div className="home-search-footer">
+                  <label htmlFor="home-area">Starting area</label>
+                  <select id="home-area" value={homeArea} onChange={(event) => setHomeArea(event.target.value)}>
+                    <option value="ip">Near me · approximate IP area</option>
+                    <option value="downtown">Downtown Atlanta</option>
+                    <option value="midtown">Midtown Atlanta</option>
+                    <option value="decatur">Decatur</option>
+                  </select>
+                </div>
+              </form>
+              <div className="home-hero-actions"><button className="cta" onClick={() => router.push("/dashboard")}>Start Here!</button><span>Atlanta-area pilot · prices shown only with a source.</span></div>
             </div>
             <Route />
           </section>
         )}
+        {mode === "home" && <HomeStory />}
         {mode === "planner" && (
           <section id="planner" className="planner">
             <div className="section-head">
@@ -548,9 +634,10 @@ export default function Stretch({
                 </div>
                 <div className="products">
                   {!search.trim() && !basket.length && (
-                    <p className="empty-list">
-                      Your grocery list is empty. Search for a food to add it.
-                    </p>
+                    <div className="empty-list sketch-empty-state">
+                      <SketchIcon name="bag" size={68} className="sketch-state-icon" />
+                      <p>Your grocery list is empty. Search for a food to add it.</p>
+                    </div>
                   )}
                   {catalog.products
                     .filter((p) =>
@@ -568,7 +655,7 @@ export default function Stretch({
                           key={p.id}
                           className={q ? "product added" : "product"}
                         >
-                          <span className="emoji">{p.emoji}</span>
+                          <span className="emoji"><SketchIcon name={foodIcon(p.name)} size={38} /></span>
                           <h3>{p.name}</h3>
                           <small>{p.unit}</small>
                           <div className="quantity">

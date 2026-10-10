@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=DM+Serif+Display&family=Caveat:wght@700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=DM+Serif+Display&family=Caveat:wght@700&family=Kalam:wght@400;700&family=Patrick+Hand&display=swap");
 :root {
   --cream: #fff9e8;
   --green: #647426;
@@ -168,12 +168,16 @@ header button {
   min-height: 340px;
   color: var(--green);
 }
-.route-illustration svg {
+.route-map {
+  position: relative;
+  height: 330px;
+}
+.route-map > svg:not(.sketch-icon) {
   width: 100%;
-  height: 340px;
+  height: 330px;
   overflow: visible;
 }
-.route-illustration path {
+.route-map > svg:not(.sketch-icon) > path {
   stroke: var(--green);
   stroke-width: 4;
   stroke-dasharray: 7 8;
@@ -223,6 +227,54 @@ header button {
   right: 10%;
   background: var(--sand);
 }
+.route-map button.pin {
+  color: var(--green);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.route-map button.pin:hover,
+.route-map button.pin[aria-pressed="true"] {
+  transform: scale(1.13);
+  box-shadow: 0 0 0 5px var(--pale);
+}
+.route-preview {
+  width: min(100%, 385px);
+  margin: -6px auto 0;
+  padding: 9px 15px 10px;
+  border: 1px solid var(--green);
+  background: var(--cream);
+  text-align: center;
+}
+.route-options {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+.route-options button {
+  flex: 1;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--green);
+  padding: 4px 2px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.route-options button:hover,
+.route-options button[aria-pressed="true"] {
+  border-bottom-color: var(--red);
+}
+.route-total {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 9px;
+  margin: 8px 0 2px;
+  color: var(--ink);
+  font-size: 12px;
+}
+.route-total strong { font-size: 17px; color: var(--green); }
+.route-total .route-grand-total { color: var(--red); font-size: 24px; }
+.route-preview > small { color: var(--green); font-size: 10px; }
 .compare {
   background: var(--green);
   padding: 60px 5% 40px;
@@ -691,7 +743,7 @@ footer {
   .route-illustration {
     min-height: 290px;
   }
-  .route-illustration svg {
+  .route-map > svg:not(.sketch-icon) {
     height: 290px;
   }
   .compare {
@@ -1061,10 +1113,19 @@ footer {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  letter-spacing: .015em;
 }
 .stretch-home > header,
 .stretch-home > footer {
   flex-shrink: 0;
+}
+.stretch-home > header {
+  justify-content: flex-start;
+  background: transparent;
+}
+.stretch-home > header::after {
+  display: none;
 }
 .stretch-home > main {
   flex: 1;
@@ -1075,8 +1136,94 @@ footer {
   min-height: 0;
   padding-block: clamp(24px, 6vh, 70px);
 }
+.stretch-home .hero h1 {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(42px, 4.7vw, 68px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: normal;
+  animation: stretch-text-boil .6s steps(1, end) infinite;
+}
+.stretch-home .hero .eyebrow,
+.stretch-home .route-options button,
+.stretch-home .pin small,
+.stretch-home footer {
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  font-size: 13px;
+  letter-spacing: .055em;
+}
+.stretch-home .hero > div > p:not(.eyebrow) { font-size: 17px; }
+.stretch-home .hero .cta { font-family: "Patrick Hand", "Comic Sans MS", cursive; font-size: 17px; }
+.stretch-home .route-total { font-size: 15px; }
+.stretch-home .route-total strong { font-family: "Kalam", "Patrick Hand", cursive; }
+.stretch-home .route-preview > small { font-size: 12px; }
+@keyframes stretch-text-boil {
+  0%, 100% { text-shadow: .6px 0 currentColor; }
+  33% { text-shadow: -.5px .3px currentColor; }
+  66% { text-shadow: .3px -.6px currentColor; }
+}
+.stretch-home .hero-scribble {
+  position: relative;
+  white-space: nowrap;
+}
+.stretch-home .hero-scribble::after {
+  content: "";
+  position: absolute;
+  height: 9px;
+  left: 1%;
+  right: 0;
+  bottom: -9px;
+  border-top: 3px solid var(--red);
+  border-radius: 58% 35% 40% 60%;
+  transform: rotate(-2deg);
+}
+.stretch-home .hero .cta {
+  position: relative;
+  isolation: isolate;
+  transform: rotate(-1.5deg);
+  transition: transform 160ms ease;
+}
+.stretch-home .hero .cta::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--red);
+  border-radius: 48% 3px 9px 4px / 5px 12px 7px 10px;
+  transform: rotate(2deg);
+  pointer-events: none;
+}
+.stretch-home .hero .cta:hover { transform: rotate(1deg) translateY(-2px); }
+.stretch-home .route-map > svg:not(.sketch-icon) > path { filter: url(#stretch-route-sketch); }
+.stretch-home .route-map button.pin { border-radius: 46% 54% 48% 52%; }
+.stretch-home .route-map button.pin::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid var(--green);
+  border-radius: 52% 45% 53% 47%;
+  transform: rotate(11deg);
+  pointer-events: none;
+}
+.stretch-home .route-preview {
+  position: relative;
+  transform: rotate(.4deg);
+}
+.stretch-home .route-preview::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid var(--green);
+  transform: rotate(-.9deg);
+  pointer-events: none;
+}
 .stretch-home footer {
   padding: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stretch-home .route-map > svg:not(.sketch-icon) > path { filter: none; }
+  .stretch-home .hero h1 { animation: none; }
+  .stretch-home .hero .cta,
+  .stretch-home .route-map button.pin { transition: none; }
 }
 @media (max-width: 600px) {
   .stretch-home header {
@@ -1107,10 +1254,18 @@ footer {
     min-height: 0;
     height: 100%;
   }
-  .stretch-home .route-illustration svg {
-    height: 100%;
-    max-height: 300px;
+  .stretch-home .route-map {
+    height: min(25dvh, 200px);
   }
+  .stretch-home .route-map > svg:not(.sketch-icon) {
+    height: 100%;
+    max-height: 200px;
+  }
+  .stretch-home .route-preview {
+    margin-top: 0;
+    padding: 5px 9px 6px;
+  }
+  .stretch-home .route-total { margin: 4px 0 0; }
   .stretch-home .route-note {
     top: 0;
     font-size: 22px;

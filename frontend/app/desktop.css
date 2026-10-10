@@ -21,4 +21,191 @@
 @media(max-width:1279px){.desktop-shell{grid-template-columns:200px minmax(0,1fr)}.desktop-sidebar{padding:20px 10px}.desktop-sidebar nav a{font-size:12px;gap:10px}.dashboard-page{padding:24px}.dashboard-metrics section{padding:18px}.desktop-content .trip-app>main{grid-template-columns:minmax(350px,1.1fr) minmax(260px,1fr);gap:16px;padding:16px}.desktop-content .trip-app .planner,.desktop-content .results-list-panel{padding:16px}.desktop-topbar{padding:0 24px;gap:16px}}
 @media(max-width:1000px){.desktop-shell{grid-template-columns:80px minmax(0,1fr)}.desktop-sidebar .nav-caption,.desktop-sidebar nav a>span:last-child,.desktop-sidebar .sidebar-foot>span:last-child{display:none}.desktop-brand{padding:0}.sidebar-toggle{display:none}.desktop-sidebar nav a{padding:14px 16px}.desktop-content .trip-app>main{grid-template-columns:minmax(0,1fr)}.desktop-content .workspace-tabs{display:flex}.desktop-content .trip-app main[data-view=list]>.planner-area-map,.desktop-content .trip-app main[data-view=list]>.results-map-panel{display:none}.desktop-content .trip-app main[data-view=map]>.planner,.desktop-content .trip-app main[data-view=map]>.results-list-panel{display:none}.dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-grid{grid-template-columns:1fr}.desktop-content .trip-checkout-grid{grid-template-columns:1fr}.desktop-location{max-width:150px}.dashboard-heading h1{font-size:34px}}
 @media(max-width:600px){.desktop-shell{grid-template-columns:56px minmax(0,1fr)}.desktop-sidebar{padding:12px 4px}.desktop-sidebar nav a{padding:14px 10px}.desktop-brand{height:55px}.sidebar-foot{display:none}.desktop-topbar{height:64px;padding:0 12px;gap:8px}.desktop-location,.global-search kbd{display:none}.dashboard-page{padding:20px 16px}.dashboard-heading{display:block}.dashboard-heading .desktop-primary{margin-top:20px}.dashboard-metrics{gap:8px}.dashboard-metrics section{padding:16px}.dashboard-metrics strong{font-size:24px}.dashboard-card,.dashboard-journey{padding:24px}.dashboard-heading h1{font-size:32px}.desktop-content .trip-app>main{padding:8px}.desktop-content .trip-progress{padding:10px}.desktop-content .trip-app .planner,.desktop-content .results-list-panel{padding:12px}.card-title{flex-wrap:wrap}.desktop-content .trip-app h1{font-size:25px}.desktop-content .trip-app .products{grid-template-columns:1fr}.desktop-content .trip-progress small{display:none}}
+
+/* The dashboard borrows the homepage's sketchbook treatment. */
+.dashboard-shell {
+  --dash-line: #879356;
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  letter-spacing: .015em;
+}
+.dashboard-shell .desktop-sidebar,
+.dashboard-shell .desktop-topbar { background: var(--cream); }
+.dashboard-shell .desktop-sidebar { border-right: 2px solid var(--dash-line); }
+.dashboard-shell .desktop-topbar { border-bottom: 2px solid var(--dash-line); }
+.dashboard-shell .desktop-content { background: var(--cream); }
+.dashboard-shell .dashboard-page {
+  background-image:
+    linear-gradient(#6474260d 1px, transparent 1px),
+    linear-gradient(90deg, #6474260d 1px, transparent 1px);
+  background-size: 35px 35px;
+}
+.dashboard-shell .nav-caption,
+.dashboard-shell .dashboard-page .eyebrow {
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  font-size: 13px;
+  letter-spacing: .1em;
+}
+.dashboard-shell .desktop-sidebar nav a,
+.dashboard-shell .global-search input,
+.dashboard-shell .desktop-location { font-family: "Patrick Hand", "Comic Sans MS", cursive; font-size: 17px; }
+.dashboard-shell .desktop-sidebar nav a { border-radius: 8px 15px 10px 14px; }
+.dashboard-shell .desktop-sidebar nav a > span:first-child { transform: rotate(-8deg); }
+.dashboard-shell .desktop-sidebar nav a.active {
+  position: relative;
+  background: var(--pale);
+  transform: rotate(-1deg);
+}
+.dashboard-shell .desktop-sidebar nav a.active::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--green);
+  border-radius: 14px 8px 13px 10px;
+  transform: rotate(1.5deg);
+  animation: dashboard-outline-boil .7s steps(1, end) infinite;
+  pointer-events: none;
+}
+.dashboard-shell .sidebar-toggle,
+.dashboard-shell .profile-control,
+.dashboard-shell .global-search kbd {
+  border: 1px solid var(--green);
+  border-radius: 43% 54% 47% 53%;
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+}
+.dashboard-shell .dashboard-heading h1 {
+  position: relative;
+  width: fit-content;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(36px, 3.5vw, 50px);
+  animation: stretch-text-boil .6s steps(1, end) infinite;
+}
+.dashboard-shell .dashboard-heading h1::after {
+  content: "";
+  position: absolute;
+  width: 62%;
+  height: 9px;
+  left: 2px;
+  bottom: -12px;
+  border-top: 3px solid var(--red);
+  border-radius: 55% 35% 45% 65%;
+  transform: rotate(-2deg);
+}
+.dashboard-shell .dashboard-heading p { font-size: 17px; }
+.dashboard-shell .desktop-primary {
+  position: relative;
+  background: var(--red);
+  color: var(--cream);
+  border-radius: 5px 9px 4px 10px;
+  font-family: "Patrick Hand", "Comic Sans MS", cursive;
+  font-size: 17px;
+  font-weight: 400;
+  transform: rotate(-1deg);
+  transition: transform 160ms ease, background 160ms ease;
+}
+.dashboard-shell .desktop-primary::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--red);
+  border-radius: 11px 4px 8px 5px;
+  transform: rotate(1.7deg);
+  pointer-events: none;
+}
+.dashboard-shell .desktop-primary:hover { background: var(--red); transform: rotate(1deg) translateY(-2px); }
+.dashboard-shell .dashboard-metrics section,
+.dashboard-shell .dashboard-card,
+.dashboard-shell .dashboard-journey {
+  position: relative;
+  border: 1px solid var(--dash-line);
+  border-radius: 18px 11px 20px 13px / 13px 21px 14px 18px;
+  background: var(--cream);
+  box-shadow: 4px 4px 0 #64742617;
+}
+.dashboard-shell .dashboard-metrics section::before,
+.dashboard-shell .dashboard-card::before,
+.dashboard-shell .dashboard-journey::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid #87935691;
+  border-radius: 12px 20px 13px 17px / 20px 12px 18px 13px;
+  transform: rotate(.35deg);
+  animation: dashboard-outline-boil .7s steps(1, end) infinite;
+  pointer-events: none;
+}
+@keyframes dashboard-outline-boil {
+  0%, 100% { transform: rotate(.35deg) translate(0, 0); }
+  34% { transform: rotate(-.25deg) translate(.5px, -.5px); }
+  67% { transform: rotate(.15deg) translate(-.5px, .5px); }
+}
+.dashboard-shell .dashboard-metrics section:nth-child(2) { background: #f5edcf; }
+.dashboard-shell .dashboard-metrics section:nth-child(3) { background: #edf0d3; }
+.dashboard-shell .dashboard-metrics section > span,
+.dashboard-shell .dashboard-metrics section > a,
+.dashboard-shell .dashboard-metrics section > small { font-size: 15px; }
+.dashboard-shell .dashboard-metrics strong {
+  font-family: "DM Serif Display", Georgia, serif;
+  color: var(--green);
+  font-weight: 400;
+}
+.dashboard-shell .dashboard-metrics strong small { font-family: "Patrick Hand", "Comic Sans MS", cursive; font-size: 16px; }
+.dashboard-shell .dashboard-journey { background: var(--pale); overflow: visible; }
+.dashboard-shell .dashboard-journey::after {
+  content: "✳";
+  position: absolute;
+  right: 30px;
+  top: 10px;
+  color: var(--red);
+  font: 46px "Caveat", cursive;
+  transform: rotate(17deg);
+  pointer-events: none;
+}
+.dashboard-shell .dashboard-journey h2,
+.dashboard-shell .dashboard-card h2,
+.dashboard-shell .dashboard-card h3 {
+  font-family: "Kalam", "Patrick Hand", cursive;
+  font-weight: 700;
+  letter-spacing: -.03em;
+}
+.dashboard-shell .dashboard-journey h2 { font-size: clamp(30px, 3vw, 43px); }
+.dashboard-shell .dashboard-card h2 { font-size: 23px; }
+.dashboard-shell .coverage-note h2 { font-size: 28px; }
+.dashboard-shell .dashboard-card p,
+.dashboard-shell .dashboard-journey > p:not(.eyebrow),
+.dashboard-shell .dashboard-empty p { font-size: 16px; line-height: 1.5; }
+.dashboard-shell .dashboard-card a,
+.dashboard-shell .dashboard-metrics a {
+  color: var(--green);
+  font-size: 15px;
+  text-decoration: underline wavy var(--red);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.dashboard-shell .dashboard-card .status-pill {
+  border-radius: 10px 16px 9px 15px;
+  font-size: 14px;
+}
+.dashboard-shell .journey-track > span {
+  border: 1px solid var(--green);
+  border-radius: 45% 55% 50% 48%;
+  font: 17px "Patrick Hand", cursive;
+}
+.dashboard-shell .journey-track i { border-top: 2px dashed var(--green); background: none; }
+.dashboard-shell .dashboard-empty > span,
+.dashboard-shell .list-symbol { border: 1px solid var(--green); border-radius: 42% 55% 45% 52%; }
+.dashboard-shell .dashboard-empty h3 { font-family: "Kalam", "Patrick Hand", cursive; font-size: 21px; }
+@media (max-width: 600px) {
+  .dashboard-shell .dashboard-metrics { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-shell .dashboard-metrics section { padding: 16px 20px; }
+  .dashboard-shell .dashboard-metrics strong { margin: 8px 0; }
+  .dashboard-shell .dashboard-metrics section > a { display: inline-block; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell .dashboard-heading h1 { animation: none; }
+  .dashboard-shell .desktop-primary { transition: none; }
+  .dashboard-shell .desktop-sidebar nav a.active::after,
+  .dashboard-shell .dashboard-metrics section::before,
+  .dashboard-shell .dashboard-card::before,
+  .dashboard-shell .dashboard-journey::before { animation: none; }
+}
 @media print{.desktop-sidebar,.desktop-topbar{display:none}.desktop-shell{display:block;height:auto;overflow:visible}.desktop-content{overflow:visible}.desktop-body{display:block}}
