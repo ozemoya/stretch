@@ -116,6 +116,7 @@ let windowStart = 0,
   dayCount = 0;
 let robotsUntil = 0;
 let robotsText = "";
+let robotsPending: Promise<void> | null = null;
 async function publicHtml(
   path: string,
   maxBytes = 6_000_000,
@@ -179,8 +180,13 @@ async function searchLidl(
   if (existing) return existing;
   const task = (async () => {
     if (robotsUntil < Date.now()) {
-      robotsText = await publicHtml("/robots.txt", 100_000, signal);
-      robotsUntil = Date.now() + 600_000;
+      robotsPending ??= publicHtml("/robots.txt", 100_000, signal)
+        .then((text) => {
+          robotsText = text;
+          robotsUntil = Date.now() + 600_000;
+        })
+        .finally(() => { robotsPending = null; });
+      await robotsPending;
     }
     const path = `/q/search?q=${encodeURIComponent(key)}`;
     if (!robotsAllows(robotsText, `https://www.lidl.com${path}`))
@@ -255,27 +261,24 @@ export async function scrapeRetailers(
       });
       continue;
     }
-    const lines: ScrapeReport["lines"] = [];
-    for (const [index, item] of items.entries()) {
-      signal?.throwIfAborted();
-      if (index >= 12) {
-        lines.push({
-          item,
-          products: [],
-          error: "Not searched: twelve-item public catalog limit per run.",
-        });
-        continue;
+    const lines: ScrapeReport["lines"] = new Array(items.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(3, items.length) }, async () => {
+      while (next < items.length) {
+        const index = next++;
+        const item = items[index];
+        signal?.throwIfAborted();
+        if (index >= 12) {
+          lines[index] = { item, products: [], error: "Not searched: twelve-item public catalog limit per run." };
+          continue;
+        }
+        try {
+          lines[index] = { item, products: await searchLidl(item.name, signal) };
+        } catch (e) {
+          lines[index] = { item, products: [], error: e instanceof Error ? e.message : "Public price search failed." };
+        }
       }
-      try {
-        lines.push({ item, products: await searchLidl(item.name, signal) });
-      } catch (e) {
-        lines.push({
-          item,
-          products: [],
-          error: e instanceof Error ? e.message : "Public price search failed.",
-        });
-      }
-    }
+    }));
     reports.push({
       retailer,
       status: lines.some((l) => l.products.length) ? "retrieved" : "failed",

@@ -200,10 +200,10 @@ export async function compareBasket(
         agent: {
           aiConnected: !!agentPlan,
           mode: agentPlan
-            ? `Local AI planned product searches using ${agentPlan.model}; prices still come from validated retailer pages.`
+            ? `${agentPlan.provider === "openai" ? "OpenAI" : "Local AI"} planned product searches using ${agentPlan.model}; prices still come from validated retailer pages.`
             : process.env.BRIGHT_DATA_SERP_ZONE
-              ? "Website search is running; the local AI model is unavailable."
-              : "The local AI model and website search provider are unavailable.",
+              ? "Website search is running; AI planning was unavailable or timed out."
+              : "AI planning and the website search provider are unavailable.",
         },
         publicCatalogs,
         storeCoverage: coverage,

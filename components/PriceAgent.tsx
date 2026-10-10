@@ -23,6 +23,10 @@ import {
   settlePendingReports,
 } from "@/lib/search-state";
 import { normalizeCatalogReport } from "@/lib/product-ownership";
+import {
+  hasVisibleBranchPrice,
+  hasVisibleCatalogPrice,
+} from "@/lib/visible-price-results";
 export default function PriceAgent({
   items,
   zip,
@@ -104,7 +108,6 @@ export default function PriceAgent({
     }
   }, [autoStart]);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState("coverage");
   const [phase, setPhase] = useState(0);
   useEffect(() => {
@@ -377,13 +380,15 @@ export default function PriceAgent({
     ? Math.min(...completeTrips.map((trip) => trip.totalCents))
     : null;
   const alternatives = nearbyAlternatives(result?.stores ?? [], choices);
+  const visibleCatalogs = result?.publicCatalogs.filter(hasVisibleCatalogPrice) ?? [];
+  const visibleBranches = result?.stores.filter(hasVisibleBranchPrice) ?? [];
   return (
     <section
       className="live-sources search-workspace"
       aria-label="Basket price agent"
     >
-      {!result && liveReports.length > 0 && (
-        <StoreColumns reports={liveReports} items={items} />
+      {!result && liveReports.some(hasVisibleCatalogPrice) && (
+        <StoreColumns reports={liveReports.filter(hasVisibleCatalogPrice)} items={items} />
       )}
       <p className="eyebrow">YOUR LIST. EVERY POSSIBLE ROUTE.</p>
       <h2>Find your next best stop.</h2>
@@ -449,13 +454,13 @@ export default function PriceAgent({
         <div className="search-progress" role="status" aria-live="polite">
           <span className="search-spinner" />
           {agentStage === "planning"
-            ? "Local AI is planning food searches…"
+            ? "AI is planning food searches…"
             : agentStage === "ready"
               ? "AI search plan ready. Checking retailer pages…"
               : agentStage === "reviewing"
-                ? "Local AI is reviewing product matches…"
+                ? "AI is reviewing product matches…"
                 : agentStage === "unavailable"
-                  ? "Local AI is unavailable. Checking connected websites…"
+                  ? "AI planning unavailable or timed out. Checking connected websites…"
                   : [
                       "Finding stores and connected sources…",
                       "Searching products and checking packages…",
@@ -492,23 +497,6 @@ export default function PriceAgent({
               </select>
             </label>
           </div>
-          <div className="search-filters" aria-label="Filter results">
-            {[
-              ["all", "All stores"],
-              ["retrieved", "Prices found"],
-              ["pending", "Collecting"],
-              ["unavailable", "Unavailable"],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={filter === id}
-                onClick={() => setFilter(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <p>{result.coverage}</p>
           {result.warnings.map((w) => (
             <p role="alert" key={w}>
@@ -527,45 +515,17 @@ export default function PriceAgent({
             </strong>{" "}
             Only complete reviewed baskets with a driving route can be ranked.
           </p>
-          <p className="small">
-            Retailers found:{" "}
-            {[...new Set(result.storeCoverage.map((s) => s.retailer))].join(
-              " · ",
-            ) || "None returned"}
-          </p>
           <p>
             <strong>
-              {result.publicCatalogs?.filter(
-                (report) => report.status === "retrieved",
-              ).length ?? 0}{" "}
-              retailer catalogs returned live advertised prices.
+              {visibleCatalogs.length} retailer catalogs returned validated online prices.
             </strong>{" "}
             Review these separately below.
           </p>
-          <details>
-            <summary>All discovered retailers and price coverage</summary>
-            <ul className="place-list">
-              {result.storeCoverage.map((s) => (
-                <li key={s.id}>
-                  <a href={s.mapUrl} target="_blank" rel="noreferrer">
-                    {s.name} ↗
-                  </a>
-                  <span>
-                    {s.retailer} · {s.miles} mi ·{" "}
-                    {s.address || "Address not supplied"}
-                  </span>
-                  <strong>
-                    {s.status === "checked"
-                      ? "Price source checked"
-                      : s.status === "failed"
-                        ? "Price check failed"
-                        : "No verified branch price yet"}
-                  </strong>
-                  <span>{s.detail}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
+          {result.storeCoverage.length > visibleBranches.length && (
+            <p className="small">
+              {result.storeCoverage.length - visibleBranches.length} nearby locations had no verified branch price and are hidden from comparison.
+            </p>
+          )}
           <p className="small">
             Checked {new Date(result.checkedAt).toLocaleString()}. Prices can
             change at checkout.
@@ -618,7 +578,7 @@ export default function PriceAgent({
               {busy ? "Checking progress…" : "Refresh background prices"}
             </button>
           )}
-          {!!result.publicCatalogs?.length && (
+          {!!visibleCatalogs.length && (
             <StoreColumns
               items={items}
               onRetry={(retailerId) =>
@@ -626,14 +586,7 @@ export default function PriceAgent({
                   ? check()
                   : refreshProvider(retailerId, true))
               }
-              reports={result.publicCatalogs
-                .filter(
-                  (report) =>
-                    filter === "all" ||
-                    (filter === "unavailable"
-                      ? !["retrieved", "pending"].includes(report.status)
-                      : report.status === filter),
-                )
+              reports={visibleCatalogs
                 .filter((report) =>
                   `${report.retailer} ${report.lines.map((l) => l.item.name).join(" ")}`
                     .toLowerCase()
@@ -648,21 +601,6 @@ export default function PriceAgent({
                 )}
             />
           )}
-          {!!result.publicCatalogs?.some((report) => !report.lines.length) && (
-            <details>
-              <summary>Scraping availability for other retailers</summary>
-              <ul className="place-list">
-                {result.publicCatalogs
-                  .filter((report) => !report.lines.length)
-                  .map((report) => (
-                    <li key={report.retailer}>
-                      <strong>{report.retailer}</strong>
-                      <span>{report.detail}</span>
-                    </li>
-                  ))}
-              </ul>
-            </details>
-          )}
           {!result.stores.length && (
             <p>
               No branch-verified prices returned for these stores. Public
@@ -671,10 +609,8 @@ export default function PriceAgent({
             </p>
           )}
           <div className="live-grid">
-            {result.storeCoverage.map((location) => {
-              const store = result.stores.find(
-                (entry) => entry.id === location.id,
-              );
+            {visibleBranches.map((store) => {
+              const location = result.storeCoverage.find((entry) => entry.id === store.id)!;
               const total = store
                 ? reviewedTotal(store, choices[store.id] ?? {})
                 : null;

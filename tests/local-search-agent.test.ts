@@ -29,6 +29,33 @@ describe("local search agent", () => {
     } finally { globalThis.fetch = previous; }
   });
 
+  it("uses the configured hosted model for planning without trusting it for prices", async () => {
+    const previousFetch = globalThis.fetch;
+    const previousKey = process.env.OPENAI_API_KEY;
+    const previousModel = process.env.OPENAI_SEARCH_MODEL;
+    process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENAI_SEARCH_MODEL = "gpt-5.5";
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+      return Response.json({ output: [{ content: [{ type: "output_text", text: JSON.stringify({ searches: [{ id: "eggs", queries: ["large eggs dozen"] }] }) }] }] });
+    }) as typeof fetch;
+    try {
+      const plan = await planBasketSearch(items);
+      expect(plan?.provider).toBe("openai");
+      expect(plan?.model).toBe("gpt-5.5");
+      expect(plan?.queries.eggs).toEqual(["large eggs dozen"]);
+      expect(calls[0].url).toBe("https://api.openai.com/v1/responses");
+      expect(calls[0].body.model).toBe("gpt-5.5");
+    } finally {
+      globalThis.fetch = previousFetch;
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
+      if (previousModel === undefined) delete process.env.OPENAI_SEARCH_MODEL;
+      else process.env.OPENAI_SEARCH_MODEL = previousModel;
+    }
+  });
+
   it("rejects an unrelated product while preserving source price evidence", async () => {
     const previous = globalThis.fetch;
     globalThis.fetch = vi.fn(async () => Response.json({message:{content:JSON.stringify({decisions:[

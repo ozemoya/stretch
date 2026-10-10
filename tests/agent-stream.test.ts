@@ -8,6 +8,7 @@ vi.mock("../lib/compare-basket",async()=>{
  return {input:z.object({items:z.array(z.object({id:z.string()})),zip:z.string()}),compareBasket:vi.fn(async(_request:Request,onReport:Function)=>{onReport(report);return Response.json({publicCatalogs:[report],stores:[]});})};
 });
 import {POST} from "../app/api/agent/search/route";
+import {planBasketSearch} from "../lib/local-search-agent";
 it("streams cached observations and collector updates before the completed result",async()=>{
  const response=await POST(new Request("http://localhost/api/agent/search",{method:"POST",body:JSON.stringify({zip:"30303",items:[{id:"milk"}]})}));
  expect(response.headers.get("content-type")).toBe("application/x-ndjson");
@@ -21,4 +22,16 @@ it("streams cached observations and collector updates before the completed resul
 it("rejects duplicate items before starting any collection",async()=>{
  const response=await POST(new Request("http://localhost/api/agent/search",{method:"POST",body:JSON.stringify({zip:"30303",items:[{id:"milk"},{id:"milk"}]})}));
  expect(response.status).toBe(400);
+});
+it("continues retailer collection when AI planning exceeds its deadline",async()=>{
+ vi.mocked(planBasketSearch).mockImplementationOnce(async (_items, signal)=>{
+   await new Promise<void>(resolve=>signal?.addEventListener("abort",()=>resolve(),{once:true}));
+   return null;
+ });
+ const started=Date.now();
+ const response=await POST(new Request("http://localhost/api/agent/search",{method:"POST",body:JSON.stringify({zip:"30303",items:[{id:"milk"}]})}));
+ const events=(await response.text()).trim().split("\n").map(line=>JSON.parse(line));
+ expect(events.at(-1).type).toBe("complete");
+ expect(events.some(event=>event.type==="report")).toBe(true);
+ expect(Date.now()-started).toBeLessThan(6000);
 });

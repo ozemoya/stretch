@@ -88,7 +88,12 @@ export async function POST(request: Request) {
                 cached: true,
               });
           send({ type: "agent", stage: "planning" });
-          const agentPlan = await planBasketSearch(p.items);
+          // AI expands queries, but cannot hold the retailer search for its full timeout.
+          const planningSignal = AbortSignal.any([
+            request.signal,
+            AbortSignal.timeout(process.env.OPENAI_API_KEY ? 4500 : 2500),
+          ]);
+          const agentPlan = await planBasketSearch(p.items, planningSignal);
           request.signal.throwIfAborted();
           send({
             type: "agent",
@@ -117,7 +122,11 @@ export async function POST(request: Request) {
             Array.isArray(result.publicCatalogs)
           ) {
             send({ type: "agent", stage: "reviewing" });
-            const reviewed = await reviewProductMatches(result.publicCatalogs);
+            const reviewSignal = AbortSignal.any([
+              request.signal,
+              AbortSignal.timeout(process.env.OPENAI_API_KEY ? 4500 : 2500),
+            ]);
+            const reviewed = await reviewProductMatches(result.publicCatalogs, reviewSignal);
             result.publicCatalogs = reviewed.reports;
             result.publicCatalogs = result.publicCatalogs.map(
               (report: ScrapeReport) => normalizeCatalogReport(report, p.items),
