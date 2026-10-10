@@ -361,6 +361,13 @@ export default function Stretch({
   }, [mode]);
   useEffect(() => {
     if (mode !== "planner" || !restored) return;
+    const listId = searchParams.get("listId");
+    if (!listId) return;
+    const list = readSavedLists(window.localStorage).find((entry) => entry.id === listId);
+    if (list) loadList(list);
+  }, [mode, restored, searchParams]);
+  useEffect(() => {
+    if (mode !== "planner" || !restored) return;
     writeSavedSettings(window.localStorage, { prefs, manualOrigin: ipArea ? null : searchOrigin });
   }, [mode, restored, prefs, ipArea, searchOrigin]);
   useEffect(() => {
