@@ -1,5 +1,6 @@
 "use client";
 import StoreColumns from "./StoreColumns";
+import MultiStorePlanner from "./MultiStorePlanner";
 import SketchIcon from "./SketchIcon";
 import { useState, useEffect, useRef } from "react";
 import type { AgentItem, StoreCheck } from "@/lib/price-agent";
@@ -50,6 +51,7 @@ export default function PriceAgent({
   gasPrice,
   gasPriceReported,
   mpg,
+  maxStops,
   nearbyPlaces,
   radius,
   onRadiusChange,
@@ -64,6 +66,7 @@ export default function PriceAgent({
   gasPrice: number;
   gasPriceReported: boolean;
   mpg: number;
+  maxStops: number;
   nearbyPlaces: NearbyPlace[];
   radius: number;
   onRadiusChange: (radius: number) => void;
@@ -717,6 +720,8 @@ export default function PriceAgent({
             })}</tbody></table>}
             {comparedStores.length > 0 && <button className="text-button" onClick={() => setComparedStores([])}>Show all branches</button>}
           </>}
+          <MultiStorePlanner items={items} stores={visibleBranches} locations={result.storeCoverage}
+            origin={origin} area={area} gasStop={gasStop} mpg={mpg} gasPrice={gasPrice} maxStores={maxStops} />
           <div className={`live-grid ${comparisonView === "table" ? "branch-table-mode" : ""}`}>
             {visibleBranches.filter((store) => !comparedStores.length || comparedStores.includes(store.id)).map((store) => {
               const location = result.storeCoverage.find((entry) => entry.id === store.id)!;

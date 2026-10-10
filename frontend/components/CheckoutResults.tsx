@@ -165,6 +165,7 @@ export default function CheckoutResults() {
                 gasPrice={draft.prefs.gas}
                 gasPriceReported={!!draft.fuelSource}
                 mpg={draft.prefs.mpg}
+                maxStops={draft.prefs.maxStops}
                 nearbyPlaces={nearbyPlaces}
                 radius={radius}
                 onRadiusChange={setRadius}
