@@ -11,6 +11,7 @@ import { centers, type SearchOrigin } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
 import type { GasStop } from "@/lib/gas-stop";
 import { readCheckoutDraft, writeCheckoutDraft } from "@/lib/checkout-draft";
+import { addSearchItems } from "@/lib/search-basket";
 import { createSavedList, readSavedLists, readSavedSettings, writeSavedLists, writeSavedSettings, type SavedList } from "@/lib/saved-plans";
 import SketchIcon, { type SketchIconName } from "./SketchIcon";
 const defaults: Preferences = {
@@ -121,6 +122,8 @@ export default function Stretch({
   const [savedLists, setSavedLists] = useState<SavedList[]>([]);
   const [savedListName, setSavedListName] = useState("");
   const [savedListNotice, setSavedListNotice] = useState("");
+  const [searchNotice, setSearchNotice] = useState("");
+  const handledSearchRef = useRef<string | null>(null);
   const [isAddItemsOpen, setIsAddItemsOpen] = useState(false);
   const addItemsTriggerRef = useRef<HTMLButtonElement>(null);
   const addItemsModalRef = useRef<HTMLElement>(null);
@@ -368,6 +371,26 @@ export default function Stretch({
   }, [mode, restored, searchParams]);
   useEffect(() => {
     if (mode !== "planner" || !restored) return;
+    const query = searchParams.get("q");
+    if (query === null) {
+      handledSearchRef.current = null;
+      return;
+    }
+    if (handledSearchRef.current === query) return;
+    handledSearchRef.current = query;
+    const result = addSearchItems(query, catalog.products, []);
+    setBasket((current) => addSearchItems(query, catalog.products, current).basket);
+    setSearch(result.unmatched[0] ?? "");
+    setSearchNotice([
+      result.matched.length ? `In your list: ${result.matched.map((product) => product.name).join(", ")}.` : "",
+      result.unmatched.length ? `No catalog match for: ${result.unmatched.join(", ")}. Use Add Items to find another grocery.` : "",
+    ].filter(Boolean).join(" "));
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("q");
+    router.replace(`/plan${params.size ? `?${params.toString()}` : ""}`, { scroll: false });
+  }, [mode, restored, searchParams, catalog.products, router]);
+  useEffect(() => {
+    if (mode !== "planner" || !restored) return;
     writeSavedSettings(window.localStorage, { prefs, manualOrigin: ipArea ? null : searchOrigin });
   }, [mode, restored, prefs, ipArea, searchOrigin]);
   useEffect(() => {
@@ -500,6 +523,7 @@ export default function Stretch({
               </p>
               <form className="home-search" onSubmit={(event) => {
                 event.preventDefault();
+                if (!search.trim()) return;
                 const params = new URLSearchParams();
                 params.set("q", search.trim());
                 if (homeArea !== "ip") params.set("area", homeArea);
@@ -508,7 +532,7 @@ export default function Stretch({
                 <label htmlFor="home-food-search">What do you need?</label>
                 <div className="home-search-row">
                   <SketchIcon name="cart" size={34} />
-                  <input id="home-food-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search groceries, like milk or bread" required />
+                  <input id="home-food-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search groceries, like milk, eggs and bread" required />
                   <button type="submit" aria-label="Search groceries">↗</button>
                 </div>
                 <div className="home-search-footer">
@@ -661,6 +685,7 @@ export default function Stretch({
                     <p className="eyebrow">BUILD YOUR LIST</p>
                     <h2>Add groceries to your list</h2>
                     <p>Search the catalog and choose exactly what you need.</p>
+                    {searchNotice && <p role="status">{searchNotice}</p>}
                   </div>
                   <button
                     type="button"
