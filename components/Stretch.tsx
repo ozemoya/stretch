@@ -1,7 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BasketItem, Catalog, Preferences, Trip } from "@/lib/types";
 import { optimize, suggestSwaps } from "@/lib/optimizer";
+import { getRouteMeasurements } from "@/lib/routing";
+import type { RouteMeasurements } from "@/lib/optimizer";
 import LiveSources from "./LiveSources";
 import PriceAgent from "./PriceAgent";
 import { centers, type SearchOrigin } from "@/lib/locations";
@@ -70,24 +72,100 @@ export default function Stretch({
     [showPlanner, setShowPlanner] = useState(false),
     [previousBasket, setPreviousBasket] = useState<BasketItem[] | null>(null);
   const [fuelSource, setFuelSource] = useState<FuelQuote | null>(null);
+
+  const [routeData, setRouteData] =
+    useState<{
+      area: typeof prefs.area;
+      catalog: Catalog;
+      routes: RouteMeasurements;
+    } | null>(null);
+
+  const [routesLoading, setRoutesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoutes() {
+      setRoutesLoading(true);
+
+      try {
+        const routes = await getRouteMeasurements(
+          catalog,
+          prefs.area,
+        );
+
+        if (!cancelled) {
+          setRouteData({
+            area: prefs.area,
+            catalog,
+            routes,
+          });
+        }
+      } catch (error) {
+        console.error("Unable to load routes:", error);
+
+        if (!cancelled) {
+          setRouteData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setRoutesLoading(false);
+        }
+      }
+    }
+
+    void loadRoutes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [catalog, prefs.area]);
+
+  const currentRoutes =
+    routeData?.area === prefs.area &&
+    routeData.catalog === catalog
+      ? routeData.routes
+      : undefined;
+
+
+
   const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
   const calculation = useMemo(() => {
     try {
-      return { trips: optimize(catalog, basket, prefs), error: "" };
+      return {
+        trips: optimize(
+          catalog,
+          basket,
+          prefs,
+          currentRoutes,
+        ),
+        error: "",
+      };
     } catch (e) {
-      return { trips: [], error: (e as Error).message };
+      return {
+        trips: [],
+        error: (e as Error).message,
+      };
     }
-  }, [catalog, basket, prefs]);
+  }, [catalog, basket, prefs, currentRoutes]);
+
   const complete = calculation.trips.filter((t) => !t.missing.length),
     best = complete[0],
     active = complete.find((t) => t.id === selected) ?? best;
+
   const swaps = useMemo(() => {
     try {
-      return suggestSwaps(catalog, basket, prefs);
+      return suggestSwaps(
+        catalog,
+        basket,
+        prefs,
+        currentRoutes,
+      );
     } catch {
       return [];
     }
-  }, [catalog, basket, prefs]);
+  }, [catalog, basket, prefs, currentRoutes]);
+
   const singles = complete.filter((t) => t.stops.length === 1),
     extra =
       best && singles[0] && best.stops.length > 1
@@ -305,11 +383,19 @@ export default function Stretch({
           id="planner"
           className={"planner " + (!showPlanner ? "collapsed" : "")}
         >
+
           <div className="section-head">
             <div>
               <p className="eyebrow">LET’S MAKE THE NUMBERS WORK</p>
               <h2>Your list. Your rules.</h2>
+
+              <p className="small" role="status">
+                {routesLoading || !currentRoutes
+                  ? "Loading driving routes..."
+                  : `Real routes loaded: ${Object.keys(currentRoutes).length}`}
+              </p>
             </div>
+
             <button
               className="text-button"
               onClick={() => setShowPlanner(!showPlanner)}
@@ -317,6 +403,7 @@ export default function Stretch({
               {showPlanner ? "Hide planner −" : "Open planner +"}
             </button>
           </div>
+
           {showPlanner && (
             <>
               <div className="settings">
