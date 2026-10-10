@@ -3,13 +3,22 @@ type PackageSize = {
   amount: number;
 };
 
-function parseSize(value: string): PackageSize | null {
+export function parseSize(value: string): PackageSize | null {
   const text = value.toLowerCase().replace(/\bfl\.?\s*oz\b/g, "fl oz");
+  const multipack = text.match(
+    /\b(\d+)\s*(?:x|×)\s*(\d+(?:\.\d+)?)\s*(fl oz|oz|lbs?|ct|counts?)\b/,
+  );
+  if (multipack) {
+    const each = parseSize(`${multipack[2]} ${multipack[3]}`);
+    return each
+      ? { ...each, amount: each.amount * Number(multipack[1]) }
+      : null;
+  }
   const dozen = text.match(/\b(\d+(?:\.\d+)?)\s*dozen\b/);
   if (dozen) return { kind: "count", amount: Number(dozen[1]) * 12 };
   if (/\bdozen\b/.test(text)) return { kind: "count", amount: 12 };
   const match = text.match(
-    /\b(\d+(?:\.\d+)?)\s*(gallons?|gal|quarts?|qt|pints?|pt|fl oz|liters?|litres?|l|milliliters?|ml|pounds?|lbs?|ounces?|oz|kilograms?|kg|grams?|g|counts?|ct|loaves?|loaf)\b/,
+    /\b(\d+(?:\.\d+)?)\s*(gallons?|gal|quarts?|qt|pints?|pt|fl oz|liters?|litres?|l|milliliters?|ml|pounds?|lbs?|ounces?|oz|kilograms?|kg|grams?|g|counts?|ct|each|packs?|pk|loaves?|loaf)\b/,
   );
   if (!match) return null;
   const amount = Number(match[1]);
@@ -32,8 +41,38 @@ function parseSize(value: string): PackageSize | null {
     return { kind: "weight", amount: amount * 35.274 };
   if (/^(?:grams?|g)$/.test(unit))
     return { kind: "weight", amount: amount * 0.035274 };
-  if (/^(?:counts?|ct)$/.test(unit)) return { kind: "count", amount };
+  if (/^(?:counts?|ct|each|packs?|pk)$/.test(unit))
+    return { kind: "count", amount };
   return { kind: "loaf", amount };
+}
+
+export function normalizedUnitPrice(priceCents: number, size: string) {
+  if (!Number.isFinite(priceCents) || priceCents <= 0) return null;
+  const parsed = parseSize(size);
+  if (!parsed || parsed.amount <= 0) return null;
+  const baseCents = priceCents / parsed.amount;
+  if (parsed.kind === "volume") {
+    return {
+      baseCents,
+      baseUnit: "fl oz" as const,
+      displayCents: parsed.amount >= 128 ? baseCents * 128 : baseCents,
+      displayUnit: parsed.amount >= 128 ? "gal" : "fl oz",
+    };
+  }
+  if (parsed.kind === "weight") {
+    return {
+      baseCents,
+      baseUnit: "oz" as const,
+      displayCents: parsed.amount >= 16 ? baseCents * 16 : baseCents,
+      displayUnit: parsed.amount >= 16 ? "lb" : "oz",
+    };
+  }
+  return {
+    baseCents,
+    baseUnit: "each" as const,
+    displayCents: baseCents,
+    displayUnit: "each",
+  };
 }
 
 export function packageMatches(requested: string, offered: string): boolean {

@@ -7,17 +7,29 @@ import type { SearchOrigin } from "@/lib/locations";
 import type { StoreCoverage } from "@/lib/retailer-coverage";
 import type { ScrapeReport } from "@/lib/retailer-scraper";
 import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
+import { centers } from "@/lib/locations";
+import type { GasStop } from "@/lib/gas-stop";
+import { fuelCostCents } from "@/lib/live-trip";
+import { normalizedUnitPrice } from "@/lib/package-match";
 export default function PriceAgent({
   items,
   zip,
   area,
   origin,
+  gasStop,
+  gasPrice,
+  gasPriceReported,
+  mpg,
   autoStart = false,
 }: {
   items: AgentItem[];
   zip: string;
   area: "downtown" | "midtown" | "decatur";
   origin: SearchOrigin | null;
+  gasStop?: GasStop | null;
+  gasPrice: number;
+  gasPriceReported: boolean;
+  mpg: number;
   autoStart?: boolean;
 }) {
   const [busy, setBusy] = useState(false),
@@ -39,6 +51,10 @@ export default function PriceAgent({
   const [choices, setChoices] = useState<
     Record<string, Record<string, string>>
   >({});
+  const [driving, setDriving] = useState<
+    Record<string, { miles: number; minutes: number }>
+  >({});
+  const [routeBusy, setRouteBusy] = useState(false);
   const [radius, setRadius] = useState(5);
   const started = useRef(false);
   useEffect(() => {
@@ -51,6 +67,55 @@ export default function PriceAgent({
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState("coverage");
   const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    if (!result?.stores.length) return;
+    const controller = new AbortController();
+    const home = origin ?? centers[area];
+    setDriving({});
+    setRouteBusy(true);
+    void Promise.all(
+      result.stores.map(async (store) => {
+        const mapped = result.storeCoverage.find((row) => row.id === store.id);
+        if (
+          !mapped ||
+          !Number.isFinite(mapped.lat) ||
+          !Number.isFinite(mapped.lon)
+        )
+          return;
+        try {
+          const response = await fetch("/api/routes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              points: [
+                home,
+                { lat: mapped.lat, lon: mapped.lon },
+                ...(gasStop ? [{ lat: gasStop.lat, lon: gasStop.lon }] : []),
+                home,
+              ],
+            }),
+            signal: controller.signal,
+          });
+          if (!response.ok) return;
+          const route = await response.json();
+          if (
+            Number.isFinite(route.miles) &&
+            Number.isFinite(route.minutes) &&
+            !controller.signal.aborted
+          )
+            setDriving((previous) => ({
+              ...previous,
+              [store.id]: { miles: route.miles, minutes: route.minutes },
+            }));
+        } catch {
+          /* An unavailable route cannot produce a trip total. */
+        }
+      }),
+    ).finally(() => {
+      if (!controller.signal.aborted) setRouteBusy(false);
+    });
+    return () => controller.abort();
+  }, [result?.stores, result?.storeCoverage, origin, area, gasStop]);
   useEffect(() => {
     if (
       busy ||
@@ -174,6 +239,30 @@ export default function PriceAgent({
     result?.stores
       .map((s) => reviewedTotal(s, choices[s.id] ?? {}))
       .filter((n): n is number => n !== null) ?? [];
+  const completeTrips =
+    result?.stores.flatMap((store) => {
+      if (store.lines.length !== items.length) return [];
+      const groceryCents = reviewedTotal(store, choices[store.id] ?? {});
+      const route = driving[store.id];
+      const fuelCents = route
+        ? fuelCostCents(route.miles, mpg, gasPrice)
+        : null;
+      return groceryCents !== null && fuelCents !== null
+        ? [
+            {
+              id: store.id,
+              name: store.name,
+              groceryCents,
+              fuelCents,
+              totalCents: groceryCents + fuelCents,
+              ...route,
+            },
+          ]
+        : [];
+    }) ?? [];
+  const cheapestTrip = completeTrips.length
+    ? Math.min(...completeTrips.map((trip) => trip.totalCents))
+    : null;
   return (
     <section
       className="live-sources search-workspace"
@@ -351,6 +440,45 @@ export default function PriceAgent({
             Checked {new Date(result.checkedAt).toLocaleString()}. Prices can
             change at checkout.
           </p>
+          <div
+            className="live-card"
+            aria-label="Verified grocery trip comparison"
+          >
+            <h3>Complete trips · groceries + driving</h3>
+            <p>
+              Choose a priced package for every food below. A trip appears here
+              only when that exact branch has a complete priced basket and a
+              driving route.
+            </p>
+            {gasStop && (
+              <p>Route includes {gasStop.name} after the grocery stop.</p>
+            )}
+            <p className="small">
+              Fuel: {mpg} MPG · ${gasPrice.toFixed(2)}/gal (
+              {gasPriceReported ? "reported station price" : "entered estimate"}
+              ). Tax and stock are not verified.
+            </p>
+            {routeBusy && <p>Calculating driving routes…</p>}
+            {!routeBusy && !completeTrips.length && (
+              <p>No complete branch-priced trip can be ranked yet.</p>
+            )}
+            {completeTrips
+              .sort((a, b) => a.totalCents - b.totalCents)
+              .map((trip) => (
+                <p key={trip.id}>
+                  <strong>
+                    {trip.name}
+                    {trip.totalCents === cheapestTrip
+                      ? " · lowest complete trip"
+                      : ""}
+                  </strong>{" "}
+                  · groceries ${(trip.groceryCents / 100).toFixed(2)} + driving
+                  ${(trip.fuelCents / 100).toFixed(2)} ={" "}
+                  <strong>${(trip.totalCents / 100).toFixed(2)}</strong> ·{" "}
+                  {trip.miles.toFixed(1)} mi, {trip.minutes} min
+                </p>
+              ))}
+          </div>
           {!!result.publicCatalogs?.length && (
             <button type="button" disabled={busy} onClick={refreshProvider}>
               {busy ? "Checking progress…" : "Refresh background prices"}
@@ -441,6 +569,10 @@ export default function PriceAgent({
                             {p.regularCents
                               ? `$${(p.regularCents / 100).toFixed(2)}`
                               : "Price unknown"}{" "}
+                            {p.regularCents &&
+                            normalizedUnitPrice(p.regularCents, p.size)
+                              ? `· $${(normalizedUnitPrice(p.regularCents, p.size)!.displayCents / 100).toFixed(2)}/${normalizedUnitPrice(p.regularCents, p.size)!.displayUnit} `
+                              : ""}
                             · {p.soldBy}
                           </option>
                         ))}

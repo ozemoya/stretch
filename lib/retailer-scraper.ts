@@ -10,6 +10,7 @@ import {
   freshMarketSpecials,
 } from "./fresh-market-specials";
 import { mergeCatalogReports } from "./merge-catalog-reports";
+import { robotsAllows } from "./robots-rules";
 
 export type ScrapedProduct = {
   id: string;
@@ -100,6 +101,7 @@ let windowStart = 0,
   dayStart = 0,
   dayCount = 0;
 let robotsUntil = 0;
+let robotsText = "";
 async function publicHtml(path: string, maxBytes = 6_000_000) {
   const now = Date.now();
   if (now - windowStart >= 60_000) {
@@ -153,25 +155,13 @@ async function searchLidl(term: string): Promise<ScrapedProduct[]> {
   if (existing) return existing;
   const task = (async () => {
     if (robotsUntil < Date.now()) {
-      const robots = await publicHtml("/robots.txt", 100_000);
-      // Fail closed if the site's generic rules change; no anti-bot or login bypass.
-      const generic = robots.match(
-        /User-agent:\s*\*\s*([\s\S]*?)(?=User-agent:|$)/i,
-      )?.[1];
-      if (
-        !generic ||
-        generic
-          .split(/\n/)
-          .some(
-            (l) =>
-              /^\s*Disallow:/i.test(l) &&
-              l.split(":").slice(1).join(":").trim() !== "",
-          )
-      )
-        throw new Error("Retailer crawling rules need review before scraping.");
+      robotsText = await publicHtml("/robots.txt", 100_000);
       robotsUntil = Date.now() + 600_000;
     }
-    const html = await publicHtml(`/q/search?q=${encodeURIComponent(key)}`);
+    const path = `/q/search?q=${encodeURIComponent(key)}`;
+    if (!robotsAllows(robotsText, `https://www.lidl.com${path}`))
+      throw new Error("Retailer crawling rules disallow this search path.");
+    const html = await publicHtml(path);
     if (!html.includes("data-grid-data"))
       throw new Error("Retailer did not return readable product tiles.");
     const products = parseLidlProducts(html, key, new Date().toISOString());

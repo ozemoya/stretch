@@ -789,6 +789,10 @@ export default function Stretch({
             </button>
             <PriceAgent
               autoStart
+              gasStop={gasStop}
+              gasPrice={prefs.gas}
+              gasPriceReported={!!fuelSource}
+              mpg={prefs.mpg}
               key={JSON.stringify([checkoutRun, checkoutBasket, prefs.area])}
               zip={searchOrigin?.zip ?? centers[prefs.area].zip}
               area={prefs.area}

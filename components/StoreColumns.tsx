@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { foodAlternatives } from "@/lib/food-alternatives";
-import { packageMatches } from "@/lib/package-match";
+import { normalizedUnitPrice, packageMatches } from "@/lib/package-match";
 import type { AgentItem } from "@/lib/price-agent";
 import type { ScrapeReport, ScrapedProduct } from "@/lib/retailer-scraper";
 
@@ -117,6 +117,20 @@ export default function StoreColumns({
                       ${(product.priceCents / 100).toFixed(2)}
                       <small> / package</small>
                     </strong>
+                    {normalizedUnitPrice(product.priceCents, product.size) && (
+                      <p className="comparison-size">
+                        $
+                        {(
+                          normalizedUnitPrice(product.priceCents, product.size)!
+                            .displayCents / 100
+                        ).toFixed(2)}{" "}
+                        /{" "}
+                        {
+                          normalizedUnitPrice(product.priceCents, product.size)!
+                            .displayUnit
+                        }
+                      </p>
+                    )}
                     <p className="small">
                       Recorded {new Date(product.retrievedAt).toLocaleString()}
                     </p>

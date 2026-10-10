@@ -71,7 +71,12 @@ export async function compareBasket(
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([
-      scrapeRetailers(coverage, p.items, mapped.places, agentPlan),
+      scrapeRetailers(coverage, p.items, mapped.places, agentPlan).then(
+        (reports) => {
+          for (const report of reports) onReport?.(report);
+          return reports;
+        },
+      ),
       providerReports(
         [...new Set(coverage.map((c) => c.retailer))],
         p.items,
@@ -147,7 +152,7 @@ export async function compareBasket(
           )!;
           row.status = store.lines.every((l) => l.error) ? "failed" : "checked";
           row.detail =
-            "Kroger API search (up to ten items, two matched branches). Remaining items are unpriced; stock is not verified.";
+            "Kroger API search (up to ten items, two matched branches, at most three 20-product pages per item). More catalog results may exist; remaining items and stock are unverified.";
           checkedStores.push({
             ...store,
             id: row.id,

@@ -62,6 +62,8 @@ it.runIf(process.env.STRETCH_LIVE_SMOKE === "1")(
           name: "Lidl",
           address: "",
           miles: 1,
+          lat: 33.75,
+          lon: -84.39,
           mapUrl: "",
           status: "unavailable",
           detail: "",

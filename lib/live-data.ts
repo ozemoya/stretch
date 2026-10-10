@@ -452,17 +452,32 @@ export function normalizeKrogerProducts(
     })),
   );
 }
+export async function collectKrogerPages<T>(
+  fetchPage: (start: number, limit: number) => Promise<T[]>,
+  limit = 20,
+  maxPages = 3,
+) {
+  const rows: T[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const chunk = await fetchPage(page * limit, limit);
+    rows.push(...chunk);
+    if (chunk.length < limit) break;
+  }
+  return rows;
+}
 export function krogerProducts(locationId: string, term: string) {
   return cached(
     `kroger:products:${locationId}:${term.toLowerCase()}`,
     5 * 60000,
-    async () =>
-      normalizeKrogerProducts(
-        await krogerGet(
-          `products?${new URLSearchParams({ "filter.locationId": locationId, "filter.term": term, "filter.limit": "10" })}`,
-        ),
-        locationId,
-      ),
+    async () => {
+      const pages = await collectKrogerPages(async (start, limit) => {
+        const raw = await krogerGet(
+          `products?${new URLSearchParams({ "filter.locationId": locationId, "filter.term": term, "filter.limit": String(limit), "filter.start": String(start) })}`,
+        );
+        return productSchema.parse(raw).data;
+      });
+      return normalizeKrogerProducts({ data: pages }, locationId);
+    },
   );
 }
 export function instacartRetailers(zip: string) {
