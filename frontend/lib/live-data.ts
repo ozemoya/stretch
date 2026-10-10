@@ -68,7 +68,9 @@ async function checkedFetch(url: string, init: RequestInit = {}) {
   });
   const response = await fetch(url, {
     ...init,
-    signal: AbortSignal.timeout(20000),
+    signal: init.signal
+      ? AbortSignal.any([init.signal, AbortSignal.timeout(20000)])
+      : AbortSignal.timeout(20000),
   });
   if (!response.ok)
     throw new ProviderError(
@@ -364,10 +366,11 @@ async function krogerToken() {
   });
   return tokenRequest;
 }
-async function krogerGet(path: string) {
+async function krogerGet(path: string, signal?: AbortSignal) {
   const auth = await krogerToken();
   const response = await checkedFetch(`https://api.kroger.com/v1/${path}`, {
     headers: { Authorization: `Bearer ${auth}` },
+    signal,
   });
   return response.json();
 }
@@ -449,20 +452,47 @@ export function normalizeKrogerProducts(
           ? Math.round(i.price.promo * 100)
           : null,
       retrievedAt: now.toISOString(),
+      retailerId: "Kroger family",
+      storeLocationId: locationId,
+      productName: p.description,
+      price: i.price && i.price.regular > 0 ? i.price.regular : null,
+      priceSource: "Kroger Products API",
+      verifiedAt: now.toISOString(),
+      productUrl: null,
     })),
   );
 }
-export function krogerProducts(locationId: string, term: string) {
+export async function collectKrogerPages<T>(
+  fetchPage: (start: number, limit: number) => Promise<T[]>,
+  limit = 20,
+  maxPages = 3,
+) {
+  const rows: T[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const chunk = await fetchPage(page * limit, limit);
+    rows.push(...chunk);
+    if (chunk.length < limit) break;
+  }
+  return rows;
+}
+export function krogerProducts(
+  locationId: string,
+  term: string,
+  signal?: AbortSignal,
+) {
   return cached(
     `kroger:products:${locationId}:${term.toLowerCase()}`,
     5 * 60000,
-    async () =>
-      normalizeKrogerProducts(
-        await krogerGet(
-          `products?${new URLSearchParams({ "filter.locationId": locationId, "filter.term": term, "filter.limit": "10" })}`,
-        ),
-        locationId,
-      ),
+    async () => {
+      const pages = await collectKrogerPages(async (start, limit) => {
+        const raw = await krogerGet(
+          `products?${new URLSearchParams({ "filter.locationId": locationId, "filter.term": term, "filter.limit": String(limit), "filter.start": String(start) })}`,
+          signal,
+        );
+        return productSchema.parse(raw).data;
+      });
+      return normalizeKrogerProducts({ data: pages }, locationId);
+    },
   );
 }
 export function instacartRetailers(zip: string) {
@@ -507,6 +537,8 @@ export type StationPrice = {
   id: string;
   name: string;
   address: string;
+  lat: number;
+  lon: number;
   miles: number;
   mapUrl: string;
   dollarsPerGallon: number | null;
@@ -614,6 +646,8 @@ export function normalizeLocalFuel(
           id: p.id,
           name: p.displayName.text,
           address: p.formattedAddress ?? "Address not supplied",
+          lat: p.location.latitude,
+          lon: p.location.longitude,
           mapUrl: p.googleMapsUri,
           miles: Math.round(miles * 10) / 10,
           dollarsPerGallon:

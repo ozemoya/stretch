@@ -80,4 +80,21 @@ describe("trip optimization", () => {
     for (const t of one)
       expect(three.find((x) => x.id === t.id)!.foodCents).toBe(t.foodCents * 3);
   });
+  it("uses measured station detour miles and the selected pump price in the total", () => {
+    const routes = { "market-a": { miles: 12, minutes: 25 } };
+    const [trip] = optimize(
+      sample,
+      [{ productId: "rice", quantity: 1 }],
+      { ...p, maxStops: 1, gas: 3.25 },
+      routes,
+      true,
+    );
+    expect(trip.id).toBe("market-a");
+    expect(trip.miles).toBe(12);
+    expect(trip.fuelCents).toBe(Math.round((12 / p.mpg) * 3.25 * 100));
+    expect(trip.totalCents).toBe(trip.foodCents + trip.fuelCents);
+    expect(
+      optimize(sample, [{ productId: "rice", quantity: 1 }], p, {}, true),
+    ).toEqual([]);
+  });
 });

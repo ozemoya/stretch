@@ -40,6 +40,8 @@ describe("local station prices", () => {
     expect(r.stations[0].id).toBe("b");
     expect(r.stations[1]).toMatchObject({
       dollarsPerGallon: 3.459,
+      lat: 33.749,
+      lon: -84.388,
       updatedAt: "2026-10-09T11:00:00Z",
       stale: false,
     });

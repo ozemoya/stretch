@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -9,7 +8,7 @@ export async function POST(request: NextRequest) {
     if (
       !Array.isArray(points) ||
       points.length < 2 ||
-      points.length > 4 ||
+      points.length > 5 ||
       !points.every(
         (p) =>
           typeof p.lat === "number" &&
@@ -19,22 +18,18 @@ export async function POST(request: NextRequest) {
           p.lat >= -90 &&
           p.lat <= 90 &&
           p.lon >= -180 &&
-          p.lon <= 180
+          p.lon <= 180,
       )
     ) {
       return NextResponse.json(
         { error: "Invalid route coordinates" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const coordinates = points
-      .map((p) => `${p.lon},${p.lat}`)
-      .join(";");
+    const coordinates = points.map((p) => `${p.lon},${p.lat}`).join(";");
 
-    const base =
-      process.env.OSRM_BASE_URL ||
-      "https://router.project-osrm.org";
+    const base = process.env.OSRM_BASE_URL || "https://router.project-osrm.org";
 
     const url =
       `${base}/route/v1/driving/${coordinates}` +
@@ -58,16 +53,14 @@ export async function POST(request: NextRequest) {
     const route = data.routes[0];
 
     return NextResponse.json({
-      miles: Number(
-        (route.distance / 1609.344).toFixed(2)
-      ),
+      miles: Number((route.distance / 1609.344).toFixed(2)),
       minutes: Math.round(route.duration / 60),
       geometry: route.geometry,
     });
   } catch {
     return NextResponse.json(
       { error: "Unable to calculate route" },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }

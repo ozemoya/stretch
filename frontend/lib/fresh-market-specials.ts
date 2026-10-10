@@ -3,6 +3,68 @@ import { z } from "zod";
 import type { NearbyPlace } from "./live-data";
 import type { AgentItem } from "./price-agent";
 import type { ScrapeReport, ScrapedProduct } from "./retailer-scraper";
+import observations from "./fresh-market-observations.json";
+
+const normalizeAddress = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/\broad\b/g, "rd")
+    .replace(/[.,]/g, "")
+    .replace(/\b(?:ne|nw|se|sw)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export function freshMarketObservedReport(
+  places: NearbyPlace[],
+  items: AgentItem[],
+  now = new Date(),
+): ScrapeReport {
+  const nearby = places.filter(
+    (place) =>
+      place.kind === "grocery" &&
+      /fresh market/i.test(`${place.brand ?? ""} ${place.name}`),
+  );
+  const lines = items.map((item) => ({
+    item,
+    products:
+      item.name.trim().toLowerCase() === "milk"
+        ? observations
+            .filter(
+              (observation) =>
+                nearby.some((place) =>
+                  normalizeAddress(place.address).startsWith(
+                    normalizeAddress(observation.storeAddress),
+                  ),
+                ) &&
+                now.getTime() >= Date.parse(observation.retrievedAt) &&
+                now.getTime() - Date.parse(observation.retrievedAt) <
+                  86_400_000,
+            )
+            .map((observation) => ({
+              id: observation.id,
+              name: observation.name,
+              brand: observation.brand,
+              size: observation.size,
+              priceCents: observation.priceCents,
+              sourceUrl: observation.sourceUrl,
+              imageUrl: observation.imageUrl,
+              retrievedAt: observation.retrievedAt,
+              verification: "official-page-observation" as const,
+              ...(item.unit.toLowerCase() !== observation.size.toLowerCase()
+                ? { matchKind: "alternative" as const }
+                : {}),
+            }))
+        : [],
+  }));
+  return {
+    retailer: "The Fresh Market",
+    status: lines.some((line) => line.products.length) ? "retrieved" : "failed",
+    detail:
+      "In-Store website prices observed for 2099 Peachtree Road NE; observations expire after 24 hours. The displayed package, branch, availability and checkout price must be confirmed before buying. Weekly specials are checked separately.",
+    lines,
+  };
+}
+
 const branch = z.object({
   storeNumber: z.number().int().positive(),
   address: z.string(),
@@ -128,13 +190,15 @@ let lastAttempt = 0;
 export async function freshMarketSpecials(
   places: NearbyPlace[],
   items: AgentItem[],
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted();
   if (!cached || cached.expires <= Date.now()) {
     if (Date.now() - lastAttempt < 60000)
       throw new Error("Weekly offer source unavailable; retry in a minute.");
     lastAttempt = Date.now();
     const robots = await fetch("https://www.thefreshmarket.com/robots.txt", {
-      signal: AbortSignal.timeout(10000),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000),
       redirect: "error",
     });
     if (!robots.ok) throw new Error("Weekly offer crawling rules unavailable.");
@@ -148,7 +212,7 @@ export async function freshMarketSpecials(
     const r = await fetch(
       "https://www.thefreshmarket.com/features/weekly-features",
       {
-        signal: AbortSignal.timeout(15000),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
         redirect: "error",
         cache: "no-store",
         headers: {

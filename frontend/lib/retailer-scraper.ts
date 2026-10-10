@@ -1,10 +1,17 @@
 import { traderJoesReport } from "./trader-joes";
+import type { SearchPlan } from "./local-search-agent";
 import { load } from "cheerio";
 import { z } from "zod";
 import type { AgentItem } from "./price-agent";
 import type { StoreCoverage } from "./retailer-coverage";
 import type { NearbyPlace } from "./live-data";
-import { freshMarketSpecials } from "./fresh-market-specials";
+import {
+  freshMarketObservedReport,
+  freshMarketSpecials,
+} from "./fresh-market-specials";
+import { mergeCatalogReports } from "./merge-catalog-reports";
+import { robotsAllows } from "./robots-rules";
+import type { SearchStatus } from "./search-state";
 
 export type ScrapedProduct = {
   id: string;
@@ -17,12 +24,25 @@ export type ScrapedProduct = {
   matchKind?: "alternative";
   verification?: "official-page-observation";
   retrievedAt: string;
+  retailerId?: string;
+  storeLocationId?: string | null;
+  productId?: string;
+  productName?: string;
+  price?: number;
+  priceSource?: string;
+  verifiedAt?: string;
+  productUrl?: string;
 };
 export type ScrapeReport = {
   retailer: string;
   status: "retrieved" | "pending" | "failed" | "unsupported" | "blocked";
   detail: string;
-  lines: { item: AgentItem; products: ScrapedProduct[]; error?: string }[];
+  lines: {
+    item: AgentItem;
+    products: ScrapedProduct[];
+    error?: string;
+    searchStatus?: SearchStatus;
+  }[];
 };
 const product = z.object({
   productId: z.union([z.number(), z.string()]),
@@ -95,7 +115,14 @@ let windowStart = 0,
   dayStart = 0,
   dayCount = 0;
 let robotsUntil = 0;
-async function publicHtml(path: string, maxBytes = 6_000_000) {
+let robotsText = "";
+let robotsPending: Promise<void> | null = null;
+async function publicHtml(
+  path: string,
+  maxBytes = 6_000_000,
+  signal?: AbortSignal,
+) {
+  signal?.throwIfAborted();
   const now = Date.now();
   if (now - windowStart >= 60_000) {
     windowStart = now;
@@ -114,7 +141,9 @@ async function publicHtml(path: string, maxBytes = 6_000_000) {
       "User-Agent": "Stretch/1.0 (+https://github.com/ozemoya/stretch)",
       Accept: "text/html,text/plain",
     },
-    signal: AbortSignal.timeout(15000),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+      : AbortSignal.timeout(15000),
     redirect: "error",
     cache: "no-store",
   });
@@ -140,7 +169,10 @@ async function publicHtml(path: string, maxBytes = 6_000_000) {
     await reader.cancel().catch(() => undefined);
   }
 }
-async function searchLidl(term: string): Promise<ScrapedProduct[]> {
+async function searchLidl(
+  term: string,
+  signal?: AbortSignal,
+): Promise<ScrapedProduct[]> {
   const key = term.toLowerCase().trim();
   const cached = cache.get(key);
   if (cached && cached.expires > Date.now()) return cached.products;
@@ -148,25 +180,18 @@ async function searchLidl(term: string): Promise<ScrapedProduct[]> {
   if (existing) return existing;
   const task = (async () => {
     if (robotsUntil < Date.now()) {
-      const robots = await publicHtml("/robots.txt", 100_000);
-      // Fail closed if the site's generic rules change; no anti-bot or login bypass.
-      const generic = robots.match(
-        /User-agent:\s*\*\s*([\s\S]*?)(?=User-agent:|$)/i,
-      )?.[1];
-      if (
-        !generic ||
-        generic
-          .split(/\n/)
-          .some(
-            (l) =>
-              /^\s*Disallow:/i.test(l) &&
-              l.split(":").slice(1).join(":").trim() !== "",
-          )
-      )
-        throw new Error("Retailer crawling rules need review before scraping.");
-      robotsUntil = Date.now() + 600_000;
+      robotsPending ??= publicHtml("/robots.txt", 100_000, signal)
+        .then((text) => {
+          robotsText = text;
+          robotsUntil = Date.now() + 600_000;
+        })
+        .finally(() => { robotsPending = null; });
+      await robotsPending;
     }
-    const html = await publicHtml(`/q/search?q=${encodeURIComponent(key)}`);
+    const path = `/q/search?q=${encodeURIComponent(key)}`;
+    if (!robotsAllows(robotsText, `https://www.lidl.com${path}`))
+      throw new Error("Retailer crawling rules disallow this search path.");
+    const html = await publicHtml(path, 6_000_000, signal);
     if (!html.includes("data-grid-data"))
       throw new Error("Retailer did not return readable product tiles.");
     const products = parseLidlProducts(html, key, new Date().toISOString());
@@ -185,26 +210,40 @@ export async function scrapeRetailers(
   stores: StoreCoverage[],
   items: AgentItem[],
   places: NearbyPlace[] = [],
+  plan?: SearchPlan,
+  signal?: AbortSignal,
+  onReport?: (report: ScrapeReport) => void,
 ): Promise<ScrapeReport[]> {
   const reports: ScrapeReport[] = [];
+  const emit = (report: ScrapeReport) => {
+    reports.push(report);
+    onReport?.(report);
+  };
   for (const retailer of new Set(stores.map((s) => s.retailer))) {
-    if (retailer === "Trader Joe’s") { reports.push(await traderJoesReport(items)); continue; }
+    signal?.throwIfAborted();
+    if (retailer === "Trader Joe’s") {
+      emit(await traderJoesReport(items, plan, signal));
+      continue;
+    }
     if (retailer === "The Fresh Market") {
+      const observed = freshMarketObservedReport(places, items);
       try {
-        reports.push(await freshMarketSpecials(places, items));
+        emit(
+          mergeCatalogReports(
+            observed,
+            await freshMarketSpecials(places, items, signal),
+          ),
+        );
       } catch {
-        reports.push({
-          retailer,
-          status: "failed",
-          detail:
-            "Weekly offer source could not be retrieved. Prices remain unknown.",
-          lines: [],
+        emit({
+          ...observed,
+          detail: `${observed.detail} Weekly offer source could not be retrieved.`,
         });
       }
       continue;
     }
     if (retailer !== "Lidl") {
-      reports.push({
+      emit({
         retailer,
         status: ["ALDI", "Sprouts", "Walmart", "Trader Joe’s"].includes(
           retailer,
@@ -227,27 +266,25 @@ export async function scrapeRetailers(
       });
       continue;
     }
-    const lines: ScrapeReport["lines"] = [];
-    for (const [index, item] of items.entries()) {
-      if (index >= 12) {
-        lines.push({
-          item,
-          products: [],
-          error: "Not searched: twelve-item public catalog limit per run.",
-        });
-        continue;
+    const lines: ScrapeReport["lines"] = new Array(items.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(3, items.length) }, async () => {
+      while (next < items.length) {
+        const index = next++;
+        const item = items[index];
+        signal?.throwIfAborted();
+        if (index >= 12) {
+          lines[index] = { item, products: [], error: "Not searched: twelve-item public catalog limit per run." };
+          continue;
+        }
+        try {
+          lines[index] = { item, products: await searchLidl(item.name, signal) };
+        } catch (e) {
+          lines[index] = { item, products: [], error: e instanceof Error ? e.message : "Public price search failed." };
+        }
       }
-      try {
-        lines.push({ item, products: await searchLidl(item.name) });
-      } catch (e) {
-        lines.push({
-          item,
-          products: [],
-          error: e instanceof Error ? e.message : "Public price search failed.",
-        });
-      }
-    }
-    reports.push({
+    }));
+    emit({
       retailer,
       status: lines.some((l) => l.products.length) ? "retrieved" : "failed",
       detail:

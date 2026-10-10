@@ -4,6 +4,8 @@ export type StoreCoverage = {
   name: string;
   address: string;
   miles: number;
+  lat: number;
+  lon: number;
   mapUrl: string;
   retailer: string;
   status: "unavailable" | "checked" | "failed";
@@ -43,6 +45,8 @@ export function groceryCoverage(places: NearbyPlace[]): StoreCoverage[] {
       name: p.name,
       address: p.address,
       miles: p.miles,
+      lat: p.lat,
+      lon: p.lon,
       mapUrl: p.mapUrl,
       retailer: retailerName(p),
       status: "unavailable",

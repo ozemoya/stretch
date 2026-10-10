@@ -1,22 +1,18 @@
-
 import type { Catalog, Preferences } from "./types";
-import type {
-  RouteMeasurements,
-} from "./optimizer";
+import type { RouteMeasurements } from "./optimizer";
 import {
   sampleStoreLocations,
   sampleStartingLocations,
   type Coordinates,
 } from "./storeLocations";
+import type { GasStop } from "./gas-stop";
 
 type RouteResponse = {
   miles: number;
   minutes: number;
 };
 
-async function requestRoute(
-  points: Coordinates[],
-): Promise<RouteResponse> {
+async function requestRoute(points: Coordinates[]): Promise<RouteResponse> {
   const response = await fetch("/api/routes", {
     method: "POST",
     headers: {
@@ -26,9 +22,7 @@ async function requestRoute(
   });
 
   if (!response.ok) {
-    throw new Error(
-      `Routing failed: ${response.status}`,
-    );
+    throw new Error(`Routing failed: ${response.status}`);
   }
 
   const result: RouteResponse = await response.json();
@@ -48,8 +42,13 @@ async function requestRoute(
 export async function getRouteMeasurements(
   catalog: Catalog,
   area: Preferences["area"],
+  gasStop?: GasStop | null,
+  origin?: Coordinates | null,
 ): Promise<RouteMeasurements> {
-  const home = sampleStartingLocations[area];
+  const home = gasStop
+    ? (origin ?? sampleStartingLocations[area])
+    : sampleStartingLocations[area];
+  const fuelPoint = gasStop ? { lat: gasStop.lat, lon: gasStop.lon } : null;
 
   if (!home) {
     throw new Error("Unknown starting area");
@@ -69,6 +68,7 @@ export async function getRouteMeasurements(
       routes[key] = await requestRoute([
         home,
         location,
+        ...(fuelPoint ? [fuelPoint] : []),
         home,
       ]);
     } catch (error) {
@@ -82,10 +82,8 @@ export async function getRouteMeasurements(
       const first = stores[i];
       const second = stores[j];
 
-      const firstLocation =
-        sampleStoreLocations[first.id];
-      const secondLocation =
-        sampleStoreLocations[second.id];
+      const firstLocation = sampleStoreLocations[first.id];
+      const secondLocation = sampleStoreLocations[second.id];
 
       if (!firstLocation || !secondLocation) {
         continue;
@@ -98,6 +96,7 @@ export async function getRouteMeasurements(
             home,
             firstLocation,
             secondLocation,
+            ...(fuelPoint ? [fuelPoint] : []),
             home,
           ],
         },
@@ -107,6 +106,7 @@ export async function getRouteMeasurements(
             home,
             secondLocation,
             firstLocation,
+            ...(fuelPoint ? [fuelPoint] : []),
             home,
           ],
         },
@@ -114,13 +114,9 @@ export async function getRouteMeasurements(
 
       for (const route of orders) {
         try {
-          routes[route.key] =
-            await requestRoute(route.points);
+          routes[route.key] = await requestRoute(route.points);
         } catch (error) {
-          console.warn(
-            `Route failed: ${route.key}`,
-            error,
-          );
+          console.warn(`Route failed: ${route.key}`, error);
         }
       }
     }

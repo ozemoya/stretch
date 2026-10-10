@@ -8,15 +8,21 @@ export default function OpenMap({
   radius,
   places,
   origin,
+  onSelectFuel,
+  selectedFuelId,
 }: {
   area: Area;
   radius: number;
   places: NearbyPlace[];
   origin?: SearchOrigin | null;
+  onSelectFuel?: (place: NearbyPlace) => void;
+  selectedFuelId?: string | null;
 }) {
   const container = useRef<HTMLDivElement>(null),
     map = useRef<LeafletMap | null>(null);
   const [error, setError] = useState("");
+  const selectFuel = useRef(onSelectFuel);
+  selectFuel.current = onSelectFuel;
   useEffect(() => {
     let cancelled = false;
     let observer: ResizeObserver | undefined;
@@ -76,12 +82,27 @@ export default function OpenMap({
           link.rel = "noreferrer";
           link.textContent = "View on OpenStreetMap ↗";
           popup.append(name, text, link);
+          if (place.kind === "fuel" && selectFuel.current) {
+            const select = document.createElement("button");
+            select.type = "button";
+            select.textContent =
+              selectedFuelId === place.id
+                ? "Selected gas stop ✓"
+                : "Add gas stop to trip";
+            select.addEventListener("click", () => selectFuel.current?.(place));
+            popup.append(select);
+          }
           L.circleMarker([place.lat, place.lon], {
-            radius: 7,
-            color: place.kind === "fuel" ? "#c7563e" : "#647426",
+            radius: selectedFuelId === place.id ? 10 : 7,
+            color:
+              selectedFuelId === place.id
+                ? "#382b22"
+                : place.kind === "fuel"
+                  ? "#c7563e"
+                  : "#647426",
             fillColor: place.kind === "fuel" ? "#c7563e" : "#647426",
             fillOpacity: 0.85,
-            weight: 2,
+            weight: selectedFuelId === place.id ? 4 : 2,
           })
             .bindPopup(popup)
             .addTo(instance);
@@ -100,7 +121,7 @@ export default function OpenMap({
       map.current?.remove();
       map.current = null;
     };
-  }, [area, radius, places, origin]);
+  }, [area, radius, places, origin, selectedFuelId]);
   return (
     <>
       <div

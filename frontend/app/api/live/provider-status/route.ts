@@ -1,14 +1,59 @@
 import { z } from "zod";
-import { providerReports } from "@/lib/provider-prices";
+import { providerReports } from "../../../../lib/provider-prices";
+import { normalizeCatalogReport } from "../../../../lib/product-ownership";
+import { deadlineStream, untilAborted } from "../../../../lib/deadline-stream";
+import { SEARCH_WINDOW_MS } from "../../../../lib/search-timing";
+import { settlePendingReports } from "../../../../lib/search-state";
+import type { ScrapeReport } from "../../../../lib/retailer-scraper";
 const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   start: z.boolean().default(false),
+  broaden: z.boolean().default(false),
+  stream: z.boolean().default(false),
   retailers: z.array(z.string().max(80)).max(20),
-  items: z.array(z.object({id:z.string().min(1).max(80),name:z.string().min(2).max(60),unit:z.string().max(80),quantity:z.number().int().min(1).max(20)})).min(1).max(30),
+  items: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(80),
+        name: z.string().min(2).max(60),
+        unit: z.string().max(80),
+        quantity: z.number().int().min(1).max(20),
+      }),
+    )
+    .min(1)
+    .max(30),
 });
 export async function POST(request: Request) {
   const parsed = input.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({error:"Invalid price status request."},{status:400});
+  if (!parsed.success)
+    return Response.json(
+      { error: "Invalid price status request." },
+      { status: 400 },
+    );
   const p = parsed.data;
-  return Response.json({reports:await providerReports(p.retailers,p.items,p.zip,p.start)},{headers:{"Cache-Control":"no-store"}});
+  if (p.stream) {
+    const reports = new Map<string, ScrapeReport>();
+    return deadlineStream(request.signal, async (send, signal) => {
+      const emit = (raw: ScrapeReport) => {
+        if (signal.aborted) return;
+        const report = normalizeCatalogReport(raw, p.items);
+        reports.set(report.retailer, report);
+        send({ type: "report", report });
+      };
+      const completed = await providerReports(p.retailers, p.items, p.zip, p.start, false,
+        emit, undefined, p.broaden, signal, { fast: true });
+      for (const report of completed) emit(report);
+    }, (reason, elapsedMs) => [{ type: "complete", elapsedMs, timedOut: reason === "timeout",
+      reports: settlePendingReports([...reports.values()], "timeout") }]);
+  }
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(SEARCH_WINDOW_MS)]);
+  const reports = await untilAborted(providerReports(p.retailers, p.items, p.zip,
+    p.start, false, undefined, undefined, p.broaden, signal, { fast: true }), signal).catch(() => undefined);
+  return Response.json(
+    {
+      reports: settlePendingReports((reports ?? []).map((report) => normalizeCatalogReport(report, p.items)), "timeout"),
+      timedOut: signal.aborted,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

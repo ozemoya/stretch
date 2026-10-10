@@ -12,6 +12,9 @@ import { groceryFeed } from "@/lib/grocery-feed";
 import { scrapeRetailers } from "@/lib/retailer-scraper";
 import type { ScrapeReport } from "@/lib/retailer-scraper";
 import { providerReports } from "@/lib/provider-prices";
+import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
+import type { SearchPlan } from "@/lib/local-search-agent";
+import { normalizeCatalogReport } from "@/lib/product-ownership";
 export const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   area: z.enum(["downtown", "midtown", "decatur"]).default("downtown"),
@@ -39,13 +42,12 @@ export const input = z.object({
     .min(1)
     .max(30),
 });
-let running = false;
-export async function compareBasket(request: Request, onReport?: (report: ScrapeReport) => void) {
-  if (running)
-    return Response.json(
-      { error: "A price check is already running. Please try again shortly." },
-      { status: 429 },
-    );
+export async function compareBasket(
+  request: Request,
+  onReport?: (report: ScrapeReport) => void,
+  agentPlan?: SearchPlan,
+  options: { deferProvider?: boolean; deferPublic?: boolean; deferPlan?: boolean } = {},
+) {
   const parsed = input.safeParse(await request.json().catch(() => null));
   if (
     !parsed.success ||
@@ -59,19 +61,52 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
       },
       { status: 400 },
     );
-  running = true;
   try {
+    request.signal.throwIfAborted();
     const p = parsed.data;
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
+    request.signal.throwIfAborted();
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([
-      scrapeRetailers(coverage, p.items, mapped.places),
-      providerReports([...new Set(coverage.map(c => c.retailer))], p.items, p.zip, true, false, onReport),
+      options.deferPublic
+        ? Promise.resolve([] as ScrapeReport[])
+        : scrapeRetailers(
+        coverage,
+        p.items,
+        mapped.places,
+        agentPlan,
+        request.signal,
+        (report) => onReport?.(normalizeCatalogReport(report, p.items)),
+      ),
+      options.deferProvider
+        ? Promise.resolve([] as ScrapeReport[])
+        : providerReports(
+            [...new Set(coverage.map((c) => c.retailer))],
+            p.items,
+            p.zip,
+            true,
+            false,
+            onReport,
+            agentPlan,
+            false,
+            request.signal,
+          ),
     ]);
-    for (const report of providerCatalogs) {
-      const index = publicCatalogs.findIndex(r => r.retailer === report.retailer);
-      if (index >= 0) publicCatalogs[index] = report; else publicCatalogs.push(report);
+    for (const rawReport of providerCatalogs) {
+      const report = normalizeCatalogReport(rawReport, p.items);
+      const index = publicCatalogs.findIndex(
+        (r) => r.retailer === report.retailer,
+      );
+      if (index >= 0) {
+        publicCatalogs[index] =
+          report.retailer === "The Fresh Market"
+            ? mergeCatalogReports(publicCatalogs[index], report)
+            : report;
+      } else publicCatalogs.push(report);
     }
+    for (const [index, report] of publicCatalogs.entries())
+      publicCatalogs[index] = normalizeCatalogReport(report, p.items);
+    request.signal.throwIfAborted();
     const checkedStores = [] as Awaited<ReturnType<typeof checkStores>>;
     const warnings: string[] = [];
     try {
@@ -113,12 +148,15 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
                   s.coordinates!.lon,
               ) < 0.001,
           );
-          return row ? [{ ...s, coverageId: row.id }] : [];
+          return row
+            ? [{ ...s, retailerId: "Kroger family", coverageId: row.id }]
+            : [];
         });
         const checked = await checkStores(
           p.items.slice(0, 10),
           matched,
           krogerProducts,
+          request.signal,
         );
         for (const store of checked) {
           const row = coverage.find(
@@ -126,21 +164,35 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
           )!;
           row.status = store.lines.every((l) => l.error) ? "failed" : "checked";
           row.detail =
-            "Kroger API search (up to ten items, two matched branches). Remaining items are unpriced; stock is not verified.";
+            "Kroger API search (up to ten items, two matched branches, at most three 20-product pages per item). More catalog results may exist; remaining items and stock are unverified.";
           checkedStores.push({
             ...store,
             id: row.id,
             lines: [
-              ...store.lines,
+              ...store.lines.map((line) => ({
+                ...line,
+                candidates: line.candidates
+                  .filter(
+                    (candidate) =>
+                      candidate.storeLocationId === store.id &&
+                      candidate.retailerId === row.retailer,
+                  )
+                  .map((candidate) => ({
+                    ...candidate,
+                    storeLocationId: row.id,
+                  })),
+              })),
               ...p.items.slice(10).map((item) => ({
                 item,
                 candidates: [],
-                error: "Not checked in this run due to provider request limits.",
+                error:
+                  "Not checked in this run due to provider request limits.",
               })),
             ],
           });
         }
       } catch {
+        request.signal.throwIfAborted();
         warnings.push(
           "Kroger price search failed. Affected stores remain unpriced.",
         );
@@ -149,7 +201,18 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
     return Response.json(
       {
         stores: checkedStores,
-        agent: { aiConnected: !!process.env.OPENAI_API_KEY, mode: process.env.OPENAI_API_KEY ? "AI source discovery and validated scraping" : process.env.BRIGHT_DATA_SERP_ZONE ? "Live web source search and validated scraping" : "Connected scrapers; AI discovery needs a server API key" },
+        agent: {
+          aiConnected: !!agentPlan,
+          mode: agentPlan
+            ? `${agentPlan.provider === "openai" ? "OpenAI" : "Local AI"} planned product searches using ${agentPlan.model}; prices still come from validated retailer pages.`
+            : options.deferPlan
+              ? "AI is planning product searches while connected prices load."
+            : process.env.BRIGHT_DATA_SERP_ZONE
+              ? "Website search is running; AI planning was unavailable or timed out."
+              : "AI planning and the website search provider are unavailable.",
+        },
+        providerSearchDeferred: options.deferProvider,
+        publicSearchDeferred: options.deferPublic,
         publicCatalogs,
         storeCoverage: coverage,
         warnings,
@@ -161,7 +224,5 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
     );
   } catch (e) {
     return errorResponse(e);
-  } finally {
-    running = false;
   }
 }
