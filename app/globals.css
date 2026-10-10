@@ -930,3 +930,23 @@ footer {
   margin-bottom: 18px;
   max-width: 240px;
 }
+.search-workspace{border:1px solid var(--green);border-radius:24px;padding:clamp(20px,4vw,48px);background:var(--pale)}
+.search-summary,.search-filters{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
+.search-summary span{border:1px solid var(--green);border-radius:999px;padding:8px 14px;font-size:13px}
+.search-controls{display:flex;gap:16px;align-items:end;margin:28px 0 12px}.search-controls label{display:grid;gap:8px;font-size:13px}.result-search{flex:1}.search-controls input,.search-controls select{border-radius:14px;background:var(--cream)}
+.search-filters button{border:1px solid var(--green);border-radius:999px;background:transparent;color:var(--ink);padding:10px 18px}.search-filters button[aria-pressed=true]{background:var(--green);color:var(--cream)}
+.search-progress{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:20px;border-radius:16px;background:var(--sand);margin:20px 0}.search-progress small{flex-basis:100%;padding-left:30px}.search-spinner{width:18px;height:18px;border:2px solid var(--green);border-right-color:transparent;border-radius:50%;animation:search-turn 1s linear infinite}
+.search-workspace .live-card{border-radius:18px;box-shadow:0 6px 0 rgba(56,43,34,.08)}
+@keyframes search-turn{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.search-spinner{animation:none}}@media(max-width:600px){.search-controls{flex-direction:column;align-items:stretch}.search-workspace{padding:20px}}
+.stop-finder{border:1px solid var(--green);border-radius:24px;padding:clamp(18px,3vw,36px);background:var(--pale);width:100%;margin:28px 0}.stop-toolbar{display:flex;gap:20px;align-items:center;flex-wrap:wrap}.stop-toolbar label{display:grid;gap:6px}.next-stop-map .osm-map{height:560px;width:100%;border-radius:18px}.stop-results{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-height:320px;overflow:auto}.stop-results li{display:flex;gap:12px;background:var(--cream);border-radius:12px;padding:16px}.stop-results small{display:block;margin-top:6px}.stop-dot{height:12px;width:12px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:5px}.stop-dot.fuel{background:var(--red)}@media(max-width:650px){.next-stop-map .osm-map{height:420px}.stop-results{grid-template-columns:1fr}}
+
+.store-comparison{display:flex;gap:18px;overflow-x:auto;padding:12px 4px 24px;scroll-snap-type:x proximity;align-items:flex-start}
+.store-column{flex:0 0 280px;scroll-snap-align:start;background:var(--cream,var(--pale));border:1px solid var(--green);border-radius:20px;overflow:hidden}
+.store-column-heading{padding:24px 20px;background:var(--green);color:var(--cream,#faf3dd);min-height:185px}
+.store-column-heading h3{font-size:28px;margin:8px 0}.store-column-heading p{font-size:14px}.comparison-status{font-size:12px}
+.comparison-food{padding:20px;border-bottom:1px dashed var(--green);min-height:420px}.comparison-request{display:flex;justify-content:space-between;margin-bottom:16px;text-transform:capitalize}
+.comparison-photo{height:150px;background:rgba(100,116,38,.08);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;overflow:hidden}.comparison-photo img{height:100%;width:100%;object-fit:contain;padding:12px}.comparison-photo span{font-size:12px;opacity:.65}
+.comparison-product-name{display:block;font-weight:600;min-height:46px}.comparison-size{font-size:14px;margin:8px 0}.comparison-price{font-size:29px;display:block}.comparison-price small{font-size:12px;font-weight:400}.comparison-food .small{font-size:11px}.comparison-missing{height:290px;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:.7}.store-column footer{padding:20px;font-size:12px}.comparison-alternative{padding-top:16px}.comparison-alternative .comparison-photo{height:100px}
+@media(min-width:1100px){.store-column{flex-basis:300px}}@media(max-width:600px){.store-column{flex-basis:82vw}}
+
+.store-column-heading{display:block;height:auto;position:static}.store-column-heading .eyebrow{color:inherit;opacity:.8}.store-column-heading h3{line-height:1.15;overflow-wrap:anywhere}.store-column-heading p{margin:12px 0}.comparison-status{display:inline-block;line-height:1.4;padding:5px 9px;border:1px solid currentColor;border-radius:999px}

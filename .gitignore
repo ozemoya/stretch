@@ -11,3 +11,10 @@ board-images*.jpg
 palette*.png
 
 *.tsbuildinfo
+bright-data-test.json
+bright-data-results.json
+.price-jobs/
+provider-*-record.json
+provider-unified-*.json
+bright-data-scrapers.json
+provider-smoke.json

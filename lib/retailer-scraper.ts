@@ -12,11 +12,12 @@ export type ScrapedProduct = {
   size: string;
   priceCents: number;
   sourceUrl: string;
+  imageUrl?: string;
   retrievedAt: string;
 };
 export type ScrapeReport = {
   retailer: string;
-  status: "retrieved" | "failed" | "unsupported" | "blocked";
+  status: "retrieved" | "pending" | "failed" | "unsupported" | "blocked";
   detail: string;
   lines: { item: AgentItem; products: ScrapedProduct[]; error?: string }[];
 };
