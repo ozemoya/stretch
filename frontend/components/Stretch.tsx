@@ -13,7 +13,6 @@ import type { GasStop } from "@/lib/gas-stop";
 import { readCheckoutDraft, writeCheckoutDraft } from "@/lib/checkout-draft";
 import { createSavedList, readSavedLists, readSavedSettings, writeSavedLists, writeSavedSettings, type SavedList } from "@/lib/saved-plans";
 import SketchIcon, { type SketchIconName } from "./SketchIcon";
-import HomeStory from "./HomeStory";
 const defaults: Preferences = {
   area: "downtown",
   budget: 35,
@@ -96,7 +95,6 @@ function Route() {
 }
 export default function Stretch({
   catalog,
-  source,
   mode = "home",
 }: {
   catalog: Catalog;
@@ -476,7 +474,6 @@ export default function Stretch({
             <Route />
           </section>
         )}
-        {mode === "home" && <HomeStory />}
         {mode === "planner" && (
           <section id="planner" className="planner">
             <div className="section-head">
@@ -740,12 +737,6 @@ export default function Stretch({
           </section>
         )}
       </main>
-      {mode === "home" && (
-        <footer>
-          STRETCH · HACKLANTA 2026 ·{" "}
-          {source === "demo" ? "DEMO DATA" : "SUPABASE CATALOG"}
-        </footer>
-      )}
     </div>
   );
 }
