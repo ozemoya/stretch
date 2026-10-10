@@ -15,12 +15,14 @@ export default function StopFinder({
   onStation,
   selectedStation,
   autoLoad = false,
+  compact = false,
 }: {
   area: Area;
   origin: SearchOrigin | null;
   onStation: (stop: GasStop | null, quote: FuelQuote | null) => void;
   selectedStation: GasStop | null;
   autoLoad?: boolean;
+  compact?: boolean;
 }) {
   const selectedStationId = selectedStation?.id ?? null;
   const [radius, setRadius] = useState(5),
@@ -87,13 +89,17 @@ export default function StopFinder({
   }
   const visible = places.filter((p) => kind === "all" || p.kind === kind);
   return (
-    <article className="stop-finder">
-      <p className="eyebrow">GROCERIES + GAS · ONE GOOD ROUTE</p>
-      <h2 id="live-title">Find your next stop.</h2>
-      <p>
-        See nearby grocery stores and gas stations together. Start with your
-        list, then choose the stops that work for your trip.
-      </p>
+    <article
+      className={"stop-finder" + (compact ? " compact-stop-finder" : "")}
+    >
+      {!compact && <p className="eyebrow">GROCERIES + GAS · ONE GOOD ROUTE</p>}
+      <h2 id="live-title">Nearby stores and gas</h2>
+      {!compact && (
+        <p>
+          See nearby grocery stores and gas stations together. Start with your
+          list, then choose the stops that work for your trip.
+        </p>
+      )}
       {selectedStation && (
         <p className="selected-gas-stop" role="status">
           <strong>Gas stop selected: {selectedStation.name}</strong> · Route and
@@ -168,114 +174,116 @@ export default function StopFinder({
           }
         />
       </div>
-      <p role="status">
-        {busy
-          ? "Loading groceries and gas stations…"
-          : `${visible.length} mapped stops within ${radius} miles of ${origin?.label || area}.`}
-      </p>
-      {loaded && !visible.length && (
-        <p>No mapped stops matched this filter. Try a wider radius.</p>
-      )}
-      <ul className="stop-results">
-        {visible.map((p) => (
-          <li key={p.id}>
-            <span
-              className={p.kind === "fuel" ? "stop-dot fuel" : "stop-dot"}
-            />
-            <div>
-              <a href={p.mapUrl} target="_blank" rel="noreferrer">
-                {p.name} ↗
-              </a>
-              <small>
-                {p.kind === "fuel" ? "Gas station" : "Grocery stop"} · {p.miles}{" "}
-                mi · {p.address || "Address not supplied"}
-              </small>
-              {p.kind === "fuel" && (
-                <button
-                  type="button"
-                  aria-pressed={selectedStationId === p.id}
-                  onClick={() =>
-                    onStation(
-                      {
-                        id: p.id,
-                        name: p.name,
-                        address: p.address,
-                        lat: p.lat,
-                        lon: p.lon,
-                        mapUrl: p.mapUrl,
-                      },
-                      null,
-                    )
-                  }
-                >
-                  {selectedStationId === p.id
-                    ? "Selected gas stop ✓"
-                    : "Add gas stop to trip"}
-                </button>
+      <div className="stop-directory">
+        <p role="status">
+          {busy
+            ? "Loading groceries and gas stations…"
+            : `${visible.length} mapped stops within ${radius} miles of ${origin?.label || area}.`}
+        </p>
+        {loaded && !visible.length && (
+          <p>No mapped stops matched this filter. Try a wider radius.</p>
+        )}
+        <ul className="stop-results">
+          {visible.map((p) => (
+            <li key={p.id}>
+              <span
+                className={p.kind === "fuel" ? "stop-dot fuel" : "stop-dot"}
+              />
+              <div>
+                <a href={p.mapUrl} target="_blank" rel="noreferrer">
+                  {p.name} ↗
+                </a>
+                <small>
+                  {p.kind === "fuel" ? "Gas station" : "Grocery stop"} ·{" "}
+                  {p.miles} mi · {p.address || "Address not supplied"}
+                </small>
+                {p.kind === "fuel" && (
+                  <button
+                    type="button"
+                    aria-pressed={selectedStationId === p.id}
+                    onClick={() =>
+                      onStation(
+                        {
+                          id: p.id,
+                          name: p.name,
+                          address: p.address,
+                          lat: p.lat,
+                          lon: p.lon,
+                          mapUrl: p.mapUrl,
+                        },
+                        null,
+                      )
+                    }
+                  >
+                    {selectedStationId === p.id
+                      ? "Selected gas stop ✓"
+                      : "Add gas stop to trip"}
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+        <details>
+          <summary>Check reported pump prices</summary>
+          <p>
+            Map locations do not include pump prices. Search the connected price
+            provider for reported regular-gas prices.
+          </p>
+          <button type="button" disabled={priceBusy} onClick={checkFuel}>
+            {priceBusy ? "Checking pump reports…" : "Check pump prices"}
+          </button>
+          {priceError && <p role="alert">{priceError}</p>}
+          {prices?.stations.map((s) => (
+            <div className="live-card" key={s.id}>
+              <strong>{s.name}</strong>
+              <p>
+                {s.dollarsPerGallon === null
+                  ? "No pump report returned"
+                  : `$${s.dollarsPerGallon.toFixed(3)} / gallon`}
+              </p>
+              <button
+                type="button"
+                aria-pressed={selectedStationId === s.id}
+                onClick={() =>
+                  onStation(
+                    {
+                      id: s.id,
+                      name: s.name,
+                      address: s.address,
+                      lat: s.lat,
+                      lon: s.lon,
+                      mapUrl: s.mapUrl,
+                    },
+                    !s.stale && s.dollarsPerGallon !== null && s.updatedAt
+                      ? {
+                          kind: "station",
+                          stationName: s.name,
+                          dollarsPerGallon: s.dollarsPerGallon,
+                          period: s.updatedAt,
+                          retrievedAt: prices.retrievedAt,
+                          sourceUrl: s.mapUrl,
+                          region: s.address,
+                        }
+                      : null,
+                  )
+                }
+              >
+                {selectedStationId === s.id
+                  ? "Selected gas stop ✓"
+                  : "Add this gas stop to trip"}
+              </button>
+              {(s.stale || s.dollarsPerGallon === null) && (
+                <small>Using your entered gas price for this stop.</small>
               )}
             </div>
-          </li>
-        ))}
-      </ul>
-      <details>
-        <summary>Check reported pump prices</summary>
-        <p>
-          Map locations do not include pump prices. Search the connected price
-          provider for reported regular-gas prices.
+          ))}
+        </details>
+        <p className="small">
+          OpenStreetMap locations can be incomplete. Distances are straight-line
+          estimates; grocery and pump prices require separate verified sources.
         </p>
-        <button type="button" disabled={priceBusy} onClick={checkFuel}>
-          {priceBusy ? "Checking pump reports…" : "Check pump prices"}
-        </button>
-        {priceError && <p role="alert">{priceError}</p>}
-        {prices?.stations.map((s) => (
-          <div className="live-card" key={s.id}>
-            <strong>{s.name}</strong>
-            <p>
-              {s.dollarsPerGallon === null
-                ? "No pump report returned"
-                : `$${s.dollarsPerGallon.toFixed(3)} / gallon`}
-            </p>
-            <button
-              type="button"
-              aria-pressed={selectedStationId === s.id}
-              onClick={() =>
-                onStation(
-                  {
-                    id: s.id,
-                    name: s.name,
-                    address: s.address,
-                    lat: s.lat,
-                    lon: s.lon,
-                    mapUrl: s.mapUrl,
-                  },
-                  !s.stale && s.dollarsPerGallon !== null && s.updatedAt
-                    ? {
-                        kind: "station",
-                        stationName: s.name,
-                        dollarsPerGallon: s.dollarsPerGallon,
-                        period: s.updatedAt,
-                        retrievedAt: prices.retrievedAt,
-                        sourceUrl: s.mapUrl,
-                        region: s.address,
-                      }
-                    : null,
-                )
-              }
-            >
-              {selectedStationId === s.id
-                ? "Selected gas stop ✓"
-                : "Add this gas stop to trip"}
-            </button>
-            {(s.stale || s.dollarsPerGallon === null) && (
-              <small>Using your entered gas price for this stop.</small>
-            )}
-          </div>
-        ))}
-      </details>
-      <p className="small">
-        OpenStreetMap locations can be incomplete. Distances are straight-line
-        estimates; grocery and pump prices require separate verified sources.
-      </p>
+      </div>
     </article>
   );
 }

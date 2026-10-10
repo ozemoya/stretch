@@ -48,6 +48,7 @@ export default function PriceAgent({
   gasPriceReported,
   mpg,
   autoStart = false,
+  onSelectTrip,
 }: {
   items: AgentItem[];
   zip: string;
@@ -58,9 +59,12 @@ export default function PriceAgent({
   gasPriceReported: boolean;
   mpg: number;
   autoStart?: boolean;
+  onSelectTrip?: (store: StoreCheck, selected: Record<string, string>, route: { miles: number; minutes: number }, storeLocation: { mapUrl: string; lat: number; lon: number }) => void;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [comparisonView, setComparisonView] = useState<"table" | "cards">("table");
+  const [comparedStores, setComparedStores] = useState<string[]>([]);
   const [result, setResult] = useState<{
     stores: StoreCheck[];
     publicCatalogs: ScrapeReport[];
@@ -81,9 +85,10 @@ export default function PriceAgent({
   const [choices, setChoices] = useState<
     Record<string, Record<string, string>>
   >({});
-  const [driving, setDriving] = useState<
-    Record<string, { miles: number; minutes: number }>
-  >({});
+  const [driving, setDriving] = useState<{
+    key: string;
+    routes: Record<string, { miles: number; minutes: number }>;
+  }>({ key: "", routes: {} });
   const [routeBusy, setRouteBusy] = useState(false);
   const [radius, setRadius] = useState(5);
   const started = useRef(false);
@@ -132,11 +137,13 @@ export default function PriceAgent({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("coverage");
   const [phase, setPhase] = useState(0);
+  const routeKey = JSON.stringify([result?.checkedAt, origin?.lat, origin?.lon, area,
+    gasStop?.id, gasStop?.lat, gasStop?.lon]);
   useEffect(() => {
     if (!result?.stores.length) return;
     const controller = new AbortController();
     const home = origin ?? centers[area];
-    setDriving({});
+    setDriving({ key: routeKey, routes: {} });
     setRouteBusy(true);
     void Promise.all(
       result.stores.map(async (store) => {
@@ -168,10 +175,10 @@ export default function PriceAgent({
             Number.isFinite(route.minutes) &&
             !controller.signal.aborted
           )
-            setDriving((previous) => ({
-              ...previous,
-              [store.id]: { miles: route.miles, minutes: route.minutes },
-            }));
+            setDriving((previous) => previous.key === routeKey ? ({
+              key: routeKey,
+              routes: { ...previous.routes, [store.id]: { miles: route.miles, minutes: route.minutes } },
+            }) : previous);
         } catch {
           /* An unavailable route cannot produce a trip total. */
         }
@@ -180,7 +187,7 @@ export default function PriceAgent({
       if (!controller.signal.aborted) setRouteBusy(false);
     });
     return () => controller.abort();
-  }, [result?.stores, result?.storeCoverage, origin, area, gasStop]);
+  }, [result?.stores, result?.storeCoverage, origin, area, gasStop, routeKey]);
   useEffect(() => {
     if (!busy) return;
     setPhase(0);
@@ -395,15 +402,19 @@ export default function PriceAgent({
     result?.stores
       .map((s) => reviewedTotal(s, choices[s.id] ?? {}))
       .filter((n): n is number => n !== null) ?? [];
+  const canReviewStore = (store: StoreCheck) => store.lines.every((line) => {
+    const selected = line.candidates.find((candidate) => candidate.id === choices[store.id]?.[line.item.id]);
+    return selected && ownedCandidate(store, selected) && (!selected.productUrl || /^https:\/\//i.test(selected.productUrl));
+  });
   const completeTrips =
     result?.stores.flatMap((store) => {
       if (store.lines.length !== items.length) return [];
       const groceryCents = reviewedTotal(store, choices[store.id] ?? {});
-      const route = driving[store.id];
+      const route = driving.key === routeKey ? driving.routes[store.id] : undefined;
       const fuelCents = route
         ? fuelCostCents(route.miles, mpg, gasPrice)
         : null;
-      return groceryCents !== null && fuelCents !== null
+      return groceryCents !== null && fuelCents !== null && route
         ? [
             {
               id: store.id,
@@ -436,8 +447,8 @@ export default function PriceAgent({
       {!result && liveReports.some(hasVisibleCatalogPrice) && (
         <StoreColumns reports={liveReports.filter(hasVisibleCatalogPrice)} items={items} />
       )}
-      <p className="eyebrow">YOUR LIST. EVERY POSSIBLE ROUTE.</p>
-      <h2>Find your next best stop.</h2>
+      <p className="eyebrow">PRICE COMPARISON</p>
+      <h2>Available store prices</h2>
       <div className="search-summary">
         <span>
           {items.length} {items.length === 1 ? "item" : "items"} in your list
@@ -446,9 +457,8 @@ export default function PriceAgent({
         <span>{radius} mile radius</span>
       </div>
       <p>
-        Search your entire list across supported stores, then confirm the brand
-        and package you would actually buy. Dietary suitability must be checked
-        on the product label.
+        Compare prices for your list, then choose a brand and package size.
+        Check product labels for ingredients and allergens.
       </p>
       <button
         className="cta"
@@ -492,10 +502,8 @@ export default function PriceAgent({
         </select>
       </label>
       <p className="small">
-        Discovers mapped grocery stores from every retailer in the radius. Each
-        is checked for a supported public scraper or connected price source.
-        Online catalog listings do not establish branch prices. Complete
-        branch-priced baskets include driving; tax and stock remain unverified.
+        Some stores don’t share local prices. Online prices may differ in store.
+        Trip totals include driving fuel but exclude tax; stock is not confirmed.
       </p>
       {error && <p role="alert">{error}</p>}
       {busy && (
@@ -525,19 +533,19 @@ export default function PriceAgent({
       {result?.search && !sourcesBusy && (
         <p role="status" className="small">
           Search finished in {(result.search.elapsedMs / 1000).toFixed(1)} seconds.
-          {result.search.partial ? " Some sources did not return a verified result in time. Showing the prices received; check again to retrieve completed searches." : " Available verified prices are shown below."}
+          {result.search.partial ? " Some stores haven’t returned prices. You can check again." : " Results are below."}
         </p>
       )}
       {sourceError && <p role="alert" className="small">{sourceError}</p>}
       {result && (
         <>
           {result.agent && (
-            <p className="small">
+            <details className="small"><summary>Search details</summary><p>
               {result.agent.mode}
               {result.agent.aiConnected && result.agent.reviewedMatches
                 ? ` AI reviewed ${result.agent.reviewedMatches} product matches.`
                 : ""}
-            </p>
+            </p></details>
           )}
           <div className="search-controls">
             <label className="result-search">
@@ -557,7 +565,7 @@ export default function PriceAgent({
               </select>
             </label>
           </div>
-          <p>{result.coverage}</p>
+          <details className="small"><summary>Store coverage</summary><p>{result.coverage}</p></details>
           {result.warnings.map((w) => (
             <p role="alert" key={w}>
               {w}
@@ -577,13 +585,13 @@ export default function PriceAgent({
           </p>
           <p>
             <strong>
-              {visibleCatalogs.length} retailer catalogs returned validated online prices.
+              Online prices found at {visibleCatalogs.length} retailers.
             </strong>{" "}
             Review these separately below.
           </p>
           {result.storeCoverage.length > visibleBranches.length && (
             <p className="small">
-              {result.storeCoverage.length - visibleBranches.length} nearby locations had no verified branch price and are hidden from comparison.
+              Local prices aren’t available for {result.storeCoverage.length - visibleBranches.length} nearby stores.
             </p>
           )}
           <p className="small">
@@ -612,10 +620,11 @@ export default function PriceAgent({
             {!routeBusy && !completeTrips.length && (
               <p>No complete branch-priced trip can be ranked yet.</p>
             )}
+            {!gasStop && <p>Choose a specific gas station on the map to continue to trip review.</p>}
             {completeTrips
               .sort((a, b) => a.totalCents - b.totalCents)
               .map((trip) => (
-                <p key={trip.id}>
+                <div key={trip.id} className="trip-option">
                   <strong>
                     {trip.name}
                     {trip.totalCents === cheapestTrip
@@ -626,7 +635,18 @@ export default function PriceAgent({
                   ${(trip.fuelCents / 100).toFixed(2)} ={" "}
                   <strong>${(trip.totalCents / 100).toFixed(2)}</strong> ·{" "}
                   {trip.miles.toFixed(1)} mi, {trip.minutes} min
-                </p>
+                  {gasStop && onSelectTrip && result.stores.some((store) => store.id === trip.id && canReviewStore(store)) && (
+                    <button type="button" className="cta" disabled={routeBusy || driving.key !== routeKey}
+                      onClick={() => {
+                        const store = result.stores.find((entry) => entry.id === trip.id);
+                        const route = driving.routes[trip.id];
+                        const location = result.storeCoverage.find((entry) => entry.id === trip.id);
+                        if (store && route && location && driving.key === routeKey) onSelectTrip(store, choices[store.id] ?? {}, route, location);
+                      }}>
+                      REVIEW THIS TRIP ↗
+                    </button>
+                  )}
+                </div>
               ))}
           </div>
           {!!(catalogReports.length || result.storeCoverage.length) && (
@@ -668,8 +688,17 @@ export default function PriceAgent({
               remains unavailable.
             </p>
           )}
-          <div className="live-grid">
-            {visibleBranches.map((store) => {
+          {visibleBranches.length > 0 && <>
+            <div className="comparison-toolbar"><strong>Compare verified branches</strong><div><button aria-pressed={comparisonView === "table"} onClick={() => setComparisonView("table")}>Table</button><button aria-pressed={comparisonView === "cards"} onClick={() => setComparisonView("cards")}>Cards</button></div></div>
+            {comparisonView === "table" && <table className="comparison-table"><caption className="small">Select stores to focus the product breakdown below. Totals require reviewed packages and a route.</caption><thead><tr><th>Store</th><th>Coverage</th><th>Groceries</th><th>Drive / fuel</th><th>Trip total</th></tr></thead><tbody>{visibleBranches.map((store) => {
+              const trip = completeTrips.find((entry) => entry.id === store.id);
+              const total = reviewedTotal(store, choices[store.id] ?? {});
+              return <tr key={store.id} className={trip && trip.totalCents === cheapestTrip ? "best" : ""}><td><label><input type="checkbox" checked={comparedStores.includes(store.id)} onChange={(event) => setComparedStores((old) => event.target.checked ? [...old, store.id] : old.filter((id) => id !== store.id))} /> {store.name}</label><small>{store.address}</small></td><td>{pricedItemCount(store)} / {items.length}<small>items priced</small></td><td>{total === null ? "Review items" : `$${(total / 100).toFixed(2)}`}</td><td>{trip ? <>{trip.miles.toFixed(1)} mi<small>${(trip.fuelCents / 100).toFixed(2)} fuel</small></> : "Awaiting route"}</td><td>{trip ? `$${(trip.totalCents / 100).toFixed(2)}` : "Incomplete"}</td></tr>;
+            })}</tbody></table>}
+            {comparedStores.length > 0 && <button className="text-button" onClick={() => setComparedStores([])}>Show all branches</button>}
+          </>}
+          <div className={`live-grid ${comparisonView === "table" ? "branch-table-mode" : ""}`}>
+            {visibleBranches.filter((store) => !comparedStores.length || comparedStores.includes(store.id)).map((store) => {
               const location = result.storeCoverage.find((entry) => entry.id === store.id)!;
               const total = store
                 ? reviewedTotal(store, choices[store.id] ?? {})
@@ -698,6 +727,7 @@ export default function PriceAgent({
                       Retry search
                     </button>
                   )}
+                  <details className="branch-details" open={comparisonView === "cards" ? true : undefined}><summary>Review products & price sources</summary>
                   {items.map((item) => {
                     const line = store?.lines.find(
                       (entry) => entry.item.id === item.id,
@@ -790,11 +820,13 @@ export default function PriceAgent({
                       </label>
                     );
                   })}
+                  </details>
                   <strong>
                     {total === null
                       ? "Incomplete basket — missing or unreviewed prices"
                       : `Reviewed groceries: $${(total / 100).toFixed(2)}`}
                   </strong>
+                  {total !== null && !canReviewStore(store) && <p className="small">A selected product could not be verified for this branch.</p>}
                   {total !== null &&
                     totals.length >= 2 &&
                     total === Math.min(...totals) && (
@@ -803,6 +835,12 @@ export default function PriceAgent({
                         baskets. Compare travel before choosing a trip.
                       </p>
                     )}
+                  {total !== null && gasStop && onSelectTrip && canReviewStore(store) && driving.key === routeKey && driving.routes[store.id] && (
+                    <button type="button" className="cta" disabled={routeBusy}
+                      onClick={() => onSelectTrip(store, choices[store.id] ?? {}, driving.routes[store.id], location)}>
+                      REVIEW FOOD + GAS TOTAL ↗
+                    </button>
+                  )}
                 </article>
               );
             })}

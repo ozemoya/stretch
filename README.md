@@ -1,6 +1,6 @@
 # Stretch
 
-Next.js App Router + React + TypeScript + Supabase. Selected design: Draft C; original PNG logo preserved.
+Next.js App Router + React + TypeScript + Supabase. Selected design: Draft C; original PNG logo preserved. Current scope: an Atlanta-area pilot that ranks only complete, branch-verified baskets. See [Version 1 audit and milestones](docs/mvp-audit.md) for source coverage and launch blockers.
 
 ## Run
 
@@ -18,7 +18,7 @@ The Stretch project was connected and verified on October 9, 2026: 30 products, 
 
 ## Project status
 
-Hacklanta prototype. The app is now an Expo / React Native application. It keeps the Draft C visual language while using native layout, touch interactions, accessibility props, and a responsive tablet/web layout.
+Hacklanta prototype. The root project is the Next.js web application; a separate Expo / React Native prototype remains in `mobile/`.
 
 ## Selected design
 
@@ -49,7 +49,7 @@ Prices and distances in this prototype are illustrative sample data, not live st
 
 Prices and dietary tags are fictional sample data recorded October 9, 2026. Routes use illustrative area-based distances, not live navigation. Tax is excluded. Time assumes 25 mph plus 12 minutes per stop. Substitutions are not nutritional equivalents; confirm product labels.
 
-Supabase serves the sample public catalog only. Grocery lists and preferences remain in browser memory; checklist downloads are created locally. Public users have SELECT access only; INSERT, UPDATE, and DELETE are revoked and protected by RLS. IP detection sends the visitor's IP to IPwhois (and ipify if needed); Stretch does not persist the IP. Approximate IP coordinates or selected area coordinates go to Overpass/Google for location searches. Basket item names go to connected pricing providers when "Check my list" is used, and the optional feed receives basket items plus discovered store names/addresses/IDs. No device GPS permission is requested. General search results are cached in server memory as described above.
+Supabase serves the sample public catalog only. Named grocery lists and preferences are saved locally on the user's device; the current trip is kept in session storage. Public users have SELECT access only; INSERT, UPDATE, and DELETE are revoked and protected by RLS. IP detection sends the visitor's IP to IPwhois (and ipify if needed); Stretch does not persist the IP. Approximate IP coordinates or selected area coordinates go to Overpass/Google for location searches. Basket item names go to connected pricing providers when "Check my list" is used, and the optional feed receives basket items plus discovered store names/addresses/IDs. No device GPS permission is requested. General search results are cached in server memory as described above.
 
 ## Checks
 
@@ -59,7 +59,7 @@ Tests cover optimizer calculations, quantities, missing items, dietary conflicts
 
 ## Deployment
 
-Import the repository into Vercel with its Next.js preset and configure the two environment variables. No live routing provider is required for the sample demo. Old static files are kept in `archive/`.
+Import the repository into Vercel with its Next.js preset and configure the two public Supabase environment variables for the sample catalog. A live pilot also needs an authorized branch-price source; without one, Stretch reports unpriced stores rather than displaying demo prices as live results. See the [production readiness checklist](docs/production-readiness.md) before inviting real users. Old static files are kept in `archive/`.
 
 [Selected Draft C](https://www.figma.com/board/TNSW97eqDpo50behte9Xn9/Untitled?node-id=59-39)
 
@@ -84,7 +84,7 @@ Source discovery is cached locally for 24 hours. AI starts are limited to 5 per 
 
 ### Combined stop map and source search
 
-Checkout opens one large map for both groceries and gas stations. The shared radius and All stops / Groceries / Gas stations filters control both pins and the stop list. Pump-price reports can be checked below the map when a provider is configured.
+The trip flow starts with a food list on `/plan`, then opens one large map for groceries and gas stations on `/plan/results`. The shared radius and All stops / Groceries / Gas stations filters control both pins and the stop list. Pump-price reports can be checked below the map when a provider is configured. Once every selected food has a verified branch price and a gas stop is chosen, `/plan/review` shows the estimate, route directions, and supported retailer handoff. Stretch does not process payment or guarantee that an outside retailer accepts a cart import.
 
 `BRIGHT_DATA_SERP_ZONE` enables the connected Bright Data web-search API for missing product URLs, without requiring an AI key. Only allowlisted retailer product links are accepted; search snippets never become live prices. Collection pages rejected by the provider are not used as product sources. Walmart and Target get one fallback attempt after a ZIP collector failure. Existing hosted collection jobs can finish at the provider; the user can check them again explicitly. There is no automatic polling loop. Cached product records retain their retrieval timestamp. Both search requests and maximum requested scraper records reserve from a durable local 1,000-credit monthly allowance; this is conservative relative to the verified $1.50 per 1,000 rate and the $20 user budget. Shared storage/account-level spending controls remain necessary across multiple deployed servers. No payment method or paid subscription has been activated.
 

@@ -1,7 +1,5 @@
-import { getCatalog } from "@/lib/catalog";
-import Stretch from "@/components/Stretch";
+import Dashboard from "@/components/Dashboard";
 export const dynamic = "force-dynamic";
 export default async function Page() {
-  const data = await getCatalog();
-  return <Stretch {...data} />;
+  return <Dashboard />;
 }

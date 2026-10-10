@@ -1,19 +1,17 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import TripFlowHeader from "./TripFlowHeader";
+import OpenMap from "./OpenMap";
+import type { NearbyPlace } from "@/lib/live-data";
+const emptyMapPlaces: NearbyPlace[] = [];
 import type { BasketItem, Catalog, Preferences, Trip } from "@/lib/types";
-import { optimize, suggestSwaps } from "@/lib/optimizer";
-import { getRouteMeasurements } from "@/lib/routing";
-import type { RouteMeasurements } from "@/lib/optimizer";
-import LiveSources from "./LiveSources";
 import { detectLocation } from "@/lib/detect-location";
-import PriceAgent from "./PriceAgent";
 import { centers, type SearchOrigin } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
 import type { GasStop } from "@/lib/gas-stop";
-const money = (c: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    c / 100,
-  );
+import { readCheckoutDraft, writeCheckoutDraft } from "@/lib/checkout-draft";
+import { createSavedList, readSavedLists, readSavedSettings, writeSavedLists, writeSavedSettings, type SavedList } from "@/lib/saved-plans";
 const defaults: Preferences = {
   area: "downtown",
   budget: 35,
@@ -55,42 +53,143 @@ function Route({ trip }: { trip?: Trip }) {
 export default function Stretch({
   catalog,
   source,
-  error,
+  mode = "home",
 }: {
   catalog: Catalog;
   source: "demo" | "supabase";
   error?: string;
+  mode?: "home" | "planner";
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.has("q")) setSearch(searchParams.get("q") ?? "");
+    const panel = searchParams.get("panel");
+    const element = document.querySelector<HTMLDetailsElement>(panel === "settings" ? ".trip-settings" : ".saved-lists");
+    if (panel && element) element.open = true;
+  }, [searchParams]);
+  const [workspaceTab, setWorkspaceTab] = useState("list");
   const [basket, setBasket] = useState<BasketItem[]>([]),
     [prefs, setPrefs] = useState(defaults),
     [search, setSearch] = useState(""),
-    [selected, setSelected] = useState<string | null>(null),
-    [checked, setChecked] = useState<string[]>([]),
-    [notice, setNotice] = useState(""),
-    [showPlanner, setShowPlanner] = useState(true),
-    [previousBasket, setPreviousBasket] = useState<BasketItem[] | null>(null);
-  const [checkoutBasket, setCheckoutBasket] = useState<BasketItem[] | null>(
-    null,
-  );
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
-  const [checkoutRun, setCheckoutRun] = useState(0);
-  async function checkout() {
-    if (!basket.length || checkoutBusy) return;
-    setCheckoutBusy(true);
+    [restored, setRestored] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [savedLists, setSavedLists] = useState<SavedList[]>([]);
+  const [savedListName, setSavedListName] = useState("");
+  const [savedListNotice, setSavedListNotice] = useState("");
+  function persistBasket(nextBasket: BasketItem[], nextPrefs = prefs,
+    nextOrigin = searchOrigin, nextIpArea = ipArea, nextManualGas = manualGas,
+    nextGasStop = gasStop, nextFuelSource = fuelSource) {
+    const items = nextBasket.flatMap((item) => {
+      const product = catalog.products.find((entry) => entry.id === item.productId);
+      return product ? [{ id: product.id, name: product.name, unit: product.unit,
+        quantity: item.quantity }] : [];
+    });
+    if (items.length !== nextBasket.length) return false;
+    return writeCheckoutDraft(window.sessionStorage, {
+      version: 1, basket: nextBasket, items, prefs: nextPrefs,
+      origin: nextOrigin, ipArea: nextIpArea, gasStop: nextGasStop,
+      fuelSource: nextFuelSource, manualGas: nextManualGas,
+    });
+  }
+  function saveList() {
+    if (savedLists.length >= 20) {
+      setSavedListNotice("You have 20 saved lists. Remove one before saving another."); return;
+    }
+    const next = createSavedList(crypto.randomUUID(), savedListName || "My grocery list", basket,
+      { prefs, manualOrigin: ipArea ? null : searchOrigin });
+    if (!next) { setSavedListNotice("Add food and use up to 99 of each item before saving."); return; }
+    const updated = [next, ...savedLists];
+    if (!writeSavedLists(window.localStorage, updated)) {
+      setSavedListNotice("This browser could not save the list. Check storage permissions."); return;
+    }
+    setSavedLists(updated);
+    setSavedListName("");
+    setSavedListNotice(`Saved “${next.name}” on this device.`);
+  }
+  function loadList(list: SavedList) {
+    const available = new Set(catalog.products.map((product) => product.id));
+    const basket = list.basket.filter((item) => available.has(item.productId));
+    if (!basket.length) { setSavedListNotice("The foods in this saved list are no longer in the catalog."); return; }
+    setBasket(basket);
+    setPrefs(list.prefs);
+    setManualGas(list.prefs.gas);
+    setFuelSource(null);
+    setGasStop(null);
+    setIpArea(!list.manualOrigin);
+    if (list.manualOrigin) {
+      setSearchOrigin(list.manualOrigin);
+      setLocationState("Starting area selected manually");
+    } else {
+      setSearchOrigin(null);
+      setLocationState("Detecting your current IP area…");
+      const controller = new AbortController();
+      detectLocation(controller.signal).then((origin) => {
+        setSearchOrigin(origin);
+        setLocationState("Approximate location from your IP");
+      }).catch(() => setLocationState("Could not detect your area. Choose one in trip settings."));
+    }
+    setSearch("");
+    persistBasket(basket, list.prefs, list.manualOrigin, !list.manualOrigin,
+      list.prefs.gas, null, null);
+    setSavedListNotice(basket.length === list.basket.length
+      ? `Loaded “${list.name}”. Check your settings before searching.`
+      : `Loaded “${list.name}” with ${list.basket.length - basket.length} unavailable food removed.`);
+  }
+  function deleteList(id: string) {
+    const updated = savedLists.filter((list) => list.id !== id);
+    if (!writeSavedLists(window.localStorage, updated)) {
+      setSavedListNotice("This browser could not remove the saved list."); return;
+    }
+    setSavedLists(updated);
+    setSavedListNotice("Saved list removed.");
+  }
+  function checkout() {
+    if (!basket.length) return;
+    setCheckoutError("");
     if (!searchOrigin) {
-      setCheckoutBusy(false);
+      setCheckoutError("Choose a starting area before continuing.");
       return;
     }
-    setCheckoutBasket(basket.map((item) => ({ ...item })));
-    setCheckoutRun((run) => run + 1);
-    setCheckoutBusy(false);
-    setTimeout(
-      () =>
-        document
-          .getElementById("checkout-results")
-          ?.scrollIntoView({ behavior: "smooth" }),
-      50,
-    );
+    const items = basket.map((item) => {
+      const product = catalog.products.find(
+        (entry) => entry.id === item.productId,
+      );
+      return (
+        product && {
+          id: product.id,
+          name: product.name,
+          unit: product.unit,
+          quantity: item.quantity,
+        }
+      );
+    });
+    if (
+      items.some((item) => !item) ||
+      !Number.isFinite(prefs.gas) ||
+      !Number.isFinite(prefs.mpg)
+    ) {
+      setCheckoutError("Check your list and trip settings before continuing.");
+      return;
+    }
+    const saved = writeCheckoutDraft(window.sessionStorage, {
+      version: 1,
+      basket: basket.map((item) => ({ ...item })),
+      items: items.filter((item): item is NonNullable<typeof item> => !!item),
+      prefs,
+      origin: searchOrigin,
+      ipArea,
+      gasStop,
+      fuelSource,
+      manualGas,
+    });
+    if (!saved) {
+      setCheckoutError(
+        "Could not save this trip in your browser. Check your settings and try again.",
+      );
+      return;
+    }
+    router.push("/plan/results");
   }
   const [fuelSource, setFuelSource] = useState<FuelQuote | null>(null);
   const [gasStop, setGasStop] = useState<GasStop | null>(null);
@@ -99,6 +198,44 @@ export default function Stretch({
   const [ipArea, setIpArea] = useState(true);
   const [locationState, setLocationState] = useState("Detecting your IP area…");
   useEffect(() => {
+    if (mode !== "planner") return;
+    setSavedLists(readSavedLists(window.localStorage));
+    setRestored(true);
+    const previous = readCheckoutDraft(window.sessionStorage);
+    if (previous) {
+      setBasket(previous.basket);
+      setPrefs(previous.prefs);
+      setSearchOrigin(previous.origin);
+      setIpArea(previous.ipArea);
+      setGasStop(previous.gasStop);
+      setFuelSource(previous.fuelSource);
+      setManualGas(previous.manualGas);
+      if (!previous.ipArea) {
+        setSearchOrigin(
+          previous.origin ?? {
+            ...centers[previous.prefs.area],
+            label: previous.prefs.area,
+          },
+        );
+        setLocationState("Starting area selected manually");
+        return;
+      }
+      if (previous.origin) {
+        setLocationState("Approximate location from your IP");
+        return;
+      }
+    }
+    const savedSettings = readSavedSettings(window.localStorage);
+    if (!previous && savedSettings) {
+      setPrefs(savedSettings.prefs);
+      setManualGas(savedSettings.prefs.gas);
+      if (savedSettings.manualOrigin) {
+        setIpArea(false);
+        setSearchOrigin(savedSettings.manualOrigin);
+        setLocationState("Starting area selected manually");
+        return;
+      }
+    }
     const controller = new AbortController();
     detectLocation(controller.signal)
       .then((origin) => {
@@ -114,124 +251,56 @@ export default function Stretch({
           );
       });
     return () => controller.abort();
-  }, []);
-  const routeKey = gasStop
-    ? `${gasStop.id}:${gasStop.lat}:${gasStop.lon}:${searchOrigin?.lat ?? ""}:${searchOrigin?.lon ?? ""}`
-    : "no-gas-stop";
-
-  const [routeData, setRouteData] = useState<{
-    area: typeof prefs.area;
-    routeKey: string;
-    catalog: Catalog;
-    routes: RouteMeasurements;
-  } | null>(null);
-
-  const [routesLoading, setRoutesLoading] = useState(true);
-
+  }, [mode]);
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadRoutes() {
-      setRoutesLoading(true);
-
-      try {
-        const routes = await getRouteMeasurements(
-          catalog,
-          prefs.area,
-          gasStop,
-          searchOrigin,
-        );
-
-        if (!cancelled) {
-          setRouteData({
-            area: prefs.area,
-            routeKey,
-            catalog,
-            routes,
-          });
-        }
-      } catch (error) {
-        console.error("Unable to load routes:", error);
-
-        if (!cancelled) {
-          setRouteData(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setRoutesLoading(false);
-        }
-      }
-    }
-
-    void loadRoutes();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [catalog, prefs.area, routeKey]);
-
-  const currentRoutes =
-    routeData?.area === prefs.area &&
-    routeData.routeKey === routeKey &&
-    routeData.catalog === catalog
-      ? routeData.routes
-      : undefined;
-
-  const calculation = useMemo(() => {
-    try {
-      if (gasStop && !currentRoutes)
-        return {
-          trips: [],
-          error: routesLoading
-            ? "Calculating the route through your selected gas station…"
-            : "A driving route through this gas station is unavailable. Choose another stop or retry.",
-        };
-      return {
-        trips: optimize(catalog, basket, prefs, currentRoutes, !!gasStop),
-        error: "",
-      };
-    } catch (e) {
-      return {
-        trips: [],
-        error: (e as Error).message,
-      };
-    }
-  }, [catalog, basket, prefs, currentRoutes, gasStop, routesLoading]);
-
-  const complete = calculation.trips.filter((t) => !t.missing.length),
-    best = complete[0],
-    active = complete.find((t) => t.id === selected) ?? best;
-
-  const swaps = useMemo(() => {
-    try {
-      if (gasStop && !currentRoutes) return [];
-      return suggestSwaps(catalog, basket, prefs, currentRoutes, !!gasStop);
-    } catch {
-      return [];
-    }
-  }, [catalog, basket, prefs, currentRoutes, gasStop]);
-
-  const singles = complete.filter((t) => t.stops.length === 1),
-    extra =
-      best && singles[0] && best.stops.length > 1
-        ? singles[0].totalCents - best.totalCents
-        : 0;
-  function quantity(id: string, change: number) {
-    setBasket((old) => {
-      const q = Math.min(
-        99,
-        Math.max(
-          0,
-          (old.find((x) => x.productId === id)?.quantity ?? 0) + change,
-        ),
-      );
-      return [
-        ...old.filter((x) => x.productId !== id),
-        ...(q ? [{ productId: id, quantity: q }] : []),
-      ];
+    if (mode !== "planner" || !restored) return;
+    writeSavedSettings(window.localStorage, { prefs, manualOrigin: ipArea ? null : searchOrigin });
+  }, [mode, restored, prefs, ipArea, searchOrigin]);
+  useEffect(() => {
+    if (mode !== "planner" || !restored) return;
+    const items = basket.flatMap((item) => {
+      const product = catalog.products.find((p) => p.id === item.productId);
+      return product
+        ? [
+            {
+              id: product.id,
+              name: product.name,
+              unit: product.unit,
+              quantity: item.quantity,
+            },
+          ]
+        : [];
     });
-    setChecked([]);
-    setSelected(null);
+    writeCheckoutDraft(window.sessionStorage, {
+      version: 1,
+      basket,
+      items,
+      prefs,
+      origin: searchOrigin,
+      ipArea,
+      gasStop,
+      fuelSource,
+      manualGas,
+    });
+  }, [
+    mode,
+    restored,
+    basket,
+    catalog,
+    prefs,
+    searchOrigin,
+    ipArea,
+    gasStop,
+    fuelSource,
+    manualGas,
+  ]);
+  function quantity(id: string, change: number) {
+    const q = Math.min(99, Math.max(0,
+      (basket.find((item) => item.productId === id)?.quantity ?? 0) + change));
+    const next = [...basket.filter((item) => item.productId !== id),
+      ...(q ? [{ productId: id, quantity: q }] : [])];
+    setBasket(next);
+    persistBasket(next);
   }
   function change<K extends keyof Preferences>(key: K, value: Preferences[K]) {
     if (key === "gas") {
@@ -246,213 +315,101 @@ export default function Stretch({
         area: value as Preferences["area"],
         gas: manualGas,
       }));
-      setChecked([]);
-      setSelected(null);
       return;
     }
     setPrefs((old) => ({ ...old, [key]: value }));
-    setChecked([]);
-    setSelected(null);
-  }
-  function download() {
-    if (!active) return;
-    const body = [
-      "STRETCH — SHOPPING PLAN",
-      `Sample distances · ${active.miles} miles round trip`,
-      `Groceries ${money(active.foodCents)} + fuel ${money(active.fuelCents)} = ${money(active.totalCents)}`,
-      ...(gasStop
-        ? [
-            `Gas stop: ${gasStop.name}, ${gasStop.address}`,
-            `Fuel price: $${prefs.gas.toFixed(3)} per gallon${fuelSource ? " (reported)" : " (entered estimate)"}`,
-          ]
-        : []),
-      ...active.stops.flatMap((s) => [
-        "",
-        s.store.name,
-        ...s.items.map(
-          (i) =>
-            `[ ] ${i.quantity} × ${i.name} (${i.unit}) — ${money(i.priceCents * i.quantity)}`,
-        ),
-      ]),
-    ].join("\n");
-    const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "stretch-shopping-plan.txt";
-    a.click();
-    URL.revokeObjectURL(url);
   }
   function plan() {
-    setShowPlanner(true);
-    setTimeout(
-      () =>
-        document
-          .getElementById("planner")
-          ?.scrollIntoView({ behavior: "smooth" }),
-      0,
-    );
+    router.push("/plan");
   }
   return (
-    <>
-      <a className="skip" href="#planner">
-        Skip to planner
-      </a>
-      <header>
-        <nav>
-          <button onClick={plan}>PLAN A TRIP</button>
-          <a href="#how">HOW IT WORKS</a>
-        </nav>
-        <a href="#" aria-label="Stretch home">
-          <img className="logo" src="/assets/stretch-logo.png" alt="Stretch" />
-        </a>
-        <nav>
-          <a href="#story">OUR STORY</a>
-          <button onClick={plan}>
-            MY LIST ({basket.reduce((n, i) => n + i.quantity, 0)}) ↗
+    <div className={mode === "planner" ? "trip-app" : "stretch-home"}>
+      {mode === "planner" ? (
+        <TripFlowHeader step={1} />
+      ) : (
+        <>
+          <a className="skip" href="#main-content">
+            Skip to main content
+          </a>
+          <header>
+            <nav>
+              <button onClick={plan}>PLAN A TRIP</button>
+            </nav>
+            <a href="#" aria-label="Stretch home">
+              <img
+                className="logo"
+                src="/assets/stretch-logo.png"
+                alt="Stretch"
+              />
+            </a>
+            <nav>
+              <button onClick={plan}>MY LIST ↗</button>
+            </nav>
+          </header>
+        </>
+      )}
+      {mode === "planner" && (
+        <div className="workspace-tabs" role="group" aria-label="Planner view">
+          <button
+            aria-pressed={workspaceTab === "list"}
+            onClick={() => setWorkspaceTab("list")}
+          >
+            My list
           </button>
-        </nav>
-      </header>
-      <main>
-        <section className="hero">
-          <div>
-            <p className="eyebrow">MADE FOR EVERYDAY ATLANTA ADVENTURES</p>
-            <h1>
-              The little trip
-              <br />
-              that stretches
-              <br />
-              your budget.
-            </h1>
-            <p>
-              Your list, a smarter route, and more left over.
-              <br />
-              Compare the groceries and the drive home.
-            </p>
-            <button className="cta" onClick={plan}>
-              PLOT MY TRIP ↗
-            </button>
-          </div>
-          <Route />
-        </section>
-        {checkoutBasket && (
-          <section className="compare">
-            <div className="comparison-paper">
-              <p className="eyebrow">SAME LIST. DIFFERENT TRIPS.</p>
-              <h2>Find your sweet spot.</h2>
-              <p className="source">
-                {source === "supabase"
-                  ? "Catalog connected to Supabase"
-                  : "Demo catalog"}{" "}
-                ·{" "}
-                {catalog.offers.every((o) => o.isSample)
-                  ? "Fictional sample prices"
-                  : "Check individual price sources"}{" "}
-                · illustrative distances
+          <button
+            aria-pressed={workspaceTab === "map"}
+            onClick={() => setWorkspaceTab("map")}
+          >
+            Area map
+          </button>
+        </div>
+      )}
+      <main
+        data-view={workspaceTab}
+        id="main-content"
+        className={mode === "planner" ? "trip-planner-page" : undefined}
+      >
+        {mode === "home" && (
+          <section className="hero">
+            <div>
+              <p className="eyebrow">MADE FOR EVERYDAY ATLANTA ADVENTURES</p>
+              <h1>
+                The little trip
+                <br />
+                that stretches
+                <br />
+                your budget.
+              </h1>
+              <p>
+                Your list, a smarter route, and more left over.
+                <br />
+                Compare verified local baskets and the drive home.
               </p>
-              <p className="small">
-                {gasStop
-                  ? `Route includes ${gasStop.name} after the grocery stops. Fuel uses ${fuelSource ? `its reported price from ${new Date(fuelSource.period).toLocaleString()}` : "your entered gas price"}. Grocery prices remain sample data.`
-                  : "Fuel estimate: manually entered gas price; no gas station selected."}
-              </p>
-              {error && (
-                <p role="status" className="alert">
-                  {error}
-                </p>
-              )}
-              <div className="trip-cards">
-                {complete.slice(0, 3).map((t, i) => (
-                  <button
-                    key={t.id}
-                    className={
-                      "trip-card " + (active?.id === t.id ? "chosen" : "")
-                    }
-                    onClick={() => {
-                      setSelected(t.id);
-                      setShowPlanner(true);
-                      setChecked([]);
-                    }}
-                    aria-pressed={active?.id === t.id}
-                  >
-                    <span className="eyebrow">
-                      {i === 0
-                        ? "LOWEST TOTAL"
-                        : t.stops.length + " STOP OPTION"}
-                    </span>
-                    <h3>{t.stops.map((s) => s.store.name).join(" + ")}</h3>
-                    <strong>{money(t.totalCents)}</strong>
-                    <span>
-                      Food {money(t.foodCents)} + fuel {money(t.fuelCents)}
-                    </span>
-                    <span>
-                      {t.stops.length} grocery stop
-                      {t.stops.length > 1 ? "s" : ""}
-                      {gasStop ? ` + ${gasStop.name}` : ""} · {t.miles} miles ·
-                      ~{t.minutes} min
-                    </span>
-                    <b>
-                      {t.totalCents <= prefs.budget * 100
-                        ? money(prefs.budget * 100 - t.totalCents) +
-                          " under budget"
-                        : money(t.totalCents - prefs.budget * 100) +
-                          " over budget"}
-                    </b>
-                  </button>
-                ))}
-              </div>
-              {!complete.length && (
-                <p role="status">
-                  {calculation.error ||
-                    (!basket.length
-                      ? "Add items to your list to compare trips."
-                      : "No complete trip matches this list. Review dietary conflicts or substitutions below.")}
-                </p>
-              )}
-              {extra > 0 && (
-                <p className="tradeoff">
-                  One extra stop saves {money(extra)} versus the cheapest single
-                  store. Your call.
-                </p>
-              )}
-              <p className="small">
-                Fuel includes the drive home
-                {gasStop ? " via your selected gas station" : ""}. Time allows
-                12 minutes per grocery stop
-                {gasStop ? " and 5 minutes for fuel" : ""}; tax excluded.
-              </p>
+              <p className="small">Atlanta-area pilot · store prices appear only where a connected source verifies them.</p>
+              <button className="cta" onClick={plan}>
+                PLOT MY TRIP ↗
+              </button>
             </div>
-            <button className="list-banner" onClick={plan}>
-              YOUR NEXT GOOD TRIP STARTS WITH A LIST.{" "}
-              <span>BUILD MY LIST ↗</span>
-            </button>
+            <Route />
           </section>
         )}
-        <section
-          id="planner"
-          className={"planner " + (!showPlanner ? "collapsed" : "")}
-        >
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">LET’S MAKE THE NUMBERS WORK</p>
-              <h2>First, pick your food.</h2>
-              <p className="small" role="status">
-                {routesLoading || !currentRoutes
-                  ? "Loading driving routes…"
-                  : gasStop
-                    ? `Route includes ${gasStop.name}`
-                    : "Driving routes ready"}
-              </p>
+        {mode === "planner" && (
+          <section id="planner" className="planner">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">STEP 1 OF 3 · YOUR FOOD LIST</p>
+                <h1>Grocery list</h1>
+                <p>
+                  Build or reuse a list, then compare supported local prices and
+                  nearby gas stops. Unverified stores stay out of trip totals.
+                </p>
+              </div>
             </div>
-
-            <button
-              className="text-button"
-              onClick={() => setShowPlanner(!showPlanner)}
-            >
-              {showPlanner ? "Hide planner −" : "Open planner +"}
-            </button>
-          </div>
-
-          {showPlanner && (
-            <>
+            <details className="trip-settings">
+              <summary>
+                Trip settings · ${prefs.budget} budget ·{" "}
+                {searchOrigin?.label || "Detecting your area…"}
+              </summary>
               <div className="settings">
                 <label>
                   Starting area
@@ -543,377 +500,167 @@ export default function Stretch({
                   </label>
                 ))}
                 <span>
-                  Preferences flag incompatible items; swaps require your
-                  approval.
+                  Keep your dietary preferences with your trip. Confirm
+                  suitability on each product label.
                 </span>
               </div>
               <p className="small">
                 Dietary tags are sample data. Confirm ingredients and allergen
                 labels before buying.
               </p>
-              <div className="planner-grid">
-                <div>
-                  <div className="search-row">
-                    <label>
-                      Find a staple
-                      <input
-                        placeholder="Search your groceries…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                    </label>
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setBasket([]);
-                        setChecked([]);
-                      }}
-                    >
-                      Clear list
-                    </button>
-                  </div>
-                  <div className="products">
-                    {!search.trim() && !basket.length && (
-                      <p className="empty-list">
-                        Your grocery list is empty. Search for a food to add it.
-                      </p>
-                    )}
-                    {catalog.products
-                      .filter((p) =>
-                        search.trim()
-                          ? (p.name + " " + p.category)
-                              .toLowerCase()
-                              .includes(search.trim().toLowerCase())
-                          : basket.some((item) => item.productId === p.id),
-                      )
-                      .map((p) => {
-                        const q =
-                          basket.find((i) => i.productId === p.id)?.quantity ??
-                          0;
-                        return (
-                          <article
-                            key={p.id}
-                            className={q ? "product added" : "product"}
-                          >
-                            <span className="emoji">{p.emoji}</span>
-                            <h3>{p.name}</h3>
-                            <small>{p.unit}</small>
-                            <div className="quantity">
-                              <button
-                                onClick={() => quantity(p.id, -1)}
-                                disabled={!q}
-                                aria-label={"Remove one " + p.name}
-                              >
-                                −
-                              </button>
-                              <output aria-label={p.name + " quantity"}>
-                                {q}
-                              </output>
-                              <button
-                                onClick={() => quantity(p.id, 1)}
-                                disabled={q === 99}
-                                aria-label={"Add one " + p.name}
-                              >
-                                +
-                              </button>
-                            </div>
-                          </article>
-                        );
-                      })}
-                  </div>
-                </div>
-                <aside aria-live="polite">
-                  <p className="eyebrow">STEP 1 · BUILD YOUR FOOD LIST</p>
-                  <p>
-                    {basket.length} different foods selected. Checkout searches
-                    nearby groceries and gas stations.
-                  </p>
-                  <button
-                    className="cta"
-                    disabled={
-                      !basket.length ||
-                      !searchOrigin ||
-                      checkoutBusy ||
-                      basket.some((i) => i.quantity > 20)
-                    }
-                    onClick={checkout}
-                  >
-                    {checkoutBusy
-                      ? "FINDING YOUR AREA…"
-                      : "CHECKOUT · FIND MY STOPS"}
-                  </button>
-                  <p className="eyebrow">YOUR NEXT GOOD TRIP</p>
-                  <h2>
-                    {active ? money(active.totalCents) : "Let’s find a way."}
-                  </h2>
-                  {calculation.error && (
-                    <p className="alert" role="alert">
-                      {calculation.error}
-                    </p>
-                  )}
-                  {active && (
-                    <>
-                      <p>
-                        Home →{" "}
-                        {active.stops.map((s) => s.store.name).join(" → ")} →
-                        Home
-                      </p>
-                      <p>
-                        {active.miles} round-trip miles · ~{active.minutes} min
-                      </p>
-                      <button className="cta" onClick={download}>
-                        DOWNLOAD CHECKLIST ↓
-                      </button>
-                      {active.stops.map((s) => (
-                        <div className="shopping-stop" key={s.store.id}>
-                          <h3>{s.store.name}</h3>
-                          {s.items.map((i) => {
-                            const key = s.store.id + i.productId;
-                            const stale =
-                              Date.now() - Date.parse(i.recordedAt) >
-                              7 * 86400000;
-                            return (
-                              <label key={key} className="check-item">
-                                <input
-                                  type="checkbox"
-                                  checked={checked.includes(key)}
-                                  onChange={(e) =>
-                                    setChecked((old) =>
-                                      e.target.checked
-                                        ? [...old, key]
-                                        : old.filter((x) => x !== key),
-                                    )
-                                  }
-                                />
-                                <span>
-                                  {i.quantity} × {i.name}
-                                  <small>
-                                    {i.unit} ·{" "}
-                                    {money(i.priceCents * i.quantity)}
-                                    <br />
-                                    {i.isSample ? "Sample" : "Recorded"}:{" "}
-                                    {new Date(i.recordedAt).toLocaleDateString(
-                                      "en-US",
-                                      { timeZone: "UTC" },
-                                    )}
-                                    {stale ? " · older than 7 days" : ""}
-                                  </small>
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </>
-                  )}
-                  {swaps.length > 0 && (
-                    <div className="swaps">
-                      <h3>Make room in your budget.</h3>
-                      {swaps.map((s) => (
-                        <article key={s.fromId}>
-                          <b>
-                            {
-                              catalog.products.find((p) => p.id === s.fromId)
-                                ?.name
-                            }{" "}
-                            → {s.product.name}
-                          </b>
-                          <p>{s.note}</p>
-                          <p>
-                            {s.savings === null
-                              ? "Resolves a dietary conflict"
-                              : `Save ${money(s.savings)} on the whole trip`}
-                          </p>
-                          <button
-                            onClick={() => {
-                              setPreviousBasket(basket);
-                              setBasket(s.updated);
-                              setChecked([]);
-                              setSelected(null);
-                              setNotice(
-                                "Swapped to " +
-                                  s.product.name +
-                                  ". You can undo it.",
-                              );
-                            }}
-                          >
-                            Use this swap
-                          </button>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                  {notice && (
-                    <p role="status">
-                      {notice}{" "}
-                      <button
-                        onClick={() => {
-                          if (previousBasket) setBasket(previousBasket);
-                          setPreviousBasket(null);
-                          setChecked([]);
-                          setNotice("Swap undone.");
-                        }}
-                      >
-                        Undo swap
-                      </button>
-                    </p>
-                  )}
-                  {calculation.trips
-                    .filter((t) => t.missing.length)
-                    .map((t) => (
-                      <details key={t.id}>
-                        <summary>
-                          {t.stops.map((s) => s.store.name).join(" + ")} —
-                          incomplete
-                        </summary>
-                        <p>
-                          Missing or incompatible: {t.missing.join(", ")}.
-                          Excluded from cheapest-trip ranking.
-                        </p>
-                      </details>
-                    ))}
-                  <p className="small">
-                    Locations and routes are illustrative. Live directions
-                    aren’t available for fictional stores.
-                  </p>
-                </aside>
+            </details>
+            <details className="saved-lists">
+              <summary>Saved lists · {savedLists.length}</summary>
+              <div className="saved-lists-content">
+              <div className="saved-list-controls">
+                <label>List name
+                  <input value={savedListName} maxLength={60} placeholder="Weekly groceries" onChange={(event) => setSavedListName(event.target.value)} />
+                </label>
+                <button type="button" disabled={!basket.length} onClick={saveList}>SAVE CURRENT LIST</button>
               </div>
-            </>
-          )}
-        </section>
-        {checkoutBasket && (
-          <div id="checkout-results">
-            <p className="eyebrow">STEP 2 · YOUR STORES & GAS STOPS</p>
-            <button type="button" onClick={plan}>
-              Edit your food list
-            </button>
-            <PriceAgent
-              autoStart
-              gasStop={gasStop}
-              gasPrice={prefs.gas}
-              gasPriceReported={!!fuelSource}
-              mpg={prefs.mpg}
-              key={JSON.stringify([checkoutRun, checkoutBasket, prefs.area])}
-              zip={searchOrigin?.zip ?? centers[prefs.area].zip}
-              area={prefs.area}
-              origin={searchOrigin}
-              items={checkoutBasket.map((item) => {
-                const p = catalog.products.find(
-                  (p) => p.id === item.productId,
-                )!;
-                return {
-                  id: p.id,
-                  name: p.name,
-                  unit: p.unit,
-                  quantity: item.quantity,
-                };
-              })}
-            />
-            <LiveSources
-              key={checkoutRun}
-              autoLoad
-              area={prefs.area}
-              origin={searchOrigin}
-              onOrigin={(next) => {
-                setSearchOrigin(next);
-                setGasStop(null);
-                setFuelSource(null);
-                setPrefs((previous) => ({ ...previous, gas: manualGas }));
-              }}
-              onArea={(area) => change("area", area)}
-              selectedStation={gasStop}
-              onStation={(stop, quote) => {
-                setGasStop(stop);
-                setFuelSource(quote);
-                setPrefs((previous) => ({
-                  ...previous,
-                  gas: quote?.dollarsPerGallon ?? manualGas,
-                }));
-                setSelected(null);
-                setChecked([]);
-                setNotice(
-                  stop
-                    ? `${stop.name} added to your trip. ${quote ? "Using its reported pump price." : "Using your entered gas price."} Recalculating the route and fuel cost.`
-                    : "Gas stop removed from your trip.",
-                );
-              }}
-            />
-          </div>
+              {savedLists.length ? <ul>{savedLists.map((list) => <li key={list.id}>
+                <span><strong>{list.name}</strong><small>{list.basket.length} foods · {new Date(list.savedAt).toLocaleDateString()}</small></span>
+                <button type="button" onClick={() => loadList(list)}>Use list</button>
+                <button type="button" aria-label={`Delete ${list.name}`} onClick={() => deleteList(list.id)}>Remove</button>
+              </li>)}</ul> : <p className="small">No saved lists yet. Add food, then save it for next time.</p>}
+              <p className="small">Saved on this device only. Prices and availability are checked again each trip.</p>
+              {savedListNotice && <p role="status" className="small">{savedListNotice}</p>}
+              </div>
+            </details>
+            <div className="planner-grid">
+              <div>
+                <div className="search-row">
+                  <label>
+                    Find a staple
+                    <input
+                      placeholder="Search your groceries…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      setBasket([]);
+                      persistBasket([]);
+                    }}
+                  >
+                    Clear list
+                  </button>
+                </div>
+                <div className="products">
+                  {!search.trim() && !basket.length && (
+                    <p className="empty-list">
+                      Your grocery list is empty. Search for a food to add it.
+                    </p>
+                  )}
+                  {catalog.products
+                    .filter((p) =>
+                      search.trim()
+                        ? (p.name + " " + p.category)
+                            .toLowerCase()
+                            .includes(search.trim().toLowerCase())
+                        : basket.some((item) => item.productId === p.id),
+                    )
+                    .map((p) => {
+                      const q =
+                        basket.find((i) => i.productId === p.id)?.quantity ?? 0;
+                      return (
+                        <article
+                          key={p.id}
+                          className={q ? "product added" : "product"}
+                        >
+                          <span className="emoji">{p.emoji}</span>
+                          <h3>{p.name}</h3>
+                          <small>{p.unit}</small>
+                          <div className="quantity">
+                            <button
+                              onClick={() => quantity(p.id, -1)}
+                              disabled={!q}
+                              aria-label={"Remove one " + p.name}
+                            >
+                              −
+                            </button>
+                            <output aria-label={p.name + " quantity"}>
+                              {q}
+                            </output>
+                            <button
+                              onClick={() => quantity(p.id, 1)}
+                              disabled={q === 99}
+                              aria-label={"Add one " + p.name}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                </div>
+              </div>
+              <aside aria-live="polite">
+                <p>
+                  {basket.length} {basket.length === 1 ? "food" : "foods"}{" "}
+                  selected. Next, compare nearby stores and choose your gas
+                  stop.
+                </p>
+                <button
+                  className="cta"
+                  disabled={
+                    !basket.length ||
+                    !searchOrigin ||
+                    basket.some((i) => i.quantity > 20)
+                  }
+                  onClick={checkout}
+                >
+                  CONTINUE TO STORES & GAS →
+                </button>
+                {checkoutError && (
+                  <p className="alert" role="alert">
+                    {checkoutError}
+                  </p>
+                )}
+                {basket.some((item) => item.quantity > 20) && (
+                  <p role="alert">Use up to 20 of each food per search.</p>
+                )}
+                <p className="small">
+                  Prices and driving costs are compared in the next step.
+                </p>
+              </aside>
+            </div>
+          </section>
         )}
-        <section id="story" className="story">
-          <div>
-            <p className="eyebrow">FOOD + FUEL + A PLAN</p>
-            <h2>
-              Your budget called.
-              <br />
-              Go a little further.
-            </h2>
-            <p>
-              Make the whole trip work for you. Choose one stop,
-              <br />
-              try a swap, or take the scenic savings.
-            </p>
-            <div className="steps">
-              <span>
-                <b>01</b>MAKE A LIST
-              </span>
-              <span>
-                <b>02</b>COMPARE TRIPS
-              </span>
-              <span>
-                <b>03</b>BRING IT HOME
-              </span>
+        {mode === "planner" && (
+          <section className="planner-area-map" aria-label="Your starting area">
+            <div className="map-panel-heading">
+              <p className="eyebrow">LOCATION</p>
+              <h2>Your starting area</h2>
+              <p>
+                {searchOrigin?.label ||
+                  "Choose a starting area in trip settings."}
+              </p>
             </div>
-            <button className="cta" onClick={plan}>
-              TRY STRETCH ↗
-            </button>
-          </div>
-          <div className="stripes">
-            <div className="receipt">
-              <p className="eyebrow">THE WHOLE TRIP</p>
-              <strong>{active ? money(active.totalCents) : "Your plan"}</strong>
-              {active && (
-                <>
-                  <p>
-                    Groceries <b>{money(active.foodCents)}</b>
-                  </p>
-                  <p>
-                    Fuel <b>{money(active.fuelCents)}</b>
-                  </p>
-                  <hr />
-                  <p>
-                    {active.stops.length} grocery stops
-                    {gasStop ? ` + ${gasStop.name}` : ""} · {active.miles} miles
-                  </p>
-                </>
-              )}
-              <small>
-                {source === "demo" ? "Demo" : "Supabase"} catalog · sample
-                distances
-              </small>
-            </div>
-            <p className="hand">
-              More dinner.
-              <br />
-              Less detour doubt.
+            {searchOrigin ? (
+              <OpenMap
+                area={prefs.area}
+                origin={searchOrigin}
+                radius={5}
+                places={emptyMapPlaces}
+              />
+            ) : (
+              <p role="status">{locationState}</p>
+            )}
+            <p className="small">
+              Add your food first. Nearby stores and gas stops appear in step 2.
             </p>
-          </div>
-        </section>
-        <section id="how" className="closing">
-          <div>
-            <p className="eyebrow">SMALL CHANGES. FULLER BASKETS.</p>
-            <h2>Bring more home.</h2>
-            <p>Start with your list. Leave with a plan.</p>
-            <button className="cta" onClick={plan}>
-              PLAN MY FIRST TRIP ↗
-            </button>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
-      <footer>
-        STRETCH · HACKLANTA 2026 ·{" "}
-        {source === "demo" ? "DEMO DATA" : "SUPABASE CATALOG"}
-      </footer>
-    </>
+      {mode === "home" && (
+        <footer>
+          STRETCH · HACKLANTA 2026 ·{" "}
+          {source === "demo" ? "DEMO DATA" : "SUPABASE CATALOG"}
+        </footer>
+      )}
+    </div>
   );
 }

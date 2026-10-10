@@ -952,4 +952,250 @@ footer {
 
 .store-column-heading{display:block;height:auto;position:static}.store-column-heading .eyebrow{color:inherit;opacity:.8}.store-column-heading h3{line-height:1.15;overflow-wrap:anywhere}.store-column-heading p{margin:12px 0}.comparison-status{display:inline-block;line-height:1.4;padding:5px 9px;border:1px solid currentColor;border-radius:999px}
 
+.results-page{max-width:1440px;margin:0 auto;padding:65px 5% 90px}.results-intro{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:36px}.results-intro h1{max-width:720px}.results-intro p:last-child{color:var(--ink)}.results-edit{display:inline-block;border:1px solid var(--green);border-radius:999px;padding:12px 18px;color:var(--green);font-weight:700;white-space:nowrap}.results-edit:hover,.results-edit:focus-visible{background:var(--green);color:var(--cream)}.results-page>.live-sources{margin-top:28px}.results-empty{min-height:65vh;display:flex;flex-direction:column;align-items:flex-start;justify-content:center}.results-empty h1{max-width:700px}.results-empty .cta{display:inline-block;margin-top:18px}@media(max-width:700px){.results-page{padding:55px 5% 65px}.results-intro{align-items:flex-start;flex-direction:column}.results-intro h1{font-size:42px}}
+
 .comparison-substitute{display:block;font-size:12px;font-weight:700;color:var(--green);margin-bottom:12px}.comparison-fallback{border-top:1px dashed var(--green);padding-top:16px}.comparison-fallback a{display:block}.comparison-fallback .comparison-photo{height:110px}
+.trip-header { padding: 5px 6%; }
+.trip-home-link { color: var(--green); font-size: 13px; font-weight: 700; }
+.trip-progress { max-width: 1440px; margin: 42px auto 0; padding: 0 6%; }
+.trip-progress ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; padding: 0; margin: 0; gap: 24px; }
+.trip-progress li { border-bottom: 2px solid var(--sand); padding-bottom: 18px; }
+.trip-progress li.current, .trip-progress li.complete { border-color: var(--green); }
+.trip-progress li > a, .trip-progress li > span { display: flex; align-items: center; gap: 14px; }
+.trip-progress b { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--green); color: var(--green); }
+.trip-progress .current b, .trip-progress .complete b { background: var(--green); color: var(--cream); }
+.trip-progress span { font-weight: 700; color: var(--green); }
+.trip-progress small { display: block; margin-top: 5px; font-weight: 400; font-size: 12px; color: var(--ink); }
+.trip-progress .upcoming { opacity: .65; }
+.trip-planner-page { max-width: 1440px; margin: auto; }
+.trip-planner-page .planner { padding-top: 30px; }
+.trip-planner-page .section-head { margin-bottom: 28px; }
+.trip-planner-page .planner-grid aside { border-radius: 20px; position: sticky; top: 24px; }
+.trip-planner-page .product { border-radius: 14px; }
+.trip-list-summary { list-style: none; margin: 16px 0; padding: 0; }
+.trip-list-summary li { display: flex; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--sand); padding: 12px 0; }
+.trip-list-summary small { display: block; font-size: 12px; margin-top: 4px; }
+.trip-review-list { padding: 18px 22px; background: var(--sand); border-radius: 16px; margin-bottom: 24px; }
+.trip-review-list summary { cursor: pointer; font-weight: 700; }
+.trip-progress + .results-page { padding-top: 30px; }
+@media (max-width: 700px) {
+  .trip-progress { margin-top: 35px; }
+  .trip-progress ol { gap: 12px; }
+  .trip-progress li > a, .trip-progress li > span { gap: 8px; font-size: 13px; }
+  .trip-progress small { font-size: 10px; }
+  .trip-progress b { width: 28px; height: 28px; }
+  .trip-planner-page .planner-grid aside { position: static; }
+}
+/* The planner is an app workspace: only its content panels scroll. */
+.trip-app { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+.trip-app > .trip-header { flex: 0 0 64px; height: 64px; padding: 0 24px; }
+.trip-app .trip-header .logo { height: 58px; width: 110px; object-fit: contain; }
+.trip-app .trip-header:after { display: none; }
+.trip-app > .trip-progress { width: 100%; max-width: none; margin: 0; padding: 14px 24px 10px; flex-shrink: 0; }
+.trip-app .trip-progress li { padding-bottom: 10px; }
+.trip-app > main { flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 12px 24px 24px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; overflow: hidden; }
+.trip-app .planner, .results-list-panel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px; border: 1px solid var(--sand); border-radius: 20px; }
+.trip-app h1 { font-size: clamp(26px, 2.5vw, 38px); margin: 10px 0; }
+.trip-app .section-head { margin-bottom: 16px; }
+.trip-app .section-head p { font-size: 13px; }
+.trip-app .planner-grid { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; }
+.trip-app .planner-grid > div { width: 100%; }
+.trip-app .planner-grid aside { position: static; width: 100%; padding: 18px; }
+.trip-app .planner-grid aside .cta { width: 100%; }
+.trip-settings { padding: 14px; border-radius: 12px; background: var(--pale); }
+.trip-settings summary { cursor: pointer; font-size: 13px; color: var(--green); font-weight: 700; }
+.trip-app .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 14px; }
+.trip-app .settings label:first-child { grid-column: 1 / -1; }
+.planner-area-map { min-height: 0; display: flex; flex-direction: column; padding: 20px; border-radius: 20px; background: var(--pale); border: 1px solid var(--green); overflow: auto; }
+.map-panel-heading h2 { font-size: 25px; margin: 8px 0; }
+.map-panel-heading p { font-size: 13px; margin: 5px 0; }
+.planner-area-map .osm-map { flex: 1; min-height: 120px; height: auto; }
+.planner-area-map > .small, .planner-area-map .map-caption { flex-shrink: 0; font-size: 11px; margin-bottom: 0; }
+.results-map-panel { min-height: 0; min-width: 0; overflow: hidden; }
+.trip-app .results-intro { display: block; margin-bottom: 18px; }
+.trip-app .results-intro p { font-size: 12px; }
+.trip-app .results-edit { font-size: 12px; padding: 8px 12px; }
+.trip-app .search-workspace { margin: 0; padding: 18px; }
+.trip-app .search-workspace h2 { font-size: 29px; }
+.trip-app .trip-review-list { padding: 12px; font-size: 12px; }
+.compact-stop-finder { height: 100%; margin: 0; padding: 18px; display: flex; flex-direction: column; overflow: hidden; }
+.compact-stop-finder h2 { font-size: 25px; margin: 0 0 10px; }
+.compact-stop-finder .stop-toolbar { flex-shrink: 0; gap: 8px; font-size: 11px; }
+.compact-stop-finder .stop-toolbar select { padding: 6px; margin-top: 2px; }
+.compact-stop-finder .search-filters { gap: 5px; margin: 4px 0; }
+.compact-stop-finder .search-filters button { padding: 7px 9px; font-size: 11px; }
+.compact-stop-finder .next-stop-map { flex: 1; min-height: 100px; display: flex; flex-direction: column; }
+.compact-stop-finder .next-stop-map .osm-map { flex: 1; height: auto; min-height: 80px; margin-top: 12px; }
+.compact-stop-finder .map-caption { margin: 6px 0; font-size: 10px; }
+.compact-stop-finder .stop-directory { flex: 0 1 155px; overflow-y: auto; overscroll-behavior: contain; font-size: 12px; }
+.compact-stop-finder .stop-directory > p { margin: 8px 0; }
+.compact-stop-finder .stop-results { display: block; max-height: none; overflow: visible; margin: 0; }
+.compact-stop-finder .stop-results li { margin-bottom: 8px; padding: 10px; }
+.compact-stop-finder .selected-gas-stop { font-size: 11px; padding: 8px; margin: 0 0 8px; }
+.trip-app .results-empty { grid-column: 1 / -1; min-height: 0; overflow: auto; }
+.workspace-tabs { display: none; }
+@media (max-width: 800px) {
+  .trip-app > .trip-progress { padding: 10px 14px; }
+  .trip-app > main { padding: 8px 12px 12px; grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .workspace-tabs { display: flex; flex-shrink: 0; gap: 8px; padding: 0 12px 6px; }
+  .workspace-tabs button { flex: 1; padding: 8px; border: 1px solid var(--green); border-radius: 999px; background: transparent; color: var(--green); }
+  .workspace-tabs button[aria-pressed="true"] { background: var(--green); color: var(--cream); }
+  .trip-app main[data-view="list"] > .planner-area-map, .trip-app main[data-view="list"] > .results-map-panel { display: none; }
+  .trip-app main[data-view="map"] > .planner, .trip-app main[data-view="map"] > .results-list-panel { display: none; }
+  .trip-app .planner, .results-list-panel { padding: 14px; }
+  .trip-app .products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.trip-app .planner { display: flex; flex-direction: column; overflow: hidden; }
+.trip-app .planner > .section-head { flex-shrink: 0; margin-bottom: 12px; }
+.trip-app .planner .section-head p { margin: 5px 0; }
+.trip-app .trip-settings { flex-shrink: 0; max-height: 38%; overflow-y: auto; }
+.trip-app .planner-grid { flex: 1; min-height: 0; }
+.trip-app .planner-grid > div { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.trip-app .planner-grid aside { flex-shrink: 0; padding: 12px; }
+.trip-app .planner-grid aside > p { font-size: 12px; margin: 0 0 8px; }
+.trip-app .planner-grid aside > .small { margin: 8px 0 0; font-size: 10px; }
+
+/* Keep the home illustration, message, and action in one viewport. */
+.stretch-home {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.stretch-home > header,
+.stretch-home > footer {
+  flex-shrink: 0;
+}
+.stretch-home > main {
+  flex: 1;
+  min-height: 0;
+}
+.stretch-home .hero {
+  height: 100%;
+  min-height: 0;
+  padding-block: clamp(24px, 6vh, 70px);
+}
+.stretch-home footer {
+  padding: 12px;
+}
+@media (max-width: 600px) {
+  .stretch-home header {
+    height: 66px;
+  }
+  .stretch-home .logo {
+    height: 58px;
+  }
+  .stretch-home .hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(120px, 1fr);
+    align-content: center;
+    gap: clamp(6px, 2dvh, 16px);
+    padding: clamp(18px, 3dvh, 28px) 7% 12px;
+  }
+  .stretch-home .hero h1 {
+    font-size: clamp(34px, 7dvh, 47px);
+    margin: 10px 0;
+  }
+  .stretch-home .hero > div > p:not(.eyebrow) {
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .stretch-home .hero .cta {
+    margin-top: 4px;
+  }
+  .stretch-home .route-illustration {
+    min-height: 0;
+    height: 100%;
+  }
+  .stretch-home .route-illustration svg {
+    height: 100%;
+    max-height: 300px;
+  }
+  .stretch-home .route-note {
+    top: 0;
+    font-size: 22px;
+  }
+  .stretch-home footer {
+    padding: 8px;
+  }
+}
+@media (max-width: 600px) and (max-height: 620px) {
+  .stretch-home .route-note {
+    display: none;
+  }
+  .stretch-home .pin {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+  }
+  .stretch-home .pin small {
+    top: 37px;
+    font-size: 8px;
+  }
+}
+
+.trip-option { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px 0; border-top:1px solid var(--sand); font-size:14px; }
+.trip-option .cta { margin-left:auto; padding:10px 14px; font-size:11px; white-space:nowrap; }
+.trip-app > main.trip-checkout-page { display:block; overflow-y:auto; padding:18px max(24px, 6vw) 34px; }
+.trip-checkout-heading { display:flex; align-items:end; justify-content:space-between; gap:20px; margin-bottom:20px; }
+.trip-checkout-heading p:last-child { font-size:13px; }
+.trip-checkout-grid { display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(340px, .85fr); gap:20px; max-width:1400px; margin:auto; }
+.trip-checkout-basket, .trip-checkout-total { border:1px solid var(--green); border-radius:22px; padding:clamp(20px,3vw,34px); background:var(--pale); min-width:0; }
+.trip-checkout-basket h2 { font-size:clamp(25px,3vw,36px); margin:4px 0; }
+.trip-checkout-basket > p:not(.eyebrow) { font-size:13px; margin-bottom:18px; }
+.trip-checkout-basket > a { display:inline-block; margin-bottom:16px; font-size:12px; text-decoration:underline; }
+.trip-checkout-basket ul { list-style:none; padding:0; margin:0 0 18px; }
+.trip-checkout-basket li { display:flex; justify-content:space-between; gap:20px; padding:15px 0; border-bottom:1px solid var(--sand); }
+.trip-checkout-basket li strong, .trip-checkout-basket li small, .trip-checkout-stop strong, .trip-checkout-stop small { display:block; }
+.trip-checkout-basket li strong { line-height:1.3; }
+.trip-checkout-basket li small, .trip-checkout-stop small { font-size:12px; margin-top:4px; }
+.trip-checkout-basket li a, .trip-checkout-stop a { display:inline-block; font-size:12px; margin-top:8px; text-decoration:underline; }
+.trip-checkout-basket li b { white-space:nowrap; }
+.trip-checkout-total { background:var(--green); color:var(--cream); align-self:start; }
+.trip-checkout-total .eyebrow { color:inherit; }
+.trip-checkout-total h2 { font-size:clamp(46px,6vw,74px); margin:5px 0; line-height:1; }
+.trip-checkout-total-caption { font-size:13px; opacity:.88; }
+.trip-checkout-total dl { margin:22px 0; }
+.trip-checkout-total dl div { display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-bottom:1px solid currentColor; font-size:13px; }
+.trip-checkout-total dd { margin:0; font-weight:700; white-space:nowrap; }
+.trip-checkout-total .trip-checkout-total-row { font-size:18px; border-bottom:0; }
+.trip-checkout-stop { display:flex; gap:14px; padding:16px; border-radius:15px; background:var(--cream); color:var(--ink); }
+.trip-checkout-stop-icon { font-size:24px; }
+.trip-budget-status { font-size:16px; font-weight:700; margin:18px 0 8px; }
+.trip-checkout-total .small { color:inherit; font-size:11px; line-height:1.5; }
+.trip-checkout-warning { padding:10px; border:1px solid currentColor; border-radius:8px; font-size:12px; }
+.trip-checkout-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+.trip-handoff { border-top:1px solid currentColor; padding-top:16px; margin-top:18px; }
+.trip-handoff h3 { font-size:21px; margin:0 0 12px; }
+.trip-handoff-primary,.trip-handoff-shop,.trip-handoff-copy { display:block; width:100%; padding:12px 14px; margin:9px 0; border-radius:9px; text-align:center; font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
+.trip-handoff-primary { border:1px solid var(--cream); background:var(--cream); color:var(--green); }
+.trip-handoff-shop,.trip-handoff-copy { border:1px solid var(--cream); background:transparent; color:var(--cream); }
+.trip-handoff button:disabled { opacity:.55; cursor:wait; }
+.trip-checkout-actions .cta, .trip-checkout-actions button { padding:12px 15px; border-radius:8px; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+.trip-checkout-actions .cta { background:var(--cream); color:var(--green); }
+.trip-checkout-actions button { background:transparent; color:var(--cream); border:1px solid currentColor; }
+.trip-checkout-empty { max-width:650px; margin:auto; padding:8vh 0; }
+.trip-checkout-empty .cta { display:inline-block; margin-top:15px; }
+@media(max-width:800px) { .trip-app > main.trip-checkout-page { display:block; padding:12px 16px 28px; } .trip-checkout-grid { grid-template-columns:1fr; } .trip-checkout-heading { align-items:start; flex-direction:column; } .trip-progress small { display:none; } }
+@media print { .trip-checkout-shell { height:auto; overflow:visible; } .trip-checkout-shell .trip-header,.trip-checkout-shell .trip-progress,.trip-checkout-actions,.trip-checkout-heading .results-edit,.trip-checkout-basket>.results-edit { display:none!important; } .trip-app > main.trip-checkout-page { overflow:visible; } .trip-checkout-total { color:#222; background:#fff; } .trip-checkout-basket { background:#fff; } }
+
+.saved-lists { position:relative; z-index:3; flex-shrink:0; margin-top:10px; padding:12px 14px; border:1px solid var(--sand); border-radius:12px; }
+.saved-lists summary { cursor:pointer; color:var(--green); font-size:13px; font-weight:800; }
+.saved-lists-content { position:absolute; top:calc(100% + 5px); left:0; right:0; max-height:min(350px, 48vh); overflow-y:auto; padding:14px; border:1px solid var(--green); border-radius:12px; background:var(--cream); box-shadow:0 12px 28px rgba(45,58,18,.18); }
+.saved-list-controls { display:flex; align-items:end; gap:10px; margin:12px 0; }
+.saved-list-controls label { flex:1; min-width:0; font-size:11px; font-weight:700; }
+.saved-list-controls input { display:block; width:100%; margin-top:5px; padding:9px; border:1px solid var(--green); border-radius:8px; background:var(--cream); color:var(--ink); }
+.saved-list-controls button,.saved-lists li button { padding:9px 11px; border:1px solid var(--green); border-radius:8px; background:var(--green); color:var(--cream); font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
+.saved-list-controls button:disabled { opacity:.5; cursor:not-allowed; }
+.saved-lists ul { list-style:none; padding:0; margin:0; }
+.saved-lists li { display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px solid var(--sand); }
+.saved-lists li span { flex:1; min-width:0; }
+.saved-lists li strong,.saved-lists li small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.saved-lists li small { font-size:10px; }
+.saved-lists li button:last-child { background:transparent; color:var(--green); }
+.saved-lists .small { font-size:11px; margin:8px 0 0; }
+.trip-route-handoff { padding:15px; border:1px solid var(--cream); border-radius:14px; margin-top:18px; }
+.trip-route-handoff h3 { margin:0 0 5px; font-size:19px; }
+.trip-route-handoff p,.trip-route-handoff small { display:block; font-size:11px; line-height:1.4; }
+.trip-route-handoff .trip-handoff-primary { margin:12px 0 8px; }
+@media(max-width:600px) { .saved-list-controls { flex-direction:column; align-items:stretch; } .saved-lists li { flex-wrap:wrap; } .saved-lists li span { flex-basis:100%; } }

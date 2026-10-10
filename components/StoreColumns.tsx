@@ -46,7 +46,7 @@ export default function StoreColumns({
         <article className="store-column" key={report.retailer}>
           <div className="store-column-heading">
             <span className="eyebrow">
-              ONLINE RETAILER CATALOG · BRANCH UNVERIFIED
+              ONLINE PRICES · CHECK LOCAL STORE
             </span>
             <h3>{report.retailer}</h3>
             <p>
@@ -66,7 +66,7 @@ export default function StoreColumns({
               {report.status === "pending"
                 ? "Searching website…"
                 : report.status === "retrieved"
-                  ? "Online listing found · no branch price"
+                  ? "Local store price not confirmed"
                   : "Live pricing unavailable"}
             </span>
             {onRetry &&
