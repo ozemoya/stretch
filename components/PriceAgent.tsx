@@ -58,7 +58,9 @@ export default function PriceAgent({
         (report) =>
           report.status === "pending" ||
           report.lines.some((line) =>
-            /Collection (?:running|starting)/i.test(line.error ?? ""),
+            /Collection (?:running|starting)|Broader catalog search queued/i.test(
+              line.error ?? "",
+            ),
           ),
       )
     )
@@ -140,6 +142,7 @@ export default function PriceAgent({
           zip,
           items,
           retailers: [...new Set(result.storeCoverage.map((s) => s.retailer))],
+          broaden: true,
         }),
         signal: AbortSignal.timeout(120000),
       });

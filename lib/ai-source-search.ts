@@ -49,6 +49,7 @@ export async function discoverSources(
   item: AgentItem,
   zip: string,
   plan?: SearchPlan,
+  options?: { broader?: boolean; exclude?: string[] },
 ): Promise<string[]> {
   if (
     process.env.BRIGHT_DATA_SERP_ZONE &&
@@ -58,14 +59,23 @@ export async function discoverSources(
     const scope = instacartSlugs[retailer]
       ? `${domains[retailer]}/store/${instacartSlugs[retailer]}/products/`
       : domains[retailer];
-    const queries = [
-      `${retailer} ${item.name} site:${scope}`,
-      ...(plan?.queries[item.id] ?? []).map(
-        (phrase) => `${retailer} ${phrase} site:${scope}`,
-      ),
-      `${item.name} ${item.unit} product price site:${scope}`,
-    ].slice(0, 3);
-    for (const query of queries) {
+    const queries = options?.broader
+      ? [
+          `${retailer} ${item.name} products site:${scope}`,
+          `${item.name} grocery alternatives site:${scope}`,
+          ...(plan?.queries[item.id] ?? []).map(
+            (phrase) => `${retailer} ${phrase} site:${scope}`,
+          ),
+        ].slice(0, 3)
+      : [
+          `${retailer} ${item.name} ${item.unit} site:${scope}`,
+          ...(plan?.queries[item.id] ?? []).map(
+            (phrase) => `${retailer} ${phrase} site:${scope}`,
+          ),
+          `${retailer} ${item.name} site:${scope}`,
+        ].slice(0, 3);
+    const found = new Set<string>();
+    for (const [queryIndex, query] of queries.entries()) {
       await reserveRecords(1);
       const response = await fetch("https://api.brightdata.com/request", {
         method: "POST",
@@ -91,12 +101,18 @@ export async function discoverSources(
         const urls = (Array.isArray(result.organic) ? result.organic : [])
           .map((r: { link?: string }) => r.link)
           .filter((url: unknown): url is string => typeof url === "string");
-        const products = urls
-          .filter((url: string) => validDiscoveredSource(retailer, url))
-          .slice(0, 3);
-        if (products.length) return products;
+        for (const url of urls) {
+          if (
+            validDiscoveredSource(retailer, url) &&
+            !options?.exclude?.includes(url)
+          )
+            found.add(url);
+          if (found.size === 3) return [...found];
+        }
       }
+      if (queryIndex >= 1 && found.size) return [...found];
     }
+    if (found.size) return [...found];
   }
   if (!process.env.OPENAI_API_KEY || !domains[retailer]) return [];
   const now = Date.now();
@@ -155,6 +171,10 @@ export async function discoverSources(
           urls.push(annotation.url);
   }
   return [...new Set(urls)]
-    .filter((url) => validDiscoveredSource(retailer, url))
+    .filter(
+      (url) =>
+        validDiscoveredSource(retailer, url) &&
+        !options?.exclude?.includes(url),
+    )
     .slice(0, 3);
 }

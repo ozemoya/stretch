@@ -8,6 +8,7 @@ import { verifiedProductSources } from "./verified-product-sources";
 import { reserveRecords } from "./provider-budget";
 import { discoverSources, validDiscoveredSource } from "./ai-source-search";
 import type { SearchPlan } from "./local-search-agent";
+import { packageMatches, prioritizePackageMatches } from "./package-match";
 
 type ProviderConfig = {
   id: string;
@@ -52,6 +53,8 @@ type Job = {
   checked: number;
   status: string;
   fallback?: boolean;
+  packageFallback?: boolean;
+  sourceUrls?: string[];
   stage?: "discovery" | "products";
   products?: ScrapedProduct[];
   error?: string;
@@ -68,6 +71,16 @@ export function matchesRequestedFood(name: string, term: string) {
     words.some(
       (value) => value === word || value === word + "s" || word === value + "s",
     ),
+  );
+}
+export function needsBroaderCatalogSearch(
+  products: ScrapedProduct[],
+  item: AgentItem,
+): boolean {
+  return !products.some(
+    (product) =>
+      matchesRequestedFood(product.name, item.name) &&
+      packageMatches(item.unit, product.size),
   );
 }
 async function api(endpoint: string, body?: unknown) {
@@ -199,6 +212,7 @@ async function job(
   start: boolean,
   cacheOnly = false,
   plan?: SearchPlan,
+  broadenUnmatched = false,
 ): Promise<Job> {
   const config = providers[retailer];
   let configuredUrls: string[] = [];
@@ -284,6 +298,40 @@ async function job(
     const now = Date.now();
     if (cacheOnly)
       return saved ?? { started: now, checked: now, status: "not_requested" };
+    if (
+      (start || broadenUnmatched) &&
+      (saved?.status === "ready" || saved?.status === "failed") &&
+      !saved.packageFallback &&
+      !config.keyword &&
+      needsBroaderCatalogSearch(saved.products ?? [], item)
+    ) {
+      saved.packageFallback = true;
+      const extraUrls = await discoverSources(retailer, item, zip, plan, {
+        broader: true,
+        exclude: saved.sourceUrls ?? configuredUrls,
+      }).catch(() => []);
+      if (extraUrls.length) {
+        const next = await api(
+          `trigger?dataset_id=${config.id}&format=json&include_errors=true`,
+          {
+            input: extraUrls.map((url) => ({ url })),
+            limit_per_input: 1,
+          },
+        );
+        if (/^s[d]?_[a-z0-9]+$/.test(next.snapshot_id ?? "")) {
+          saved.id = next.snapshot_id;
+          saved.status = "running";
+          saved.stage = "products";
+          saved.error = undefined;
+          saved.sourceUrls = [
+            ...new Set([...(saved.sourceUrls ?? configuredUrls), ...extraUrls]),
+          ];
+          saved.checked = now;
+        }
+      }
+      await writeFile(filename, JSON.stringify(saved));
+      return saved;
+    }
     if (!start && saved?.status === "ready" && saved.products?.length)
       return saved;
     if (
@@ -309,12 +357,20 @@ async function job(
       saved.status = state.status;
       if (state.status === "ready") {
         const raw = await api(`snapshot/${saved.id}?format=json`);
-        saved.products = parseProviderProducts(
+        const freshProducts = parseProviderProducts(
           raw,
           config.host,
           undefined,
           retailer,
         );
+        saved.products = [
+          ...new Map(
+            [...(saved.products ?? []), ...freshProducts].map((product) => [
+              product.sourceUrl,
+              product,
+            ]),
+          ).values(),
+        ];
         if (
           !saved.products.length &&
           Array.isArray(raw) &&
@@ -436,6 +492,7 @@ async function job(
       status: "running",
       stage: config.method ? "discovery" : "products",
       products: saved?.products,
+      sourceUrls: configuredUrls,
     };
     await writeFile(filename, JSON.stringify(saved));
     return saved;
@@ -455,6 +512,7 @@ export async function providerReports(
   cacheOnly = false,
   onReport?: (report: ScrapeReport) => void,
   plan?: SearchPlan,
+  broadenUnmatched = false,
 ): Promise<ScrapeReport[]> {
   if (!providerConfigured()) return [];
   const supported = [...new Set(retailers)].filter((retailer) =>
@@ -479,26 +537,38 @@ export async function providerReports(
             start,
             cacheOnly,
             plan,
+            broadenUnmatched,
           );
           line = {
             item,
-            products: selectFoodMatches(
-              (state.products ?? []).filter(
-                (product) =>
-                  providers[retailer].host !== "www.instacart.com" ||
-                  retailer === "Whole Foods" ||
-                  validDiscoveredSource(retailer, product.sourceUrl),
+            products: prioritizePackageMatches(
+              selectFoodMatches(
+                (state.products ?? []).filter(
+                  (product) =>
+                    providers[retailer].host !== "www.instacart.com" ||
+                    retailer === "Whole Foods" ||
+                    validDiscoveredSource(retailer, product.sourceUrl),
+                ),
+                item.name,
+                matchesRequestedFood,
               ),
-              item.name,
-              matchesRequestedFood,
+              item.unit,
             ),
-            ...(state.status !== "ready"
+            ...((state.status === "ready" || state.status === "failed") &&
+            !state.packageFallback &&
+            needsBroaderCatalogSearch(state.products ?? [], item) &&
+            !Object.hasOwn(providers[retailer], "keyword")
               ? {
                   error:
-                    state.error ??
-                    `Collection ${state.status}. Refresh to check existing work.`,
+                    "Broader catalog search queued for the requested package.",
                 }
-              : {}),
+              : state.status !== "ready"
+                ? {
+                    error:
+                      state.error ??
+                      `Collection ${state.status}. Refresh to check existing work.`,
+                  }
+                : {}),
           };
         } catch {
           line = {

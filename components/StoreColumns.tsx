@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { foodAlternatives } from "@/lib/food-alternatives";
+import { packageMatches } from "@/lib/package-match";
 import type { AgentItem } from "@/lib/price-agent";
 import type { ScrapeReport, ScrapedProduct } from "@/lib/retailer-scraper";
 
@@ -95,6 +96,11 @@ export default function StoreColumns({
                     {product.matchKind === "alternative" && (
                       <span className="comparison-substitute">
                         Similar item · review before choosing
+                      </span>
+                    )}
+                    {!packageMatches(item.unit, product.size) && (
+                      <span className="comparison-substitute">
+                        Different package size · compare before choosing
                       </span>
                     )}
                     <ProductPhoto key={product.id} product={product} />

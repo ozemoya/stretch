@@ -44,8 +44,33 @@ it("uses the local agent's food query when the first retailer search misses", as
     },
   );
   expect(queries).toHaveLength(2);
+  expect(queries[0]).toContain("eggs dozen");
   expect(queries[1]).toContain("large grade a eggs 12 count");
   expect(result).toHaveLength(1);
+});
+it("searches beyond an already collected package and excludes that product page", async () => {
+  process.env.BRIGHT_DATA_API_KEY = "test-only";
+  process.env.BRIGHT_DATA_SERP_ZONE = "test-only";
+  const half =
+    "https://www.instacart.com/store/the-fresh-market/products/19476600-milk-64-fl-oz";
+  const gallon =
+    "https://www.instacart.com/store/the-fresh-market/products/20704843-milk-128-fl-oz";
+  const queries: string[] = [];
+  globalThis.fetch = vi.fn(async (_url, init) => {
+    queries.push(
+      new URL(JSON.parse(String(init?.body)).url).searchParams.get("q") ?? "",
+    );
+    return Response.json({ organic: [{ link: half }, { link: gallon }] });
+  }) as typeof fetch;
+  const result = await discoverSources(
+    "The Fresh Market",
+    { id: "milk", name: "milk", unit: "1 gallon", quantity: 1 },
+    "30303",
+    undefined,
+    { broader: true, exclude: [half] },
+  );
+  expect(queries[0]).toContain("milk products");
+  expect(result).toEqual([gallon]);
 });
 it("searches The Fresh Market's full Instacart catalog for a requested food", async () => {
   process.env.BRIGHT_DATA_API_KEY = "test-only";
