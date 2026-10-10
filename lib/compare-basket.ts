@@ -65,6 +65,7 @@ export async function compareBasket(
     request.signal.throwIfAborted();
     const p = parsed.data;
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
+    request.signal.throwIfAborted();
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([
       options.deferPublic
@@ -105,6 +106,7 @@ export async function compareBasket(
     }
     for (const [index, report] of publicCatalogs.entries())
       publicCatalogs[index] = normalizeCatalogReport(report, p.items);
+    request.signal.throwIfAborted();
     const checkedStores = [] as Awaited<ReturnType<typeof checkStores>>;
     const warnings: string[] = [];
     try {

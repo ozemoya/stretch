@@ -23,6 +23,7 @@ import {
   settlePendingReports,
 } from "@/lib/search-state";
 import { normalizeCatalogReport } from "@/lib/product-ownership";
+import { SEARCH_CLIENT_TIMEOUT_MS } from "@/lib/search-timing";
 import {
   hasVisibleBranchPrice,
   hasVisibleCatalogPrice,
@@ -69,6 +70,7 @@ export default function PriceAgent({
     warnings: string[];
     foundStores: number;
     agent?: { aiConnected: boolean; mode: string; reviewedMatches?: number };
+    search?: { elapsedMs: number; partial: boolean; timedOut: boolean };
   } | null>(null);
   const [liveReports, setLiveReports] = useState<ScrapeReport[]>([]);
   const [sourcesBusy, setSourcesBusy] = useState(false);
@@ -123,6 +125,9 @@ export default function PriceAgent({
       started.current = true;
       void check();
     }
+    // React replays effects in development. Its cleanup aborts the first request,
+    // so the next setup must start a replacement instead of leaving a busy screen.
+    return () => { started.current = false; };
   }, [autoStart]);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("coverage");
@@ -177,23 +182,6 @@ export default function PriceAgent({
     return () => controller.abort();
   }, [result?.stores, result?.storeCoverage, origin, area, gasStop]);
   useEffect(() => {
-    if (
-      busy || sourcesBusy ||
-      !liveReports.some(
-        (report) =>
-          report.status === "pending" ||
-          report.lines.some((line) =>
-            /Collection (?:running|starting)|Broader catalog search queued/i.test(
-              line.error ?? "",
-            ),
-          ),
-      )
-    )
-      return;
-    const timer = setTimeout(() => void refreshProvider(), 20000);
-    return () => clearTimeout(timer);
-  }, [busy, sourcesBusy, result, liveReports]);
-  useEffect(() => {
     if (!busy) return;
     setPhase(0);
     const timer = setInterval(() => setPhase((p) => Math.min(p + 1, 2)), 4000);
@@ -227,16 +215,7 @@ export default function PriceAgent({
         }),
         signal: AbortSignal.any([
           controller.signal,
-          AbortSignal.timeout(
-            Math.min(
-              240000,
-              Math.max(
-                5000,
-                Number(process.env.NEXT_PUBLIC_STRETCH_SEARCH_TIMEOUT_MS) ||
-                  120000,
-              ),
-            ),
-          ),
+          AbortSignal.timeout(SEARCH_CLIENT_TIMEOUT_MS),
         ]),
       });
       if (!epoch.current.isCurrent(requestId)) return;
@@ -289,7 +268,7 @@ export default function PriceAgent({
                 epoch.current.isCurrent(requestId) ? event.result : previous,
               );
               setBusy(false);
-              setSourcesBusy(true);
+              setSourcesBusy(false);
             }
             if (event.type === "catalog-review")
               setResult((previous) => previous && epoch.current.isCurrent(requestId)
@@ -301,7 +280,10 @@ export default function PriceAgent({
                       : previous.agent,
                   }
                 : previous);
-            if (event.type === "sources-complete") setSourcesBusy(false);
+            if (event.type === "sources-complete") {
+              setBusy(false);
+              setSourcesBusy(false);
+            }
             if (event.type === "sources-error") {
               setSourcesBusy(false);
               setSourceError(event.error);
@@ -323,7 +305,7 @@ export default function PriceAgent({
             : previous,
         );
         const message = timeout
-          ? initialComplete ? "Some retailer sources timed out. Prices already found are kept." : "Search timed out. Retry the search."
+          ? "The five-second search window ended. Any verified prices already found are kept. You can search again to check slower sources."
           : e instanceof Error ? e.message : "Price check unavailable.";
         if (initialComplete) setSourceError(message);
         else setError(message);
@@ -359,7 +341,7 @@ export default function PriceAgent({
         }),
         signal: AbortSignal.any([
           controller.signal,
-          AbortSignal.timeout(120000),
+          AbortSignal.timeout(SEARCH_CLIENT_TIMEOUT_MS),
         ]),
       });
       if (!epoch.current.isCurrent(requestId)) return;
@@ -383,6 +365,13 @@ export default function PriceAgent({
               setLiveReports((previous) => epoch.current.isCurrent(requestId)
                 ? upsertReport(previous, event.report, items)
                 : previous);
+            if (event.type === "complete") {
+              setLiveReports((previous) => epoch.current.isCurrent(requestId)
+                ? settlePendingReports((event.reports ?? []).reduce(
+                    (reports: ScrapeReport[], report: ScrapeReport) => upsertReport(reports, report, items), previous), "timeout")
+                : previous);
+              setSourcesBusy(false);
+            }
           }
           if (chunk.done) break;
         }
@@ -468,7 +457,7 @@ export default function PriceAgent({
       >
         {busy ? "SEARCH IN PROGRESS…" : "SEARCH STORES & PRICES ↗"}
       </button>
-      {busy && (
+      {(busy || sourcesBusy) && (
         <button
           type="button"
           onClick={() => {
@@ -525,12 +514,18 @@ export default function PriceAgent({
                       "Searching products and checking packages…",
                       "Preparing the first comparison…",
                     ][phase]}
-          <small>Available prices will appear as each source responds.</small>
+          <small>Up to five seconds. Verified prices appear as they arrive.</small>
         </div>
       )}
       {result && sourcesBusy && (
         <p role="status" aria-live="polite" className="small">
-          Nearby stores are ready. Live prices are updating in the background; {visibleCatalogs.length} {visibleCatalogs.length === 1 ? "retailer has" : "retailers have"} a validated online price so far.
+          Checking for new prices — up to five seconds. Your current results stay available.
+        </p>
+      )}
+      {result?.search && !sourcesBusy && (
+        <p role="status" className="small">
+          Search finished in {(result.search.elapsedMs / 1000).toFixed(1)} seconds.
+          {result.search.partial ? " Some sources did not return a verified result in time. Showing the prices received; check again to retrieve completed searches." : " Available verified prices are shown below."}
         </p>
       )}
       {sourceError && <p role="alert" className="small">{sourceError}</p>}
@@ -640,7 +635,7 @@ export default function PriceAgent({
               disabled={busy || sourcesBusy}
               onClick={() => void refreshProvider()}
             >
-              {sourcesBusy ? "Checking sources…" : "Refresh background prices"}
+              {sourcesBusy ? "Checking sources…" : "Check for new prices"}
             </button>
           )}
           {!!visibleCatalogs.length && (

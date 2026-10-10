@@ -20,8 +20,9 @@ export function traderJoesObserved(item:AgentItem,now=Date.now()):ScrapedProduct
 }
 const pending=new Map<string,Promise<ScrapeReport['lines'][number]>>();
 const recent=new Map<string,{at:number;line:ScrapeReport['lines'][number]}>();
-export async function traderJoesReport(items:AgentItem[],plan?:SearchPlan):Promise<ScrapeReport> {
+export async function traderJoesReport(items:AgentItem[],plan?:SearchPlan,signal?:AbortSignal):Promise<ScrapeReport> {
  const lines=await Promise.all(items.map(async item=>{
+   signal?.throwIfAborted();
    const products=traderJoesObserved(item);
    if(products.length)return {item,products};
    const key=item.name.toLowerCase();const cached=recent.get(key);
@@ -30,9 +31,10 @@ export async function traderJoesReport(items:AgentItem[],plan?:SearchPlan):Promi
    const task=(async()=>{
      let products:ScrapedProduct[]=[];
      try {
-       const urls=await discoverSources(retailer,item,"",plan);
+       const urls=await discoverSources(retailer,item,"",plan,{signal});
+       signal?.throwIfAborted();
        const results=await Promise.allSettled(urls.map(async url=>{
-         const response=await fetch(url,{redirect:"error",signal:AbortSignal.timeout(12000)});
+         const response=await fetch(url,{redirect:"error",signal:signal?AbortSignal.any([signal,AbortSignal.timeout(12000)]):AbortSignal.timeout(12000)});
          if(!response.ok)return [];
          const html=await response.text();if(html.length>4000000)return [];
          return parseTraderJoesPage(html,url).filter(p=>isCloseFood(item.name,p.name));
@@ -41,7 +43,7 @@ export async function traderJoesReport(items:AgentItem[],plan?:SearchPlan):Promi
      } catch {}
      return {item,products,...(!products.length?{error:"Official product-page search completed, but price content could not be verified. A rendered-page refresh is needed."}:{})};
    })();
-   pending.set(key,task);try{const line=await task;recent.set(key,{at:Date.now(),line});return line;}finally{pending.delete(key);}
+   pending.set(key,task);try{const line=await task;if(!signal?.aborted)recent.set(key,{at:Date.now(),line});return line;}finally{pending.delete(key);}
  }));
  return {retailer,status:lines.some(l=>l.products.length)?"retrieved":"failed",detail:"Prices observed on Trader Joe’s official website; observation time is shown on each item. Cached observations expire after 24 hours. Local branch availability and checkout prices still require confirmation.",lines};
 }

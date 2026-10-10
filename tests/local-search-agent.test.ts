@@ -75,4 +75,20 @@ describe("local search agent", () => {
       expect(result.reports[0].lines[0].products[0].priceCents).toBe(599);
     } finally {globalThis.fetch=previous;}
   });
+
+  it("reuses an AI plan for repeat baskets without another model call", async () => {
+    const previous = globalThis.fetch;
+    const item = { id: "cache-oats", name: "rolled oats", unit: "18 oz", quantity: 1 };
+    const fetchMock = vi.fn(async (input: string | URL | Request) => String(input).endsWith("/api/tags")
+      ? Response.json({ models: [{ name: "llama3.2:3b" }] })
+      : Response.json({ message: { content: JSON.stringify({ searches: [{ id: item.id, queries: ["rolled oats 18 oz"] }] }) } }));
+    globalThis.fetch = fetchMock as typeof fetch;
+    try {
+      const first = await planBasketSearch([item]);
+      const second = await planBasketSearch([{ ...item, quantity: 3 }]);
+      expect(first?.queries[item.id]).toEqual(["rolled oats 18 oz"]);
+      expect(second).toEqual(first);
+      expect(fetchMock).toHaveBeenCalledTimes(2); // local model availability + one inference
+    } finally { globalThis.fetch = previous; }
+  });
 });

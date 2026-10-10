@@ -190,13 +190,15 @@ let lastAttempt = 0;
 export async function freshMarketSpecials(
   places: NearbyPlace[],
   items: AgentItem[],
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted();
   if (!cached || cached.expires <= Date.now()) {
     if (Date.now() - lastAttempt < 60000)
       throw new Error("Weekly offer source unavailable; retry in a minute.");
     lastAttempt = Date.now();
     const robots = await fetch("https://www.thefreshmarket.com/robots.txt", {
-      signal: AbortSignal.timeout(10000),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000),
       redirect: "error",
     });
     if (!robots.ok) throw new Error("Weekly offer crawling rules unavailable.");
@@ -210,7 +212,7 @@ export async function freshMarketSpecials(
     const r = await fetch(
       "https://www.thefreshmarket.com/features/weekly-features",
       {
-        signal: AbortSignal.timeout(15000),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
         redirect: "error",
         cache: "no-store",
         headers: {

@@ -222,7 +222,7 @@ export async function scrapeRetailers(
   for (const retailer of new Set(stores.map((s) => s.retailer))) {
     signal?.throwIfAborted();
     if (retailer === "Trader Joe’s") {
-      emit(await traderJoesReport(items, plan));
+      emit(await traderJoesReport(items, plan, signal));
       continue;
     }
     if (retailer === "The Fresh Market") {
@@ -231,7 +231,7 @@ export async function scrapeRetailers(
         emit(
           mergeCatalogReports(
             observed,
-            await freshMarketSpecials(places, items),
+            await freshMarketSpecials(places, items, signal),
           ),
         );
       } catch {

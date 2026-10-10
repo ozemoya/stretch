@@ -215,6 +215,7 @@ async function job(
   plan?: SearchPlan,
   broadenUnmatched = false,
   signal?: AbortSignal,
+  fast = false,
 ): Promise<Job> {
   signal?.throwIfAborted();
   const config = providers[retailer];
@@ -263,11 +264,12 @@ async function job(
     } catch {}
     // Search the requested food even when a known product URL exists. Seeds are
     // fallbacks, not a replacement for searching the wider product catalog.
-    if (!discoveryCached && start && !cacheOnly) {
+    if (!discoveryCached && start && !cacheOnly && (!fast || !seedUrls.length)) {
       try {
         discoveredUrls = await discoverSources(retailer, item, zip, plan, {
           signal,
         });
+        signal?.throwIfAborted();
         await writeFile(
           sourceFile,
           JSON.stringify({ at: Date.now(), urls: discoveredUrls }),
@@ -292,6 +294,11 @@ async function job(
       `${retailer}:${zip}:${item.name.toLowerCase()}:${configuredUrls.join(",")}${version}`,
     )
     .digest("hex");
+  // A cache read must never join a network job already running for this item.
+  if (cacheOnly) {
+    try { return JSON.parse(await readFile(path.join(directory, `${key}.json`), "utf8")); }
+    catch { return { started: Date.now(), checked: Date.now(), status: "not_requested" }; }
+  }
   if (locks.has(key)) return locks.get(key)!;
   const task = (async () => {
     await mkdir(directory, { recursive: true });
@@ -311,7 +318,7 @@ async function job(
     )
       saved = undefined;
     if (
-      (start || broadenUnmatched) &&
+      !fast && (start || broadenUnmatched) &&
       (saved?.status === "ready" || saved?.status === "failed") &&
       !saved.packageFallback &&
       !config.keyword &&
@@ -535,14 +542,15 @@ export async function providerReports(
   plan?: SearchPlan,
   broadenUnmatched = false,
   signal?: AbortSignal,
+  options: { fast?: boolean } = {},
 ): Promise<ScrapeReport[]> {
   if (!providerConfigured()) return [];
   const supported = [...new Set(retailers)].filter((retailer) =>
     Object.hasOwn(providers, retailer),
   );
   // Bound parallel website collection rather than waiting for every item in sequence.
-  const tasks = supported.flatMap((retailer) =>
-    items.map((item) => ({ retailer, item })),
+  const tasks = items.flatMap((item) =>
+    supported.map((retailer) => ({ retailer, item })),
   );
   const lines = new Map<string, ScrapeReport["lines"]>();
   let cursor = 0;
@@ -562,6 +570,7 @@ export async function providerReports(
             plan,
             broadenUnmatched,
             signal,
+            options.fast,
           );
           const state =
             boundedJobStatus(rawState.status, rawState.started) === "timeout"
@@ -595,7 +604,7 @@ export async function providerReports(
             item,
             products,
             searchStatus,
-            ...((state.status === "ready" || state.status === "failed") &&
+            ...(!options.fast && (state.status === "ready" || state.status === "failed") &&
             !state.packageFallback &&
             needsBroaderCatalogSearch(state.products ?? [], item) &&
             !Object.hasOwn(providers[retailer], "keyword")
@@ -615,8 +624,8 @@ export async function providerReports(
           line = {
             item,
             products: [],
-            error: "Website collection failed. No price assumed.",
-            searchStatus: "error",
+            error: signal?.aborted ? "Source missed the search deadline. Retry to check again." : "Website collection failed. No price assumed.",
+            searchStatus: signal?.aborted ? "timeout" : "error",
           };
         }
         const group = lines.get(retailer) ?? [];
