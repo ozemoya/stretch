@@ -1077,6 +1077,9 @@ footer {
 .planner-area-map > .small, .planner-area-map .map-caption { flex-shrink: 0; font-size: 11px; margin-bottom: 0; }
 .results-map-panel { min-height: 460px; min-width: 0; height: calc(100dvh - 190px); position: sticky; top: 12px; align-self: start; overflow: hidden; }
 .nearby-grocery-directory { margin: 16px 0 20px; padding: 16px; border: 1px solid var(--sand); border-radius: 16px; background: var(--pale); }
+.nearby-grocery-directory > summary { cursor:pointer; color:var(--green); font-weight:800; font-size:14px; }
+.nearby-grocery-directory[open] > summary { margin-bottom:12px; }
+.nearby-grocery-directory .directory-more { margin-top:10px; padding:8px 11px; border:1px solid var(--green); border-radius:9px; background:var(--cream); color:var(--green); cursor:pointer; }
 .nearby-grocery-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .nearby-grocery-heading h2 { margin: 3px 0 0; font-size: 21px; }
 .nearby-grocery-heading > strong { flex: none; color: var(--green); font-size: 13px; }
@@ -1106,8 +1109,11 @@ footer {
 .compact-stop-finder .next-stop-map { flex: 1; min-height: 100px; display: flex; flex-direction: column; }
 .compact-stop-finder .next-stop-map .osm-map { flex: 1; height: auto; min-height: 80px; margin-top: 12px; }
 .compact-stop-finder .map-caption { margin: 6px 0; font-size: 10px; }
-.compact-stop-finder .stop-directory { flex: 0 1 155px; overflow-y: auto; overscroll-behavior: contain; font-size: 12px; }
+.compact-stop-finder .stop-directory { flex: 0 0 auto; max-height:35%; overflow-y: auto; overscroll-behavior: contain; font-size: 12px; }
 .compact-stop-finder .stop-directory > p { margin: 8px 0; }
+.compact-stop-finder .gas-station-list > summary { cursor:pointer; color:var(--green); font-weight:800; padding:7px 0; }
+.compact-stop-finder .gas-station-list label { display:grid; gap:5px; margin:8px 0; }
+.compact-stop-finder .gas-station-list input { width:100%; padding:8px 10px; border:1px solid var(--green); border-radius:8px; background:var(--cream); }
 .compact-stop-finder .stop-results { display: block; max-height: none; overflow: visible; margin: 0; }
 .compact-stop-finder .stop-results li { margin-bottom: 8px; padding: 10px; }
 .compact-stop-finder .selected-gas-stop { font-size: 11px; padding: 8px; margin: 0 0 8px; }
@@ -1396,8 +1402,10 @@ footer {
 .remove-list-item:hover { color:var(--red); }
 .current-list-empty { display:flex; align-items:center; gap:12px; margin-top:16px; padding:14px; border:1px dashed #64742666; border-radius:12px; color:var(--green); }
 .current-list-empty p { margin:0; font-size:11px; line-height:1.45; }
-.save-list-card { margin-top:14px; padding:16px; background:var(--green); color:var(--cream); border-radius:16px; }
-.save-list-card .eyebrow { margin:0 0 12px; color:var(--cream); opacity:.8; }
+.save-list-card { margin-top:14px; padding:12px 16px; background:var(--pale); color:var(--green); border:1px solid var(--sand); border-radius:12px; }
+.save-list-card summary { cursor:pointer; font-weight:800; }
+.save-list-card[open] summary { margin-bottom:14px; }
+.save-list-card .eyebrow { margin:0 0 12px; color:var(--green); opacity:.8; }
 .save-list-card label { display:block; font-size:11px; font-weight:700; }
 .save-list-card input { margin-top:6px; padding:10px; border:1px solid var(--cream); background:var(--cream); color:var(--ink); }
 .save-list-button { display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:10px; padding:11px 13px; border:1px solid var(--cream); border-radius:9px; background:var(--cream); color:var(--green); font:inherit; font-size:11px; font-weight:800; cursor:pointer; }

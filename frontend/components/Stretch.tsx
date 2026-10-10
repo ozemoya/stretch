@@ -109,8 +109,8 @@ export default function Stretch({
   useEffect(() => {
     if (searchParams.has("q")) setSearch(searchParams.get("q") ?? "");
     const panel = searchParams.get("panel");
-    const element = document.querySelector<HTMLDetailsElement>(panel === "settings" ? ".trip-settings" : ".saved-lists");
-    if (panel && element) element.open = true;
+    const settings = document.querySelector<HTMLDetailsElement>(".trip-settings");
+    if (panel === "settings" && settings) settings.open = true;
   }, [searchParams]);
   const [workspaceTab, setWorkspaceTab] = useState("list");
   const [basket, setBasket] = useState<BasketItem[]>([]),
@@ -221,14 +221,6 @@ export default function Stretch({
     setSavedListNotice(basket.length === list.basket.length
       ? `Loaded “${list.name}”. Check your settings before searching.`
       : `Loaded “${list.name}” with ${list.basket.length - basket.length} unavailable food removed.`);
-  }
-  function deleteList(id: string) {
-    const updated = savedLists.filter((list) => list.id !== id);
-    if (!writeSavedLists(window.localStorage, updated)) {
-      setSavedListNotice("This browser could not remove the saved list."); return;
-    }
-    setSavedLists(updated);
-    setSavedListNotice("Saved list removed.");
   }
   function checkout() {
     if (!basket.length) return;
@@ -554,12 +546,8 @@ export default function Stretch({
           <section id="planner" className="planner">
             <div className="section-head">
               <div>
-                <p className="eyebrow">STEP 1 OF 3 · YOUR FOOD LIST</p>
                 <h1>Grocery list</h1>
-                <p>
-                  Build or reuse a list, then compare supported local prices and
-                  nearby gas stops. Unverified stores stay out of trip totals.
-                </p>
+                <p>Add what you need, then compare stores and the drive.</p>
               </div>
             </div>
             <details className="trip-settings">
@@ -666,25 +654,11 @@ export default function Stretch({
                 labels before buying.
               </p>
             </details>
-            <details className="saved-lists">
-              <summary>Saved lists · {savedLists.length}</summary>
-              <div className="saved-lists-content">
-              {savedLists.length ? <ul>{savedLists.map((list) => <li key={list.id}>
-                <span><strong>{list.name}</strong><small>{list.basket.length} foods · {new Date(list.savedAt).toLocaleDateString()}</small></span>
-                <button type="button" onClick={() => loadList(list)}>Use list</button>
-                <button type="button" aria-label={`Delete ${list.name}`} onClick={() => deleteList(list.id)}>Remove</button>
-              </li>)}</ul> : <p className="small">No saved lists yet. Add food, then save it for next time.</p>}
-              <p className="small">Saved on this device only. Prices and availability are checked again each trip.</p>
-              {savedListNotice && <p role="status" className="small">{savedListNotice}</p>}
-              </div>
-            </details>
             <div className="planner-grid">
               <div>
                 <div className="add-items-prompt">
                   <div>
-                    <p className="eyebrow">BUILD YOUR LIST</p>
-                    <h2>Add groceries to your list</h2>
-                    <p>Search the catalog and choose exactly what you need.</p>
+                    <h2>Add groceries</h2>
                     {searchNotice && <p role="status">{searchNotice}</p>}
                   </div>
                   <button
@@ -705,7 +679,7 @@ export default function Stretch({
                   <div className="current-list-heading">
                     <div>
                       <p className="eyebrow">YOUR ACTIVE LIST</p>
-                      <h2>{basket.length ? `${basket.length} items` : "Start your list"}</h2>
+                      <h2>{basket.length ? `${basket.length} ${basket.length === 1 ? "item" : "items"}` : "Start your list"}</h2>
                     </div>
                     {!!basket.length && (
                       <button
@@ -771,8 +745,8 @@ export default function Stretch({
                     </div>
                   )}
                 </div>
-                <div className="save-list-card">
-                  <p className="eyebrow">KEEP THIS LIST</p>
+                <details className="save-list-card">
+                  <summary>Save this list for later</summary>
                   <label htmlFor="active-list-name">List name</label>
                   <input
                     id="active-list-name"
@@ -785,12 +759,7 @@ export default function Stretch({
                     SAVE LIST <span>↗</span>
                   </button>
                   {savedListNotice && <p role="status" className="save-list-notice">{savedListNotice}</p>}
-                </div>
-                <p>
-                  {basket.length === 0 ? "No" : basket.length} {basket.length === 1 || basket.length === 0? "food" : "foods"}{" "}
-                  selected. Next, compare nearby stores and choose your gas
-                  stop.
-                </p>
+                </details>
                 <button
                   className="cta"
                   disabled={
@@ -816,9 +785,6 @@ export default function Stretch({
                 {basket.some((item) => item.quantity > 20) && (
                   <p role="alert">Use up to 20 of each food per search.</p>
                 )}
-                <p className="small">
-                  Prices and driving costs are compared in the next step.
-                </p>
               </aside>
             </div>
             {isAddItemsOpen && (
@@ -927,9 +893,6 @@ export default function Stretch({
             ) : (
               <p role="status">{locationState}</p>
             )}
-            <p className="small">
-              Add your food first. Nearby stores and gas stops appear in step 2.
-            </p>
           </section>
         )}
       </main>

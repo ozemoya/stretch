@@ -14,7 +14,7 @@ export default function Dashboard() {
     <div className="dashboard-heading"><div><p className="eyebrow">DASHBOARD</p><h1>Plan your grocery trip</h1><p>Make a list, compare store prices, and check the cost of the drive.</p></div><Link className="desktop-primary" href="/plan">New grocery list <span>↗</span></Link></div>
     <div className="dashboard-metrics">
       <section><SketchIcon name="tag" size={39} className="metric-icon" /><span>Your trip budget</span><strong>{draft ? `$${draft.prefs.budget.toFixed(0)}` : "—"}</strong><Link href="/plan?panel=settings">Adjust your preferences →</Link></section>
-      <section><SketchIcon name="map" size={39} className="metric-icon" /><span>Saved lists</span><strong>{ready ? lists.length : "—"}<small>lists</small></strong><small>Available on this device</small></section>
+      <section><SketchIcon name="map" size={39} className="metric-icon" /><span>Saved lists</span><strong>{ready ? lists.length : "—"}<small>{lists.length === 1 ? "list" : "lists"}</small></strong><small>Available on this device</small></section>
     </div>
     <div className="dashboard-grid">
       <section className="dashboard-journey"><SketchIcon name="star" size={52} className="journey-doodle" /><p className="eyebrow">GET STARTED</p><h2>What do you need<br />this week?</h2><p>Add your groceries, then compare prices from available stores and choose a gas stop.</p><Link className="desktop-primary" href={draft?.items.length ? "/plan/results" : "/plan"}>{draft?.items.length ? "Continue your comparison" : "Start with your groceries"} ↗</Link><div className="journey-track"><span>1<small>Your list</small></span><i /><span>2<small>Stores & gas</small></span><i /><span>3<small>Trip review</small></span></div></section>

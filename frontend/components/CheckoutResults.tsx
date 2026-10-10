@@ -27,6 +27,7 @@ export default function CheckoutResults() {
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [placesError, setPlacesError] = useState("");
   const [storeQuery, setStoreQuery] = useState("");
+  const [storeLimit, setStoreLimit] = useState(20);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const groceryStores = nearbyGroceryStores(nearbyPlaces, storeQuery);
   const groceryCount = nearbyGroceryStores(nearbyPlaces).length;
@@ -92,13 +93,10 @@ export default function CheckoutResults() {
             >
               <div className="results-intro">
                 <div>
-                  <p className="eyebrow">
-                    STEP 2 OF 3 · YOUR STORES & GAS STOPS
-                  </p>
                   <h1>Compare stores and gas</h1>
                   <p>
                     {draft.items.length}{" "}
-                    {draft.items.length === 1 ? "food" : "foods"} on your list
+                    {draft.items.length === 1 ? "item" : "items"} on your list
                     {draft.origin
                       ? ` · Starting near ${draft.origin.label}`
                       : ` · ${draft.prefs.area} area`}
@@ -111,8 +109,8 @@ export default function CheckoutResults() {
               </div>
               <details className="trip-review-list">
                 <summary>
-                  Review your food list · {draft.items.length}{" "}
-                  {draft.items.length === 1 ? "food" : "foods"}
+                  Your list · {draft.items.length}{" "}
+                  {draft.items.length === 1 ? "item" : "items"}
                 </summary>
                 <ul className="trip-list-summary">
                   {draft.items.map((item) => (
@@ -130,31 +128,6 @@ export default function CheckoutResults() {
                   {draft.prefs.gas.toFixed(2)} per gallon
                 </p>
               </details>
-              <section className="nearby-grocery-directory" aria-label="Nearby grocery store locations">
-                <div className="nearby-grocery-heading">
-                  <div>
-                    <p className="eyebrow">MAPPED STORES · {radius} MILES</p>
-                    <h2>Grocery stores near you</h2>
-                  </div>
-                  <strong>{groceryCount} found</strong>
-                </div>
-                <p className="small">Every mapped grocery location appears on the map. Store prices are shown separately when a source confirms them.</p>
-                <label className="nearby-grocery-search">
-                  Find a store
-                  <input type="search" value={storeQuery} onChange={(event) => setStoreQuery(event.target.value)} placeholder="Search names or addresses" />
-                </label>
-                <div className="nearby-grocery-list">
-                  {groceryStores.map((store) => (
-                    <button type="button" key={store.id} aria-pressed={selectedPlaceId === store.id}
-                      onClick={() => { setSelectedPlaceId((current) => current === store.id ? null : store.id); setWorkspaceTab("map"); }}>
-                      <span><strong>{store.name}</strong><small><b>Address</b> {store.address || "Not listed in map data"}</small></span>
-                      <span>{store.miles} mi <span aria-hidden="true">↗</span></span>
-                    </button>
-                  ))}
-                  {!groceryCount && <p role={placesError ? "alert" : "status"}>{placesError || "Finding nearby grocery stores on the map…"}</p>}
-                  {!!groceryCount && !groceryStores.length && <p>No stores match that search.</p>}
-                </div>
-              </section>
               <PriceAgent
                 autoStart
                 items={draft.items}
@@ -168,7 +141,6 @@ export default function CheckoutResults() {
                 maxStops={draft.prefs.maxStops}
                 nearbyPlaces={nearbyPlaces}
                 radius={radius}
-                onRadiusChange={setRadius}
                 onSelectTrip={(store, selected, route, storeLocation) => {
                   const latest = readCheckoutDraft(window.sessionStorage);
                   const review = latest && createTripReview(latest, store, selected, route, storeLocation);
@@ -181,6 +153,26 @@ export default function CheckoutResults() {
                 }}
               />
               {reviewError && <p role="alert">{reviewError}</p>}
+              <details className="nearby-grocery-directory" aria-label="Nearby grocery store locations">
+                <summary>Browse mapped grocery stores · {groceryCount} within {radius} miles</summary>
+                <p className="small">These locations are on the map. Only stores with their own confirmed prices appear in trip comparisons.</p>
+                <label className="nearby-grocery-search">
+                  Find a store
+                  <input type="search" value={storeQuery} onChange={(event) => { setStoreQuery(event.target.value); setStoreLimit(20); }} placeholder="Search names or addresses" />
+                </label>
+                <div className="nearby-grocery-list">
+                  {groceryStores.slice(0, storeLimit).map((store) => (
+                    <button type="button" key={store.id} aria-pressed={selectedPlaceId === store.id}
+                      onClick={() => { setSelectedPlaceId((current) => current === store.id ? null : store.id); setWorkspaceTab("map"); }}>
+                      <span><strong>{store.name}</strong><small>{store.address || "Address not listed"}</small></span>
+                      <span>{store.miles} mi <span aria-hidden="true">↗</span></span>
+                    </button>
+                  ))}
+                  {!groceryCount && <p role={placesError ? "alert" : "status"}>{placesError || "Finding nearby grocery stores…"}</p>}
+                  {!!groceryCount && !groceryStores.length && <p>No stores match that search.</p>}
+                </div>
+                {groceryStores.length > storeLimit && <button type="button" className="directory-more" onClick={() => setStoreLimit((count) => count + 20)}>Show 20 more stores</button>}
+              </details>
             </section>
             <section
               className="results-map-panel"

@@ -6,10 +6,8 @@ import { useEffect, useState } from "react";
 import { readCheckoutDraft } from "@/lib/checkout-draft";
 
 const navigation = [
-  ["/dashboard", "Dashboard", "◈"], ["/plan", "Find groceries", "⌕"],
-  ["/lists", "My grocery lists", "☷"], ["/plan/results", "Compare stores", "▤"],
-  ["/plan/results?view=map", "Trip planner & gas", "⌁"],
-  ["/plan?panel=settings", "Trip settings", "⚙"],
+  ["/dashboard", "Dashboard", "◈"], ["/plan", "Grocery list", "⌕"],
+  ["/lists", "Saved lists", "☷"],
 ];
 
 export default function DesktopShell({ children }: { children: React.ReactNode }) {

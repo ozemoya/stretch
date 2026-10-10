@@ -77,7 +77,6 @@ function TripSummary({ draft, review }: { draft: CheckoutDraft; review: TripRevi
   return <>
     <div className="trip-checkout-heading">
       <div>
-        <p className="eyebrow">STEP 3 OF 3 · TRIP REVIEW</p>
         <h1>Review your trip</h1>
         <p>Starting near {draft.origin?.label ?? draft.prefs.area} · {review.products.length} of {draft.items.length} items priced · {review.miles.toFixed(1)} miles round trip</p>
       </div>
