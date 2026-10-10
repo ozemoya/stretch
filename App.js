@@ -9,6 +9,10 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import HowItWorksPage from './pages/HowItWorksPage';
+import MyListPage from './pages/MyListPage';
+import PlanTripPage from './pages/PlanTripPage';
+import { starterList } from './pages/pageData';
 
 const colors = {
   cream: '#FFF9E8',
@@ -18,6 +22,7 @@ const colors = {
   ink: '#3A3B25',
   pale: '#EBECCF',
   line: 'rgba(100, 116, 38, .23)',
+  tan: '#E9E9CE',
 };
 
 const spacing = { xs: 6, sm: 10, md: 16, lg: 24, xl: 40, xxl: 64 };
@@ -51,10 +56,24 @@ function BackgroundSvg({ type }) {
       </Svg>
     );
   }
+  const topAndBottomBubbles = Array.from({ length: 17 }, (_, index) => 26 + index * 36.45);
+  const sideBubbles = Array.from({ length: 6 }, (_, index) => 26 + index * 38.34);
   return (
-    <Svg style={styles.backgroundSvg} viewBox="0 0 635 320" preserveAspectRatio="none">
+    <Svg style={styles.backgroundSvg} viewBox="0 0 635 320" preserveAspectRatio="xMidYMid slice">
       <Rect width="635" height="320" fill="#E7E9D0" />
-      <Rect x="26" y="26" width="583" height="268" rx="21" fill="#FFF9E5" />
+      <Rect x="26" y="26" width="583" height="268" fill="#FFF9E5" />
+      {topAndBottomBubbles.map((cx, index) => (
+        <React.Fragment key={`horizontal-${index}`}>
+          <Circle cx={cx} cy="26" r="21" fill="#FFF9E5" />
+          <Circle cx={cx} cy="294" r="21" fill="#FFF9E5" />
+        </React.Fragment>
+      ))}
+      {sideBubbles.map((cy, index) => (
+        <React.Fragment key={`vertical-${index}`}>
+          <Circle cx="26" cy={cy} r="21" fill="#FFF9E5" />
+          <Circle cx="609" cy={cy} r="21" fill="#FFF9E5" />
+        </React.Fragment>
+      ))}
     </Svg>
   );
 }
@@ -82,27 +101,42 @@ function ActionButton({ children, onPress, small = false }) {
   );
 }
 
-function Header({ scrollTo }) {
+function Header({ currentPage, onNavigate, scrollTo }) {
+  const handlePress = (page) => {
+    if (page === 'story') {
+      if (currentPage === 'home') {
+        scrollTo('story');
+      } else {
+        onNavigate('home', 'story');
+      }
+      return;
+    }
+
+    onNavigate(page);
+  };
+
   return (
     <View style={styles.header}>
       <BackgroundSvg type="header" />
       <View style={styles.headerNav}>
-        <Pressable accessibilityRole="link" accessibilityLabel="Plan a trip" onPress={() => scrollTo('planner')}>
-          <Text style={styles.navText}>PLAN A TRIP</Text>
+        <Pressable accessibilityRole="link" accessibilityLabel="Plan a trip" onPress={() => handlePress('plan')}>
+          <Text style={[styles.navText, currentPage === 'plan' && styles.navTextActive]}>PLAN A TRIP</Text>
         </Pressable>
-        <Pressable accessibilityRole="link" accessibilityLabel="How it works" onPress={() => scrollTo('how')}>
-          <Text style={styles.navText}>HOW IT WORKS</Text>
+        <Pressable accessibilityRole="link" accessibilityLabel="How it works" onPress={() => handlePress('how')}>
+          <Text style={[styles.navText, currentPage === 'how' && styles.navTextActive]}>HOW IT WORKS</Text>
         </Pressable>
-        <Pressable accessibilityRole="link" accessibilityLabel="Our story" onPress={() => scrollTo('story')}>
-          <Text style={styles.navText}>OUR STORY</Text>
+        <Pressable accessibilityRole="link" accessibilityLabel="Our story" onPress={() => handlePress('story')}>
+          <Text style={[styles.navText, currentPage === 'home' && styles.navTextActive]}>OUR STORY</Text>
         </Pressable>
-        <Pressable accessibilityRole="link" accessibilityLabel="My list" onPress={() => scrollTo('planner')}>
-          <Text style={styles.navText}>MY LIST ↗</Text>
+        <Pressable accessibilityRole="link" accessibilityLabel="My list" onPress={() => handlePress('list')}>
+          <Text style={[styles.navText, currentPage === 'list' && styles.navTextActive]}>MY LIST ↗</Text>
         </Pressable>
       </View>
-      <View style={styles.brand}>
-        <Image source={require('./assets/board-6.png')} accessibilityLabel="Stretch" style={styles.brandImage} />
-      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Home" onPress={() => handlePress('home')} style={styles.brandTouchable}>
+        <View style={styles.brand}>
+          <Image source={require('./assets/board-6.png')} accessibilityLabel="Stretch" style={styles.brandImage} />
+        </View>
+      </Pressable>
     </View>
   );
 }
@@ -113,14 +147,11 @@ function RouteIllustration() {
 
   return (
     <View accessibilityLabel="Illustration of a two-stop grocery route" style={[styles.routePanel, isWide && styles.wideRoutePanel]}>
-      <Text style={styles.scribble}>a little detour.{'\n'}a lot more dinner.</Text>
-      <Svg accessibilityLabel="Home to Market A to Market B and back home" style={styles.routeMap} viewBox="0 0 420 280">
-        <Path d="M47 182 C6 87 94 28 185 58 S367 61 348 161 S159 282 47 182" fill="none" stroke={colors.olive} strokeWidth="4" strokeDasharray="7 8" />
-        <Path d="m152 55 17 9-19 5m184 91-18-1 10-14m-260 34-16-9 17-7" fill="none" stroke={colors.olive} strokeWidth="4" />
-      </Svg>
-      <RouteStop label="HOME" value="⌂" style={styles.homeStop} />
-      <RouteStop label="MARKET A" value="1" style={styles.marketAStop} />
-      <RouteStop label="MARKET B" value="2" gold style={styles.marketBStop} />
+      <Image
+        source={require('./assets/example-map.png')}
+        accessibilityLabel="Example map showing a route from home to Market A to Market B and back home"
+        style={styles.routeImage}
+      />
     </View>
   );
 }
@@ -136,7 +167,7 @@ function RouteStop({ label, value, gold = false, style }) {
   );
 }
 
-function Hero({ scrollTo }) {
+function Hero({ onNavigate }) {
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
 
@@ -146,7 +177,7 @@ function Hero({ scrollTo }) {
         <SectionEyebrow>MADE FOR EVERYDAY ATLANTA ADVENTURES</SectionEyebrow>
         <Text accessibilityRole="header" style={styles.heroTitle}>The little trip{'\n'}that stretches{'\n'}your budget.</Text>
         <Text style={styles.intro}>Your list, a smarter route, and more left over.{'\n'}Compare the groceries and the drive home.</Text>
-        <ActionButton onPress={() => scrollTo('planner')}>PLOT MY TRIP ↗</ActionButton>
+        <ActionButton onPress={() => onNavigate('plan')}>PLOT MY TRIP ↗</ActionButton>
       </View>
       <RouteIllustration />
     </View>
@@ -164,7 +195,7 @@ function TripCard({ trip }) {
   );
 }
 
-function Comparison({ scrollTo }) {
+function Comparison({ onNavigate }) {
   return (
     <View nativeID="planner" style={styles.comparison}>
       <View style={styles.comparisonCard}>
@@ -176,7 +207,7 @@ function Comparison({ scrollTo }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Build my list"
-        onPress={() => scrollTo('budget')}
+        onPress={() => onNavigate('list')}
         style={styles.listBanner}
       >
         <Text style={styles.bannerText}>YOUR NEXT GOOD TRIP STARTS WITH A LIST.</Text>
@@ -186,7 +217,7 @@ function Comparison({ scrollTo }) {
   );
 }
 
-function Budget({ scrollTo }) {
+function Budget({ onNavigate }) {
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
   const [activeStep, setActiveStep] = useState(0);
@@ -217,7 +248,7 @@ function Budget({ scrollTo }) {
             </Pressable>
           ))}
         </View>
-        <ActionButton small onPress={() => scrollTo('planner')}>TRY STRETCH ↗</ActionButton>
+        <ActionButton small onPress={() => onNavigate('plan')}>TRY STRETCH ↗</ActionButton>
       </View>
       <View style={[styles.receiptScene, isWide && styles.wideReceiptScene]}>
         <BackgroundSvg type="striped" />
@@ -234,14 +265,14 @@ function Budget({ scrollTo }) {
   );
 }
 
-function Cta({ scrollTo }) {
+function Cta({ onNavigate }) {
   return (
     <View nativeID="story" style={styles.cta}>
       <View style={styles.ctaCard}>
         <SectionEyebrow>SMALL CHANGES. FULLER BASKETS.</SectionEyebrow>
         <Text accessibilityRole="header" style={styles.sectionTitle}>Bring more home.</Text>
         <Text style={styles.ctaText}>Start with your list. Leave with a plan.</Text>
-        <ActionButton onPress={() => scrollTo('planner')}>PLAN MY FIRST TRIP ↗</ActionButton>
+        <ActionButton onPress={() => onNavigate('plan')}>PLAN MY FIRST TRIP ↗</ActionButton>
       </View>
     </View>
   );
@@ -251,31 +282,72 @@ export default function App() {
   const scrollRef = useRef(null);
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
+  const [currentPage, setCurrentPage] = useState('home');
+  const [selectedTrip, setSelectedTrip] = useState('TWO-STOP LOOP');
+  const [groceryList, setGroceryList] = useState(starterList);
+
   const sectionOffsets = useMemo(() => ({ planner: isWide ? 360 : 470, budget: isWide ? 650 : 930, how: isWide ? 650 : 930, story: isWide ? 1030 : 1430 }), [isWide]);
   const scrollTo = (section) => scrollRef.current?.scrollTo({ y: sectionOffsets[section], animated: true });
 
+  const handleNavigate = (page, section) => {
+    setCurrentPage(page);
+    if (page === 'home' && section) {
+      setTimeout(() => scrollTo(section), 0);
+    }
+  };
+
+  const handleAddItem = (label, qty) => {
+    setGroceryList((currentList) => [{ id: Date.now(), label, qty, checked: false }, ...currentList]);
+  };
+
+  const handleToggleItem = (id) => {
+    setGroceryList((currentList) => currentList.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item)));
+  };
+
+  const handleRemoveItem = (id) => {
+    setGroceryList((currentList) => currentList.filter((item) => item.id !== id));
+  };
+
+  if (currentPage === 'home') {
+    return (
+      <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.content}>
+        <Header currentPage={currentPage} onNavigate={handleNavigate} scrollTo={scrollTo} />
+        <Hero onNavigate={handleNavigate} />
+        <Comparison onNavigate={handleNavigate} />
+        <Budget onNavigate={handleNavigate} />
+        <Cta onNavigate={handleNavigate} />
+        <View style={styles.footer}>
+          <BackgroundSvg type="bubbly" />
+          <Text style={styles.footerText}>STRETCH · HACKLANTA 2026 · SAMPLE DATA</Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
-    <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.content}>
-      <Header scrollTo={scrollTo} />
-      <Hero scrollTo={scrollTo} />
-      <Comparison scrollTo={scrollTo} />
-      <Budget scrollTo={scrollTo} />
-      <Cta scrollTo={scrollTo} />
-      <View style={styles.footer}>
-        <BackgroundSvg type="bubbly" />
-        <Text style={styles.footerText}>STRETCH · HACKLANTA 2026 · SAMPLE DATA</Text>
-      </View>
-    </ScrollView>
+    <View style={styles.screen}>
+      <Header currentPage={currentPage} onNavigate={handleNavigate} scrollTo={scrollTo} />
+      <ScrollView contentContainerStyle={styles.pagesContent}>
+        {currentPage === 'plan' && <PlanTripPage selectedTrip={selectedTrip} onSelectTrip={setSelectedTrip} />}
+        {currentPage === 'how' && <HowItWorksPage />}
+        {currentPage === 'list' && (
+          <MyListPage groceryList={groceryList} onToggleItem={handleToggleItem} onRemoveItem={handleRemoveItem} onAddItem={handleAddItem} />
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   content: { backgroundColor: colors.cream },
+  pagesContent: { backgroundColor: colors.cream, paddingBottom: spacing.xxl },
   header: { height: 82, backgroundColor: colors.gold, position: 'relative', justifyContent: 'center', paddingHorizontal: '5%' },
   headerNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   navText: { color: colors.olive, fontFamily: typography.sans, fontSize: 9, fontWeight: '700' },
-  brand: { position: 'absolute', top: 0, left: '50%', marginLeft: -47, width: 94, height: 64, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
+  navTextActive: { opacity: 0.65 },
+  brandTouchable: { position: 'absolute', top: 0, left: '50%', marginLeft: -47 },
+  brand: { width: 94, height: 64, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   brandImage: { width: 86, height: 55, resizeMode: 'contain' },
   hero: { minHeight: 430, paddingHorizontal: '9%', paddingVertical: spacing.xl, backgroundColor: colors.cream, flexDirection: 'column' },
   wideHero: { minHeight: 360, flexDirection: 'row' },
@@ -287,8 +359,9 @@ const styles = StyleSheet.create({
   buttonSmall: { marginTop: spacing.lg },
   buttonPressed: { opacity: 0.75 },
   buttonText: { color: colors.cream, fontFamily: typography.sans, fontSize: 8, fontWeight: '700' },
-  routePanel: { height: 240, position: 'relative', marginTop: spacing.lg },
-  wideRoutePanel: { flex: 1, height: 'auto', marginTop: 0 },
+  routePanel: { height: 290, position: 'relative', marginTop: spacing.lg, padding: spacing.sm, backgroundColor: colors.tan, borderRadius: 20 },
+  wideRoutePanel: { flex: 1, height: 'auto', minHeight: 360, marginTop: 0 },
+  routeImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   scribble: { color: colors.olive, fontFamily: typography.scribble, fontSize: 18, lineHeight: 19, position: 'absolute', right: '7%', top: 0, transform: [{ rotate: '-4deg' }] },
   routeMap: { position: 'absolute', left: 0, right: 0, top: 30, bottom: 0 },
   routeStop: { position: 'absolute', alignItems: 'center' },
