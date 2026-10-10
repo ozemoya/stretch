@@ -18,7 +18,15 @@ class SupabaseClient:
         self.client = client
         self.settings = settings
 
-    async def read_table(self, table: str) -> list[dict[str, Any]]:
+    async def read_table(
+        self,
+        table: str,
+        *,
+        filters: dict[str, str] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        order: str | None = None,
+    ) -> list[dict[str, Any]]:
         url = self.settings.supabase_url
         key = self.settings.supabase_key
         if not url or not key:
@@ -33,7 +41,13 @@ class SupabaseClient:
                     "apikey": key,
                     "Authorization": f"Bearer {key}",
                 },
-                params={"select": "*"},
+                params={
+                    "select": "*",
+                    **(filters or {}),
+                    **({"limit": str(limit)} if limit is not None else {}),
+                    **({"offset": str(offset)} if offset is not None else {}),
+                    **({"order": order} if order else {}),
+                },
             )
             response.raise_for_status()
             data = response.json()
