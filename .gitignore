@@ -18,3 +18,10 @@ provider-*-record.json
 provider-unified-*.json
 bright-data-scrapers.json
 provider-smoke.json
+
+# Python virtual environments
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc

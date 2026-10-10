@@ -8,13 +8,13 @@ Node 20.9+ required. Run `npm ci`, copy `.env.example` to `.env.local`, then `np
 
 ## Supabase setup
 
-Run `supabase/setup.sql` once in the project's SQL Editor against an empty project. It creates tables, read-only public policies, and 30 products / 90 sample offers. Alternatively, apply `supabase/migrations/202610090001_catalog.sql` and then `supabase/seed.sql` through your migration workflow.
+The FastAPI bridge reads the existing `products`, `product`, and `store` tables. `product.id` joins to `products.id`, and `product.locationID` joins to `store.locationID`. Prices are converted from dollars to frontend cents; rows without a product or store mapping are skipped.
 
-Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`, then restart Next.js. The comparison panel should say **Catalog connected to Supabase**. No service-role key is needed. Credentials are ignored by Git.
+Run the FastAPI bridge from the repository root with `uvicorn backend.main:app --reload --port 8000` after copying `backend/.env.example` to `backend/.env` and setting its Supabase credentials. Set `BACKEND_API_URL=http://localhost:8000` in the frontend `.env.local`, then restart Expo/Next.js. The comparison panel should say **Catalog connected to Supabase**. Supabase credentials belong only to the backend; never expose a service-role key to the frontend.
 
 Without a key the app explicitly uses its built-in demo catalog. A database failure displays a warning and falls back to demo data.
 
-The Stretch project was connected and verified on October 9, 2026: 30 products, 3 stores, 90 sample offers, and 6 substitutions. Local `.env.local` contains the public connection settings and is ignored by Git; each teammate or deployment must configure their own environment.
+The Stretch project was connected and verified on October 9, 2026: 30 products, 3 stores, 90 sample offers, and 6 substitutions. Local `.env.local` contains the backend URL and is ignored by Git; each teammate or deployment must configure its own backend environment.
 
 ## Project status
 

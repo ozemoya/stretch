@@ -19,4 +19,3 @@ export function selectFoodMatches(products:ScrapedProduct[],request:string,exact
 export function foodAlternatives(reports:ScrapeReport[],retailer:string,itemId:string,request:string) {
  return reports.filter(r=>r.retailer!==retailer).flatMap(r=>r.lines.filter(l=>l.item.id===itemId).flatMap(l=>l.products.filter(p=>isCloseFood(request,p.name)).map(p=>({...p,sourceRetailer:r.retailer})))).slice(0,3);
 }
-

@@ -30,4 +30,3 @@ export async function POST(request: Request) {
     cancel() { /* The bounded collectors may finish saving their existing jobs. */ },
   }),{headers:{"Content-Type":"application/x-ndjson","Cache-Control":"no-store","X-Accel-Buffering":"no"}});
 }
-
