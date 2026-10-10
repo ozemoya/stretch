@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   Area,
   FuelQuote,
@@ -8,12 +8,17 @@ import type {
   NearbyPlace,
 } from "@/lib/live-data";
 import OpenMap from "./OpenMap";
+import { originQuery, type SearchOrigin } from "@/lib/locations";
 export default function LocalFuel({
   area,
   onFuel,
+  origin,
+  autoLoad = false,
 }: {
   area: Area;
   onFuel: (quote: FuelQuote) => void;
+  origin?: SearchOrigin | null;
+  autoLoad?: boolean;
 }) {
   const [radius, setRadius] = useState(3),
     [type, setType] = useState<FuelType>("REGULAR_UNLEADED"),
@@ -25,8 +30,11 @@ export default function LocalFuel({
     updatedAt: string;
     radiusMiles: number;
     area: Area;
+    origin: SearchOrigin;
   } | null>(null);
   const run = useRef(0);
+  const started = useRef(false);
+  useEffect(()=>{if(autoLoad && !started.current){started.current=true;void search();}},[autoLoad]);
   async function search() {
     const id = ++run.current;
     setBusy(true);
@@ -35,8 +43,8 @@ export default function LocalFuel({
     setResult(null);
     try {
       const r = await fetch(
-        `/api/live/places?area=${area}&radius=${radius}&kind=fuel`,
-        { signal: AbortSignal.timeout(25000) },
+        `/api/live/places?area=${area}&radius=${radius}&kind=fuel${originQuery(origin)}`,
+        { signal: AbortSignal.timeout(45000) },
       );
       const data = await r.json();
       if (!r.ok)
@@ -55,7 +63,7 @@ export default function LocalFuel({
     setResult(null);
     try {
       const r = await fetch(
-        `/api/live/local-fuel?area=${area}&radius=${radius}&type=${type}`,
+        `/api/live/local-fuel?area=${area}&radius=${radius}&type=${type}${originQuery(origin)}`,
         { cache: "no-store", signal: AbortSignal.timeout(25000) },
       );
       const d = await r.json();
@@ -105,11 +113,13 @@ export default function LocalFuel({
             area={mapped.area}
             radius={mapped.radiusMiles}
             places={mapped.places}
+            origin={mapped.origin}
           />
           <p>
             {mapped.places.length} mapped stations returned within{" "}
             {mapped.radiusMiles} {mapped.radiusMiles === 1 ? "mile" : "miles"}.
-            Straight-line distance from {mapped.area}, not driving distance.
+            Straight-line distance from {mapped.origin.label}, not driving
+            distance.
           </p>
           <p className="small">
             Map data updated {new Date(mapped.updatedAt).toLocaleString()} · ©
