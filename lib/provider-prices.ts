@@ -7,6 +7,7 @@ import type { ScrapeReport, ScrapedProduct } from "./retailer-scraper";
 import { verifiedProductSources } from "./verified-product-sources";
 import { reserveRecords } from "./provider-budget";
 import { discoverSources, validDiscoveredSource } from "./ai-source-search";
+import type { SearchPlan } from "./local-search-agent";
 
 type ProviderConfig = { id: string; method?: string; host: string; keyword?: string };
 const providers: Record<string, ProviderConfig> = {
@@ -69,7 +70,7 @@ export function parseProviderProducts(raw: unknown, host: string, now = new Date
     return [{ id: String(p.product_id ?? p.sku ?? url.pathname), name, brand: String(p.brand ?? p.product_brand ?? ""), size, priceCents: Math.round(price * 100), sourceUrl: url.toString(), imageUrl, retrievedAt: now }];
   });
 }
-async function job(retailer: ProviderRetailer, item: AgentItem, zip: string, start: boolean, cacheOnly = false): Promise<Job> {
+async function job(retailer: ProviderRetailer, item: AgentItem, zip: string, start: boolean, cacheOnly = false, plan?: SearchPlan): Promise<Job> {
   const config = providers[retailer];
   let configuredUrls: string[] = [];
   if (!config.keyword) {
@@ -88,7 +89,7 @@ async function job(retailer: ProviderRetailer, item: AgentItem, zip: string, sta
         if (Date.now()-cached.at<86400000) configuredUrls=cached.urls.filter((value:string)=>validDiscoveredSource(retailer,value));
       } catch {}
       if (!configuredUrls.length && start) {
-        configuredUrls = await discoverSources(retailer,item,zip);
+        configuredUrls = await discoverSources(retailer,item,zip,plan);
         if(configuredUrls.length) await writeFile(sourceFile,JSON.stringify({at:Date.now(),urls:configuredUrls}));
       }
     }
@@ -150,7 +151,7 @@ async function job(retailer: ProviderRetailer, item: AgentItem, zip: string, sta
   })();
   locks.set(key, task); try { return await task; } finally { locks.delete(key); }
 }
-export async function providerReports(retailers: string[], items: AgentItem[], zip: string, start = true, cacheOnly = false, onReport?: (report: ScrapeReport) => void): Promise<ScrapeReport[]> {
+export async function providerReports(retailers: string[], items: AgentItem[], zip: string, start = true, cacheOnly = false, onReport?: (report: ScrapeReport) => void, plan?: SearchPlan): Promise<ScrapeReport[]> {
   if (!providerConfigured()) return [];
   const supported = [...new Set(retailers)].filter(retailer => Object.hasOwn(providers, retailer));
   // Bound parallel website collection rather than waiting for every item in sequence.
@@ -162,7 +163,7 @@ export async function providerReports(retailers: string[], items: AgentItem[], z
       const {retailer,item} = tasks[cursor++];
       let line: ScrapeReport["lines"][number];
       try {
-        const state = await job(retailer as ProviderRetailer,item,zip,start,cacheOnly);
+        const state = await job(retailer as ProviderRetailer,item,zip,start,cacheOnly,plan);
         line = {item,products:selectFoodMatches(state.products ?? [],item.name,matchesRequestedFood),...(state.status !== "ready" ? {error:state.error ?? `Collection ${state.status}. Refresh to check existing work.`}: {})};
       } catch { line = {item,products:[],error:"Website collection failed. No price assumed."}; }
       const group = lines.get(retailer) ?? []; group.push(line); lines.set(retailer,group);

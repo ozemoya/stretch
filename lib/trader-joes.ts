@@ -4,6 +4,7 @@ import {discoverSources,validDiscoveredSource} from "./ai-source-search";
 import type {AgentItem} from "./price-agent";
 import type {ScrapedProduct,ScrapeReport} from "./retailer-scraper";
 import {isCloseFood} from "./food-alternatives";
+import type {SearchPlan} from "./local-search-agent";
 const retailer="Trader Joe’s";
 export function parseTraderJoesPage(html:string,url:string,at=new Date().toISOString()):ScrapedProduct[] {
  if(!validDiscoveredSource(retailer,url))return [];
@@ -19,7 +20,7 @@ export function traderJoesObserved(item:AgentItem,now=Date.now()):ScrapedProduct
 }
 const pending=new Map<string,Promise<ScrapeReport['lines'][number]>>();
 const recent=new Map<string,{at:number;line:ScrapeReport['lines'][number]}>();
-export async function traderJoesReport(items:AgentItem[]):Promise<ScrapeReport> {
+export async function traderJoesReport(items:AgentItem[],plan?:SearchPlan):Promise<ScrapeReport> {
  const lines=await Promise.all(items.map(async item=>{
    const products=traderJoesObserved(item);
    if(products.length)return {item,products};
@@ -29,7 +30,7 @@ export async function traderJoesReport(items:AgentItem[]):Promise<ScrapeReport> 
    const task=(async()=>{
      let products:ScrapedProduct[]=[];
      try {
-       const urls=await discoverSources(retailer,item,"");
+       const urls=await discoverSources(retailer,item,"",plan);
        const results=await Promise.allSettled(urls.map(async url=>{
          const response=await fetch(url,{redirect:"error",signal:AbortSignal.timeout(12000)});
          if(!response.ok)return [];

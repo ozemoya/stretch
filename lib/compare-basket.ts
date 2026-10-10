@@ -12,6 +12,7 @@ import { groceryFeed } from "@/lib/grocery-feed";
 import { scrapeRetailers } from "@/lib/retailer-scraper";
 import type { ScrapeReport } from "@/lib/retailer-scraper";
 import { providerReports } from "@/lib/provider-prices";
+import type { SearchPlan } from "@/lib/local-search-agent";
 export const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   area: z.enum(["downtown", "midtown", "decatur"]).default("downtown"),
@@ -40,7 +41,7 @@ export const input = z.object({
     .max(30),
 });
 let running = false;
-export async function compareBasket(request: Request, onReport?: (report: ScrapeReport) => void) {
+export async function compareBasket(request: Request, onReport?: (report: ScrapeReport) => void, agentPlan?: SearchPlan) {
   if (running)
     return Response.json(
       { error: "A price check is already running. Please try again shortly." },
@@ -65,8 +66,8 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([
-      scrapeRetailers(coverage, p.items, mapped.places),
-      providerReports([...new Set(coverage.map(c => c.retailer))], p.items, p.zip, true, false, onReport),
+      scrapeRetailers(coverage, p.items, mapped.places, agentPlan),
+      providerReports([...new Set(coverage.map(c => c.retailer))], p.items, p.zip, true, false, onReport, agentPlan),
     ]);
     for (const report of providerCatalogs) {
       const index = publicCatalogs.findIndex(r => r.retailer === report.retailer);
@@ -149,7 +150,7 @@ export async function compareBasket(request: Request, onReport?: (report: Scrape
     return Response.json(
       {
         stores: checkedStores,
-        agent: { aiConnected: !!process.env.OPENAI_API_KEY, mode: process.env.OPENAI_API_KEY ? "AI source discovery and validated scraping" : process.env.BRIGHT_DATA_SERP_ZONE ? "Live web source search and validated scraping" : "Connected scrapers; AI discovery needs a server API key" },
+        agent: { aiConnected: !!agentPlan, mode: agentPlan ? `Local AI planned product searches using ${agentPlan.model}; prices still come from validated retailer pages.` : process.env.BRIGHT_DATA_SERP_ZONE ? "Website search is running; the local AI model is unavailable." : "The local AI model and website search provider are unavailable." },
         publicCatalogs,
         storeCoverage: coverage,
         warnings,

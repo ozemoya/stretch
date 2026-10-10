@@ -1,4 +1,5 @@
 import { traderJoesReport } from "./trader-joes";
+import type { SearchPlan } from "./local-search-agent";
 import { load } from "cheerio";
 import { z } from "zod";
 import type { AgentItem } from "./price-agent";
@@ -185,10 +186,11 @@ export async function scrapeRetailers(
   stores: StoreCoverage[],
   items: AgentItem[],
   places: NearbyPlace[] = [],
+  plan?: SearchPlan,
 ): Promise<ScrapeReport[]> {
   const reports: ScrapeReport[] = [];
   for (const retailer of new Set(stores.map((s) => s.retailer))) {
-    if (retailer === "Trader Joe’s") { reports.push(await traderJoesReport(items)); continue; }
+    if (retailer === "Trader Joe’s") { reports.push(await traderJoesReport(items,plan)); continue; }
     if (retailer === "The Fresh Market") {
       try {
         reports.push(await freshMarketSpecials(places, items));

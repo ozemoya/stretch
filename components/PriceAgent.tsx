@@ -29,9 +29,10 @@ export default function PriceAgent({
     storeCoverage: StoreCoverage[];
     warnings: string[];
     foundStores: number;
-    agent?: {aiConnected:boolean;mode:string};
+    agent?: {aiConnected:boolean;mode:string;reviewedMatches?:number};
   } | null>(null);
   const [liveReports,setLiveReports] = useState<ScrapeReport[]>([]);
+  const [agentStage,setAgentStage] = useState<"waiting"|"planning"|"ready"|"reviewing"|"reviewed"|"unavailable">("waiting");
   const [choices, setChoices] = useState<
     Record<string, Record<string, string>>
   >({});
@@ -53,6 +54,7 @@ export default function PriceAgent({
     setError("");
     setResult(null);
     setLiveReports([]);
+    setAgentStage("waiting");
     setChoices({});
     try {
       const response = await fetch("/api/agent/search", {
@@ -80,6 +82,7 @@ export default function PriceAgent({
             if (!message.trim()) continue;
             const event = JSON.parse(message);
             if (event.type === "error") throw new Error(event.error);
+            if (event.type === "agent") setAgentStage(event.stage);
             if (event.type === "report") setLiveReports(previous=>[...previous.filter(r=>r.retailer!==event.report.retailer),event.report]);
             if (event.type === "complete") setResult(event.result);
           }
@@ -112,7 +115,7 @@ export default function PriceAgent({
       {!result && liveReports.length > 0 && <StoreColumns reports={liveReports} items={items}/> }
       <p className="eyebrow">YOUR LIST. EVERY POSSIBLE ROUTE.</p>
       <h2>Find your next best stop.</h2>
-      <div className="search-summary"><span>{items.length} items in your list</span><span>⌖ {origin?.label || zip}</span><span>{radius} mile radius</span></div>
+      <div className="search-summary"><span>{items.length} {items.length === 1 ? "item" : "items"} in your list</span><span>⌖ {origin?.label || zip}</span><span>{radius} mile radius</span></div>
       <p>
         Search your entire list across supported stores, then confirm the brand
         and package you would actually buy. Dietary suitability must be checked
@@ -149,10 +152,10 @@ export default function PriceAgent({
         These results do not include travel, tax, or verified stock.
       </p>
       {error && <p role="alert">{error}</p>}
-      {busy && <div className="search-progress" role="status" aria-live="polite"><span className="search-spinner" />{["Finding stores and connected sources…","Searching products and checking packages…","Waiting for sources to respond…"][phase]}<small>Live collection can take a few minutes.</small></div>}
+      {busy && <div className="search-progress" role="status" aria-live="polite"><span className="search-spinner" />{agentStage==="planning"?"Local AI is planning food searches…":agentStage==="ready"?"AI search plan ready. Checking retailer pages…":agentStage==="reviewing"?"Local AI is reviewing product matches…":agentStage==="unavailable"?"Local AI is unavailable. Checking connected websites…":["Finding stores and connected sources…","Searching products and checking packages…","Waiting for sources to respond…"][phase]}<small>Live collection can take a few minutes.</small></div>}
       {result && (
         <>
-          {result.agent && <p className="small">{result.agent.mode}</p>}
+          {result.agent && <p className="small">{result.agent.mode}{result.agent.aiConnected && result.agent.reviewedMatches ? ` AI reviewed ${result.agent.reviewedMatches} product matches.` : ""}</p>}
           <div className="search-controls"><label className="result-search"><span>Search results</span><input type="search" placeholder="Store, product, or brand…" value={query} onChange={e=>setQuery(e.target.value)} /></label><label>Order by<select value={sort} onChange={e=>setSort(e.target.value)}><option value="coverage">Price coverage</option><option value="name">Store name</option></select></label></div>
           <div className="search-filters" aria-label="Filter results">{[["all","All stores"],["retrieved","Prices found"],["pending","Collecting"],["unavailable","Unavailable"]].map(([id,label])=><button key={id} type="button" aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label}</button>)}</div>
           <p>{result.coverage}</p>
