@@ -139,6 +139,8 @@ export default function CheckoutResults() {
                 gasPriceReported={!!draft.fuelSource}
                 mpg={draft.prefs.mpg}
                 maxStops={draft.prefs.maxStops}
+                minExtraStopSavings={draft.prefs.minExtraStopSavings}
+                shoppingPriority={draft.prefs.shoppingPriority}
                 nearbyPlaces={nearbyPlaces}
                 radius={radius}
                 onSelectTrip={(store, selected, route, storeLocation) => {

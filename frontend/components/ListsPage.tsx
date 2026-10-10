@@ -91,7 +91,7 @@ export default function ListsPage({ catalog }: { catalog: Catalog }) {
       return;
     }
     const settings = readSavedSettings(window.localStorage) ?? {
-      prefs: { area: "downtown" as const, budget: 35, mpg: 25, gas: 3.5, maxStops: 2, vegan: false, glutenFree: false, nutFree: false },
+      prefs: { area: "downtown" as const, budget: 35, mpg: 25, gas: 3.5, maxStops: 3, minExtraStopSavings: 5, shoppingPriority: "balanced" as const, vegan: false, glutenFree: false, nutFree: false },
       manualOrigin: null,
     };
     const list = createSavedList(crypto.randomUUID(), newListName || "My grocery list", newListBasket, settings);

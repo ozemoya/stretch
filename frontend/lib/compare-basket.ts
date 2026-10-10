@@ -15,6 +15,7 @@ import { providerReports } from "@/lib/provider-prices";
 import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
 import type { SearchPlan } from "@/lib/local-search-agent";
 import { normalizeCatalogReport } from "@/lib/product-ownership";
+import { freshMarketBranchOffers } from "@/lib/fresh-market-specials";
 export const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   area: z.enum(["downtown", "midtown", "decatur"]).default("downtown"),
@@ -123,6 +124,21 @@ export async function compareBasket(
       warnings.push(
         "The multi-retailer price feed failed. Its prices remain unavailable.",
       );
+    }
+    if (coverage.some((row) => row.retailer === "The Fresh Market" && row.status !== "checked")) {
+      try {
+        const offers = await freshMarketBranchOffers(mapped.places, p.items, request.signal);
+        for (const store of offers) {
+          const row = coverage.find((entry) => entry.id === store.id);
+          if (!row || row.status === "checked") continue;
+          checkedStores.push(store);
+          row.status = "checked";
+          row.detail = "Store-number-matched weekly advertised offers. Stock and checkout price are unconfirmed; only listed specials are covered.";
+        }
+      } catch {
+        request.signal.throwIfAborted();
+        warnings.push("The Fresh Market weekly offer page could not be checked for nearby branches.");
+      }
     }
     if (
       krogerConfigured() &&

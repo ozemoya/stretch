@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import ProductImage from "./ProductImage";
 import { normalizedUnitPrice, packageMatches } from "@/lib/package-match";
 import { ownedCatalogProducts } from "@/lib/product-ownership";
 import { catalogLineStatus, searchStatusLabel } from "@/lib/search-state";
@@ -8,22 +8,9 @@ import type { AgentItem } from "@/lib/price-agent";
 import type { ScrapeReport, ScrapedProduct } from "@/lib/retailer-scraper";
 
 function ProductPhoto({ product }: { product: ScrapedProduct }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <div className="comparison-photo">
-      {product.imageUrl && !failed ? (
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span>Photo not supplied</span>
-      )}
-    </div>
-  );
+  return <ProductImage className="comparison-photo" name={product.name} brand={product.brand}
+    size={product.size} upc={product.upc} retailerImageUrl={product.imageUrl}
+    retailerSourceUrl={product.sourceUrl} />;
 }
 
 export default function StoreColumns({

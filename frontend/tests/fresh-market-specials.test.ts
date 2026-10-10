@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import {
   freshMarketObservedReport,
   parseFreshMarketSpecials,
+  parseFreshMarketBranchOffers,
 } from "../lib/fresh-market-specials";
 import type { NearbyPlace } from "../lib/live-data";
 const place: NearbyPlace = {
@@ -86,4 +87,22 @@ it("shows a dated in-store milk observation only for its nearby branch", () => {
     freshMarketObservedReport([place], [milk], new Date("2026-10-11T05:00:00Z"))
       .lines[0].products,
   ).toEqual([]);
+});
+it("binds an advertised offer and retailer image to the exact nearby branch", () => {
+  const image = "https://thefreshmarket.widen.net/content/apples/jpeg/apples.jpeg?w=640";
+  const source = html().replace('"specialItemName":"Envy Apples"',
+    `"overwriteImageUrl":"${image}","specialItemName":"Envy Apples"`);
+  const stores = parseFreshMarketBranchOffers(source, [place], [item], new Date("2026-10-09T12:00:00Z"));
+  expect(stores).toHaveLength(1);
+  expect(stores[0].lines[0].candidates[0]).toMatchObject({
+    retailerId: "The Fresh Market", storeLocationId: "store", sourceStoreId: "61",
+    productName: "Envy Apples", regularCents: 249, size: "1 lb", soldBy: "WEIGHT",
+    imageUrl: image, priceKind: "branch_advertised",
+  });
+  expect(parseFreshMarketBranchOffers(source, [{ ...place, id: "other", address: "3000 Peachtree Road" }], [item], new Date("2026-10-09T12:00:00Z"))).toEqual([]);
+});
+it("rejects missing prices and unapproved image hosts for branch offers", () => {
+  const source = html("Buy 1, Get 1 Free").replace('"specialItemName":"Envy Apples"',
+    '"overwriteImageUrl":"https://example.com/apple.jpg","specialItemName":"Envy Apples"');
+  expect(parseFreshMarketBranchOffers(source, [place], [item], new Date("2026-10-09T12:00:00Z"))).toEqual([]);
 });

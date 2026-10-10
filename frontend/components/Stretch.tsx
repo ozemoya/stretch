@@ -19,7 +19,9 @@ const defaults: Preferences = {
   budget: 35,
   mpg: 25,
   gas: 3.5,
-  maxStops: 2,
+  maxStops: 3,
+  minExtraStopSavings: 5,
+  shoppingPriority: "balanced",
   vegan: false,
   glutenFree: false,
   nutFree: false,
@@ -624,6 +626,21 @@ export default function Stretch({
                   >
                     <option value={1}>One stop</option>
                     <option value={2}>Two stops</option>
+                    <option value={3}>Three stops</option>
+                  </select>
+                </label>
+                <label>
+                  Minimum savings per extra stop ($)
+                  <input type="number" min={0} max={1000} step={0.5}
+                    value={prefs.minExtraStopSavings}
+                    onChange={(e) => change("minExtraStopSavings", e.target.value === "" ? 5 : Number(e.target.value))} />
+                </label>
+                <label>
+                  Shopping priority
+                  <select value={prefs.shoppingPriority} onChange={(e) => change("shoppingPriority", e.target.value as Preferences["shoppingPriority"])}>
+                    <option value="balanced">Balanced</option>
+                    <option value="lowest_cost">Lowest trip cost</option>
+                    <option value="fewest_stops">Fewest stops</option>
                   </select>
                 </label>
               </div>

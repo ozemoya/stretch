@@ -31,6 +31,8 @@ export type Preferences = {
   mpg: number;
   gas: number;
   maxStops: number;
+  minExtraStopSavings: number;
+  shoppingPriority: "balanced" | "lowest_cost" | "fewest_stops";
   vegan: boolean;
   glutenFree: boolean;
   nutFree: boolean;

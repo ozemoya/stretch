@@ -304,8 +304,10 @@ export function nearbyPlaces(
         },
         body: new URLSearchParams({ data: query }).toString(),
       };
+      let lastError: unknown;
       for (const endpoint of [
         "https://overpass.private.coffee/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
         "https://overpass-api.de/api/interpreter",
       ]) {
         try {
@@ -318,14 +320,12 @@ export function nearbyPlaces(
             customOrigin,
           );
         } catch (e) {
-          if (
-            endpoint.includes("overpass-api.de") ||
-            (e instanceof ProviderError && e.status === 429)
-          )
-            throw e;
+          // A limit or outage at one independent OSM mirror should not hide
+          // locations returned by another mirror.
+          lastError = e;
         }
       }
-      throw new ProviderError("Map locations unavailable.");
+      throw lastError ?? new ProviderError("Map locations unavailable.");
     },
   ).then((data) => ({
     ...data,

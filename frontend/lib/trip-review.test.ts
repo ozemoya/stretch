@@ -6,7 +6,7 @@ import { createTripReview, parseTripReview, readTripReview, writeTripReview } fr
 const draft: CheckoutDraft = {
   version: 1, basket: [{ productId: "milk", quantity: 2 }],
   items: [{ id: "milk", name: "Milk", unit: "1 gallon", quantity: 2 }],
-  prefs: { area: "midtown", budget: 20, mpg: 25, gas: 3.5, maxStops: 2,
+  prefs: { area: "midtown", budget: 20, mpg: 25, gas: 3.5, maxStops: 3, minExtraStopSavings: 5, shoppingPriority: "balanced",
     vegan: false, glutenFree: false, nutFree: false },
   origin: { lat: 33.78, lon: -84.38, label: "Midtown" }, ipArea: true,
   gasStop: { id: "pump-1", name: "Pump", address: "1 Main St", lat: 33.79,

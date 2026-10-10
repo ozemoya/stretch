@@ -1,11 +1,51 @@
 import {load} from "cheerio";
 import observed from "./trader-joes-observations.json";
-import {discoverSources,validDiscoveredSource} from "./ai-source-search";
+import {validDiscoveredSource} from "./ai-source-search";
 import type {AgentItem} from "./price-agent";
 import type {ScrapedProduct,ScrapeReport} from "./retailer-scraper";
 import {isCloseFood} from "./food-alternatives";
 import type {SearchPlan} from "./local-search-agent";
+import {packageMatches} from "./package-match";
 const retailer="Trader Joe’s";
+const catalogQuery = `query SearchProducts($search: String, $pageSize: Int, $currentPage: Int, $storeCode: String = "TJ") {
+  products(search: $search, filter: {store_code: {eq: $storeCode}}, pageSize: $pageSize, currentPage: $currentPage) {
+    page_info { total_pages }
+    items { sku item_title retail_price sales_size sales_uom_description availability published primary_image }
+  }
+}`;
+type CatalogItem = {sku?:unknown;item_title?:unknown;retail_price?:unknown;sales_size?:unknown;sales_uom_description?:unknown;availability?:unknown;published?:unknown;primary_image?:unknown};
+export function parseTraderJoesCatalog(items:CatalogItem[],item:AgentItem,at=new Date().toISOString()):ScrapedProduct[] {
+ return items.flatMap(row=>{
+   if(typeof row.sku!=="string"||!/^\d{6}$/.test(row.sku)||typeof row.item_title!=="string"||
+     !isCloseFood(item.name,row.item_title)||String(row.availability)!=="1"||String(row.published)!=="1")return [];
+   const price=Number(row.retail_price),sizeNumber=Number(row.sales_size),unit=typeof row.sales_uom_description==="string"?row.sales_uom_description.trim():"";
+   if(!Number.isFinite(price)||price<=0||price>1000||!Number.isFinite(sizeNumber)||sizeNumber<=0||!unit)return [];
+   const sourceUrl=`https://www.traderjoes.com/home/products/pdp/${row.sku}`;
+   const imageUrl=typeof row.primary_image==="string"&&row.primary_image.startsWith("/content/dam/trjo/products/")
+     ?new URL(row.primary_image,"https://www.traderjoes.com").href:undefined;
+   const name=row.item_title.trim(),size=`${sizeNumber} ${unit}`;
+   return [{id:row.sku,productId:row.sku,name,brand:"Trader Joe's",priceCents:Math.round(price*100),size,
+     sourceUrl,imageUrl,retrievedAt:at,verification:"official-page-observation" as const,
+     ...(!item.name.toLowerCase().split(/\s+/).every(word=>name.toLowerCase().includes(word))?{matchKind:"alternative" as const}:{})}];
+ }).sort((a,b)=>Number(packageMatches(item.unit,b.size))-Number(packageMatches(item.unit,a.size))||a.priceCents-b.priceCents);
+}
+async function searchTraderJoesCatalog(item:AgentItem,signal?:AbortSignal):Promise<ScrapedProduct[]> {
+ const products:ScrapedProduct[]=[];
+ for(let page=1;page<=2;page++) {
+   signal?.throwIfAborted();
+   const response=await fetch("https://www.traderjoes.com/api/graphql",{
+     method:"POST",redirect:"error",headers:{"Content-Type":"application/json"},
+     signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000),
+     body:JSON.stringify({query:catalogQuery,variables:{search:item.name,pageSize:40,currentPage:page}}),
+   });
+   if(!response.ok)throw new Error("Trader Joe’s catalog did not respond.");
+   const body=await response.json();
+   if(body.errors?.length||!Array.isArray(body.data?.products?.items))throw new Error("Trader Joe’s catalog response was incomplete.");
+   products.push(...parseTraderJoesCatalog(body.data.products.items,item));
+   if(products.length>=8||page>=Number(body.data.products.page_info?.total_pages??1))break;
+ }
+ return [...new Map(products.map(product=>[product.id,product])).values()].slice(0,12);
+}
 export function parseTraderJoesPage(html:string,url:string,at=new Date().toISOString()):ScrapedProduct[] {
  if(!validDiscoveredSource(retailer,url))return [];
  const $=load(html),heading=$("h1").first(),scope=heading.parent();
@@ -29,21 +69,15 @@ export async function traderJoesReport(items:AgentItem[],plan?:SearchPlan,signal
    if(cached&&Date.now()-cached.at<300000)return {...cached.line,item};
    const existing=pending.get(key);if(existing)return {...await existing,item};
    const task=(async()=>{
-     let products:ScrapedProduct[]=[];
      try {
-       const urls=await discoverSources(retailer,item,"",plan,{signal});
-       signal?.throwIfAborted();
-       const results=await Promise.allSettled(urls.map(async url=>{
-         const response=await fetch(url,{redirect:"error",signal:signal?AbortSignal.any([signal,AbortSignal.timeout(12000)]):AbortSignal.timeout(12000)});
-         if(!response.ok)return [];
-         const html=await response.text();if(html.length>4000000)return [];
-         return parseTraderJoesPage(html,url).filter(p=>isCloseFood(item.name,p.name));
-       }));
-       products=results.flatMap(r=>r.status==="fulfilled"?r.value:[]);
-     } catch {}
-     return {item,products,...(!products.length?{error:"Official product-page search completed, but price content could not be verified. A rendered-page refresh is needed."}:{})};
+       const products=await searchTraderJoesCatalog(item,signal);
+       return {item,products,...(!products.length?{searchStatus:"no_results" as const,error:"No matching priced item appeared in the first 80 official catalog results."}:{})};
+     } catch(error) {
+       if(signal?.aborted)throw error;
+       return {item,products:[],searchStatus:"error" as const,error:error instanceof Error?error.message:"Trader Joe’s catalog search failed."};
+     }
    })();
    pending.set(key,task);try{const line=await task;if(!signal?.aborted)recent.set(key,{at:Date.now(),line});return line;}finally{pending.delete(key);}
  }));
- return {retailer,status:lines.some(l=>l.products.length)?"retrieved":"failed",detail:"Prices observed on Trader Joe’s official website; observation time is shown on each item. Cached observations expire after 24 hours. Local branch availability and checkout prices still require confirmation.",lines};
+ return {retailer,status:lines.some(l=>l.products.length)?"retrieved":"failed",detail:"Prices returned by Trader Joe’s public online catalog; observation time is shown on each item. Local branch availability and checkout prices still require confirmation.",lines};
 }

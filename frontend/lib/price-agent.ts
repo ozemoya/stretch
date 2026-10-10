@@ -23,6 +23,11 @@ export type Candidate = {
   priceSource: string;
   verifiedAt: string;
   productUrl: string | null;
+  imageUrl?: string;
+  imageSourceUrl?: string;
+  sourceStoreId?: string;
+  priceKind?: "branch_advertised" | "branch_catalog";
+  matchKind?: "exact" | "comparable" | "uncertain";
   upc?: string;
 };
 export type StoreCheck = {

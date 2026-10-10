@@ -1,6 +1,7 @@
 "use client";
 import StoreColumns from "./StoreColumns";
 import MultiStorePlanner from "./MultiStorePlanner";
+import ProductImage from "./ProductImage";
 import SketchIcon from "./SketchIcon";
 import { useState, useEffect, useRef } from "react";
 import type { AgentItem, StoreCheck } from "@/lib/price-agent";
@@ -52,6 +53,8 @@ export default function PriceAgent({
   gasPriceReported,
   mpg,
   maxStops,
+  minExtraStopSavings,
+  shoppingPriority,
   nearbyPlaces,
   radius,
   autoStart = false,
@@ -66,6 +69,8 @@ export default function PriceAgent({
   gasPriceReported: boolean;
   mpg: number;
   maxStops: number;
+  minExtraStopSavings: number;
+  shoppingPriority: "balanced" | "lowest_cost" | "fewest_stops";
   nearbyPlaces: NearbyPlace[];
   radius: number;
   autoStart?: boolean;
@@ -650,7 +655,8 @@ export default function PriceAgent({
             {comparedStores.length > 0 && <button className="text-button" onClick={() => setComparedStores([])}>Show all branches</button>}
           </>}
           {visibleBranches.length >= 2 && <MultiStorePlanner items={items} stores={visibleBranches} locations={result.storeCoverage}
-            origin={origin} area={area} gasStop={gasStop} mpg={mpg} gasPrice={gasPrice} maxStores={maxStops} />
+            origin={origin} area={area} gasStop={gasStop} mpg={mpg} gasPrice={gasPrice} maxStores={maxStops}
+            minExtraStopSavings={minExtraStopSavings} shoppingPriority={shoppingPriority} />
           }
           <div className={`live-grid ${comparisonView === "table" ? "branch-table-mode" : ""}`}>
             {visibleBranches.filter((store) => !comparedStores.length || comparedStores.includes(store.id)).map((store) => {
@@ -665,6 +671,7 @@ export default function PriceAgent({
                   <p>
                     {location.address ||
                       "Exact street address not supplied by map source"}
+                    {Number.isFinite(location.miles) && ` · ${location.miles.toFixed(1)} miles away`}
                   </p>
                   <p>
                     <strong>
@@ -696,12 +703,22 @@ export default function PriceAgent({
                       (candidate) =>
                         candidate.id === choices[store!.id]?.[item.id],
                     );
+                    const preview = selected ?? products[0];
                     return (
                       <label
                         key={item.id}
                         style={{ display: "block", marginBottom: 16 }}
                       >
                         {item.quantity} × {item.name} · requested {item.unit}
+                        {preview && <div className="branch-product-preview">
+                          <ProductImage key={preview.id} className="branch-product-photo" name={preview.name}
+                            brand={preview.brand} size={preview.size} upc={preview.upc}
+                            retailerImageUrl={preview.imageUrl} retailerSourceUrl={preview.productUrl ?? undefined} />
+                          <div><strong>{preview.name}</strong><small>{preview.brand ? `${preview.brand} · ` : ""}{preview.size} · {preview.soldBy === "WEIGHT" ? "advertised per-pound rate" : "advertised each price"}</small>
+                            <small>${(preview.price ?? 0).toFixed(2)} · {preview.matchKind === "comparable" ? "Comparable item · review before choosing" : "Matching item"}</small>
+                            <small>{preview.priceSource} · checked {new Date(preview.verifiedAt).toLocaleString()}</small>
+                            {preview.productUrl && <a href={preview.productUrl} target="_blank" rel="noreferrer">View retailer offer ↗</a>}</div>
+                        </div>}
                         {products.length ? (
                           <select
                             aria-label={`${location.name}: ${item.name}`}

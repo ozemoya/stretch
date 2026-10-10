@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { points } = body;
+    const { points, matrix } = body;
 
     if (
       !Array.isArray(points) ||
       points.length < 2 ||
-      points.length > 5 ||
+      points.length > (matrix === true ? 10 : 6) ||
       !points.every(
         (p) =>
           typeof p.lat === "number" &&
@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
 
     const base = process.env.OSRM_BASE_URL || "https://router.project-osrm.org";
 
-    const url =
-      `${base}/route/v1/driving/${coordinates}` +
-      "?overview=full&geometries=geojson";
+    const url = matrix === true
+      ? `${base}/table/v1/driving/${coordinates}?annotations=distance,duration`
+      : `${base}/route/v1/driving/${coordinates}?overview=full&geometries=geojson`;
 
     const response = await fetch(url, {
       signal: AbortSignal.timeout(10000),
@@ -46,6 +46,16 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
+    if (matrix === true) {
+      if (data.code !== "Ok" || !Array.isArray(data.distances) || !Array.isArray(data.durations) ||
+        data.distances.length !== points.length || data.durations.length !== points.length ||
+        !data.distances.every((row: unknown) => Array.isArray(row) && row.length === points.length &&
+          row.every((value: unknown) => value === null || typeof value === "number" && Number.isFinite(value) && value >= 0)) ||
+        !data.durations.every((row: unknown) => Array.isArray(row) && row.length === points.length &&
+          row.every((value: unknown) => value === null || typeof value === "number" && Number.isFinite(value) && value >= 0)))
+        throw new Error("No road-distance matrix found");
+      return NextResponse.json({ distances: data.distances, durations: data.durations });
+    }
     if (data.code !== "Ok" || !data.routes?.length) {
       throw new Error("No driving route found");
     }

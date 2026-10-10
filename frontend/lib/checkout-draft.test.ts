@@ -12,7 +12,7 @@ const draft: CheckoutDraft = {
   basket: [{ productId: "milk", quantity: 2 }],
   items: [{ id: "milk", name: "Milk", unit: "gallon", quantity: 2 }],
   prefs: {
-    area: "midtown", budget: 35, mpg: 25, gas: 3.5, maxStops: 2,
+    area: "midtown", budget: 35, mpg: 25, gas: 3.5, maxStops: 3, minExtraStopSavings: 5, shoppingPriority: "balanced",
     vegan: false, glutenFree: false, nutFree: false,
   },
   origin: { lat: 33.783, lon: -84.383, label: "Midtown", zip: "30309" },

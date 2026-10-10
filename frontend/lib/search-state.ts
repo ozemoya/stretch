@@ -1,4 +1,5 @@
 import type { ScrapeReport } from "./retailer-scraper";
+import { SEARCH_WINDOW_MS } from "./search-timing";
 
 export type SearchStatus =
   | "idle"
@@ -10,8 +11,8 @@ export type SearchStatus =
   | "timeout"
   | "error";
 export const SEARCH_TIMEOUT_MS = Math.min(
-  240_000,
-  Math.max(5_000, Number(process.env.STRETCH_SEARCH_TIMEOUT_MS) || 90_000),
+  300_000,
+  Math.max(SEARCH_WINDOW_MS, Number(process.env.STRETCH_SEARCH_TIMEOUT_MS) || SEARCH_WINDOW_MS),
 );
 export function boundedJobStatus(
   status: string,

@@ -7,7 +7,9 @@ const p: Preferences = {
   budget: 35,
   mpg: 25,
   gas: 3.5,
-  maxStops: 2,
+  maxStops: 3,
+  minExtraStopSavings: 5,
+  shoppingPriority: "balanced",
   vegan: false,
   glutenFree: false,
   nutFree: false,
@@ -17,8 +19,9 @@ const basket = sample.products
   .map((x) => ({ productId: x.id, quantity: 1 }));
 describe("trip optimization", () => {
   it("finds split-store savings and prices every selected package", () => {
-    const trips = optimize(sample, basket, p);
-    expect(trips[0].stops.length).toBe(2);
+    const trips = optimize(sample, basket, { ...p, minExtraStopSavings: 0, shoppingPriority: "lowest_cost" });
+    expect(trips[0].stops.length).toBeGreaterThan(1);
+    expect(trips[0].stops.length).toBeLessThanOrEqual(3);
     expect(trips[0].totalCents).toBeLessThan(
       Math.min(
         ...trips.filter((t) => t.stops.length === 1).map((t) => t.totalCents),
@@ -26,6 +29,13 @@ describe("trip optimization", () => {
     );
     expect(trips[0].stops.flatMap((s) => s.items).length).toBe(9);
     for (const t of trips) expect(t.totalCents).toBe(t.foodCents + t.fuelCents);
+  });
+  it("honors the minimum net savings before recommending an extra stop", () => {
+    const trips = optimize(sample, basket, p);
+    expect(trips[0].stops.length).toBe(1);
+    const baseline = trips[0].totalCents;
+    for (const trip of trips.filter((candidate) => !candidate.missing.length && candidate.stops.length > 1))
+      expect(baseline - trip.totalCents).toBeGreaterThanOrEqual(500 * (trip.stops.length - 1));
   });
   it("includes the return home in fuel and respects one-stop limits", () => {
     const trips = optimize(sample, basket, { ...p, maxStops: 1 });
