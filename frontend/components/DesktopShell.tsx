@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { readCheckoutDraft } from "@/lib/checkout-draft";
 
 const navigation = [
@@ -14,19 +14,11 @@ const navigation = [
 
 export default function DesktopShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-  const [query, setQuery] = useState("");
   const [area, setArea] = useState("Choose starting area");
   const [notice, setNotice] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setArea(readCheckoutDraft(sessionStorage)?.origin?.label ?? "Choose starting area");
-    const shortcut = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "k") { event.preventDefault(); input.current?.focus(); }
-    };
-    window.addEventListener("keydown", shortcut);
-    return () => window.removeEventListener("keydown", shortcut);
   }, [path]);
   if (path === "/") return <>{children}</>;
   return <div className={`desktop-shell ${collapsed ? "sidebar-collapsed" : ""} ${path === "/dashboard" ? "dashboard-shell" : ""}`}>
@@ -39,7 +31,6 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
     </aside>
     <div className="desktop-body">
       <header className="desktop-topbar">
-        <form onSubmit={(event) => { event.preventDefault(); router.push(`/plan?q=${encodeURIComponent(query)}`); }} className="global-search"><span aria-hidden="true">⌕</span><input ref={input} aria-label="Search groceries" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="What’s on your list today?" /><kbd>Ctrl K</kbd></form>
         <Link href="/plan?panel=settings" className="desktop-location"><span aria-hidden="true">⌖</span> {area}</Link>
         <button className="profile-control" aria-expanded={notice} onClick={() => setNotice(!notice)} aria-label="Guest profile and storage information">G</button>
         {notice && <div className="guest-popover" role="status"><strong>Shopping as a guest</strong><p>Your saved lists stay on this device. Account sync and notifications are not available yet.</p><Link href="/plan?panel=settings" onClick={() => setNotice(false)}>Manage trip preferences →</Link></div>}
