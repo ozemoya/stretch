@@ -9,10 +9,71 @@ const between = [
   [5, 0, 6],
   [3, 6, 0],
 ];
+
+
+function getRoute(
+  selected: number[],
+  catalog: Catalog,
+  area: Preferences["area"],
+  routes?: RouteMeasurements,
+) {
+  const fallbackDistances = areas[area];
+
+  const fallbackMiles =
+    selected.length === 1
+      ? 2 * fallbackDistances[selected[0]]
+      : fallbackDistances[selected[0]] +
+        between[selected[0]][selected[1]] +
+        fallbackDistances[selected[1]];
+
+  const fallback = {
+    miles: fallbackMiles,
+    minutes: Math.round((fallbackMiles / 25) * 60),
+    order: selected,
+  };
+
+  if (!routes) return fallback;
+
+  const orders =
+    selected.length === 2
+      ? [selected, [...selected].reverse()]
+      : [selected];
+
+  const candidates = orders.flatMap((order) => {
+    const key = order
+      .map((i) => catalog.stores[i].id)
+      .join("|");
+
+    const route = routes[key];
+
+    if (
+      !route ||
+      !Number.isFinite(route.miles) ||
+      route.miles < 0 ||
+      !Number.isFinite(route.minutes) ||
+      route.minutes < 0
+    ) {
+      return [];
+    }
+
+    return [{ ...route, order }];
+  });
+
+  return (
+    candidates.sort(
+      (a, b) =>
+        a.miles - b.miles ||
+        a.minutes - b.minutes,
+    )[0] ?? fallback
+  );
+}
+
+
 export function optimize(
   catalog: Catalog,
   basket: BasketItem[],
   p: Preferences,
+  routes?: RouteMeasurements,
 ): Trip[] {
   if (!basket.length) return [];
   if (
@@ -26,8 +87,7 @@ export function optimize(
     throw new Error(
       "Enter a positive MPG and nonnegative budget and gas price.",
     );
-  const distances = areas[p.area],
-    trips: Trip[] = [];
+  const trips: Trip[] = [];
   for (let mask = 1; mask < 1 << catalog.stores.length; mask++) {
     const selected = catalog.stores
       .map((_, i) => i)
@@ -84,12 +144,15 @@ export function optimize(
     }
     // Empty stops cannot improve a route. Keep incomplete single-store estimates visible.
     if (stops.some((x) => !x.items.length) && stops.length > 1) continue;
-    const miles =
-      selected.length === 1
-        ? 2 * distances[selected[0]]
-        : distances[selected[0]] +
-          between[selected[0]][selected[1]] +
-          distances[selected[1]];
+    const route = getRoute(
+      selected,
+      catalog,
+      p.area,
+      routes,
+    );
+
+    const miles = route.miles;
+
     const foodCents = stops.reduce(
       (sum, s) =>
         sum + s.items.reduce((a, i) => a + i.priceCents * i.quantity, 0),
@@ -98,13 +161,17 @@ export function optimize(
     const fuelCents = Math.round((miles / p.mpg) * p.gas * 100);
     trips.push({
       id: stops.map((x) => x.store.id).join("-"),
-      stops,
+      stops: route.order.map((i) =>
+        stops.find(
+          (s) => s.store.id === catalog.stores[i].id
+        )!
+      ),
       missing,
       foodCents,
       fuelCents,
       totalCents: foodCents + fuelCents,
       miles,
-      minutes: Math.round((miles / 25) * 60) + stops.length * 12,
+      minutes: route.minutes + stops.length * 12,
     });
   }
   return trips.sort(
@@ -114,12 +181,15 @@ export function optimize(
       a.stops.length - b.stops.length,
   );
 }
+
 export function suggestSwaps(
   catalog: Catalog,
   basket: BasketItem[],
   p: Preferences,
+  routes?: RouteMeasurements,
 ) {
-  const baseline = optimize(catalog, basket, p);
+
+  const baseline = optimize(catalog, basket, p, routes);
   const best = baseline.find((t) => !t.missing.length);
   const conflicts = Math.min(...baseline.map((t) => t.missing.length));
   return catalog.swaps.flatMap((s) => {
@@ -141,7 +211,7 @@ export function suggestSwaps(
         item.quantity +
         (basket.find((x) => x.productId === s.toId)?.quantity ?? 0),
     });
-    const candidates = optimize(catalog, updated, p);
+    const candidates = optimize(catalog, updated, p, routes);
     const after =
       candidates.find((t) => !t.missing.length) ??
       candidates.sort((a, b) => a.missing.length - b.missing.length)[0];
@@ -151,3 +221,14 @@ export function suggestSwaps(
     return [{ ...s, savings, updated, after, product }];
   });
 }
+
+
+export type RouteMeasurement = {
+  miles: number;
+  minutes: number;
+};
+
+export type RouteMeasurements = Record<
+  string,
+  RouteMeasurement
+>;
