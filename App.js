@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 const colors = {
   cream: '#FFF9E8',
@@ -26,6 +26,38 @@ const typography = {
   sans: 'System',
   scribble: 'cursive',
 };
+
+function BackgroundSvg({ type }) {
+  if (type === 'header') {
+    return (
+      <Svg style={styles.backgroundSvg} viewBox="0 0 859 82" preserveAspectRatio="none">
+        <Rect width="859" height="82" fill="#FFF9E5" />
+        <Rect width="859" height="64" fill="#E8B97A" />
+        <Path d="M0 62H859V82H0Z" fill="#E8B97A" />
+        {Array.from({ length: 30 }, (_, index) => <Circle key={index} cx={2 + index * 28.5} cy="80" r="15" fill="#FFF9E5" />)}
+      </Svg>
+    );
+  }
+  if (type === 'striped') {
+    return (
+      <Svg style={styles.backgroundSvg} viewBox="0 0 466 577" preserveAspectRatio="none">
+        <Rect width="466" height="577" fill="#E7E9D0" />
+        {Array.from({ length: 12 }, (_, index) => (
+          <React.Fragment key={index}>
+            <Rect x={4 + index * 42} width="10" height="577" fill="#E8B97A" />
+            <Rect x={26 + index * 42} width="4" height="577" fill="#F4F1DC" />
+          </React.Fragment>
+        ))}
+      </Svg>
+    );
+  }
+  return (
+    <Svg style={styles.backgroundSvg} viewBox="0 0 635 320" preserveAspectRatio="none">
+      <Rect width="635" height="320" fill="#E7E9D0" />
+      <Rect x="26" y="26" width="583" height="268" rx="21" fill="#FFF9E5" />
+    </Svg>
+  );
+}
 
 const trips = [
   { label: 'MARKET A', price: '$55', detail: 'Food $52 + fuel $3', stops: '1 stop · simple trip' },
@@ -53,6 +85,7 @@ function ActionButton({ children, onPress, small = false }) {
 function Header({ scrollTo }) {
   return (
     <View style={styles.header}>
+      <BackgroundSvg type="header" />
       <View style={styles.headerNav}>
         <Pressable accessibilityRole="link" accessibilityLabel="Plan a trip" onPress={() => scrollTo('planner')}>
           <Text style={styles.navText}>PLAN A TRIP</Text>
@@ -187,6 +220,7 @@ function Budget({ scrollTo }) {
         <ActionButton small onPress={() => scrollTo('planner')}>TRY STRETCH ↗</ActionButton>
       </View>
       <View style={[styles.receiptScene, isWide && styles.wideReceiptScene]}>
+        <BackgroundSvg type="striped" />
         <View style={styles.receipt}>
           <SectionEyebrow>THE WHOLE TRIP</SectionEyebrow>
           <Text style={styles.receiptTotal}>$48</Text>
@@ -227,7 +261,10 @@ export default function App() {
       <Comparison scrollTo={scrollTo} />
       <Budget scrollTo={scrollTo} />
       <Cta scrollTo={scrollTo} />
-      <View style={styles.footer}><Text style={styles.footerText}>STRETCH · HACKLANTA 2026 · SAMPLE DATA</Text></View>
+      <View style={styles.footer}>
+        <BackgroundSvg type="bubbly" />
+        <Text style={styles.footerText}>STRETCH · HACKLANTA 2026 · SAMPLE DATA</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -235,7 +272,7 @@ export default function App() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   content: { backgroundColor: colors.cream },
-  header: { height: 64, backgroundColor: colors.gold, position: 'relative', justifyContent: 'center', paddingHorizontal: '5%' },
+  header: { height: 82, backgroundColor: colors.gold, position: 'relative', justifyContent: 'center', paddingHorizontal: '5%' },
   headerNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   navText: { color: colors.olive, fontFamily: typography.sans, fontSize: 9, fontWeight: '700' },
   brand: { position: 'absolute', top: 0, left: '50%', marginLeft: -47, width: 94, height: 64, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
@@ -288,7 +325,7 @@ const styles = StyleSheet.create({
   lastStep: { backgroundColor: colors.red },
   stepNumber: { color: colors.cream, fontFamily: typography.serif, fontSize: 19 },
   stepLabel: { color: colors.cream, fontFamily: typography.sans, fontSize: 6, marginTop: 6 },
-  receiptScene: { minHeight: 350, overflow: 'hidden', backgroundColor: colors.cream, paddingHorizontal: '14%', paddingTop: spacing.xxl, borderLeftWidth: 8, borderLeftColor: colors.gold, borderRightWidth: 8, borderRightColor: colors.gold },
+  receiptScene: { minHeight: 350, overflow: 'hidden', backgroundColor: '#e7e9d0', paddingHorizontal: '14%', paddingTop: spacing.xxl, borderLeftWidth: 8, borderLeftColor: colors.gold, borderRightWidth: 8, borderRightColor: colors.gold },
   wideReceiptScene: { flex: 1, minHeight: 383 },
   receipt: { backgroundColor: colors.cream, padding: spacing.xl, transform: [{ rotate: '5deg' }], minHeight: 210 },
   receiptTotal: { color: colors.olive, fontFamily: typography.serif, fontSize: 52, lineHeight: 55, marginVertical: spacing.md },
@@ -298,6 +335,7 @@ const styles = StyleSheet.create({
   cta: { backgroundColor: colors.pale, paddingHorizontal: '10%', paddingVertical: spacing.xl },
   ctaCard: { backgroundColor: colors.cream, borderRadius: 22, padding: spacing.xl, alignItems: 'center' },
   ctaText: { color: colors.olive, fontFamily: typography.sans, fontSize: 11, marginTop: -spacing.sm, marginBottom: spacing.md },
-  footer: { backgroundColor: colors.pale, alignItems: 'center', paddingVertical: spacing.lg },
+  footer: { minHeight: 82, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.lg, position: 'relative', overflow: 'hidden' },
+  backgroundSvg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   footerText: { color: colors.olive, fontFamily: typography.sans, fontSize: 7 },
 });
