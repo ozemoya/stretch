@@ -260,7 +260,22 @@ export default function PriceAgent({
             const event = JSON.parse(message);
             if (event.type === "error") throw new Error(event.error);
             if (!epoch.current.isCurrent(requestId)) break;
-            if (event.type === "agent") setAgentStage(event.stage);
+            if (event.type === "agent") {
+              setAgentStage(event.stage);
+              if (event.stage === "ready" || event.stage === "unavailable")
+                setResult((previous) => previous && epoch.current.isCurrent(requestId)
+                  ? {
+                      ...previous,
+                      agent: {
+                        ...previous.agent,
+                        aiConnected: event.stage === "ready",
+                        mode: event.stage === "ready"
+                          ? `${event.provider === "openai" ? "OpenAI" : "Local AI"} planned product searches using ${event.model}; prices still come from validated retailer pages.`
+                          : "AI planning timed out; connected price sources are still loading.",
+                      },
+                    }
+                  : previous);
+            }
             if (event.type === "report")
               setLiveReports((previous) =>
                 epoch.current.isCurrent(requestId)
@@ -515,7 +530,7 @@ export default function PriceAgent({
       )}
       {result && sourcesBusy && (
         <p role="status" aria-live="polite" className="small">
-          Retailer sources are still loading. {visibleCatalogs.length} have a validated online price so far; you can review results as they arrive.
+          Nearby stores are ready. Live prices are updating in the background; {visibleCatalogs.length} {visibleCatalogs.length === 1 ? "retailer has" : "retailers have"} a validated online price so far.
         </p>
       )}
       {sourceError && <p role="alert" className="small">{sourceError}</p>}

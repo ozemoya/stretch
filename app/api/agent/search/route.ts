@@ -4,12 +4,11 @@ import {
 } from "../../../../lib/compare-basket";
 import { providerReports } from "../../../../lib/provider-prices";
 import { traderJoesObserved } from "../../../../lib/trader-joes";
-import {
-  planBasketSearch,
-  reviewProductMatches,
-} from "../../../../lib/local-search-agent";
+import { planBasketSearch } from "../../../../lib/local-search-agent";
 import { normalizeCatalogReport } from "../../../../lib/product-ownership";
-import type { ScrapeReport } from "../../../../lib/retailer-scraper";
+import { scrapeRetailers } from "../../../../lib/retailer-scraper";
+import { nearbyPlaces } from "../../../../lib/live-data";
+import type { StoreCoverage } from "../../../../lib/retailer-coverage";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -47,11 +46,8 @@ export async function POST(request: Request) {
             item,
             products: traderJoesObserved(item),
           }));
-          if (tjLines.some((line) => line.products.length))
-            send({
-              type: "report",
-              cached: true,
-              report: normalizeCatalogReport(
+          const tjReport = tjLines.some((line) => line.products.length)
+            ? normalizeCatalogReport(
                 {
                   retailer: "Trader Joe’s",
                   status: "retrieved",
@@ -60,8 +56,9 @@ export async function POST(request: Request) {
                   lines: tjLines,
                 },
                 p.items,
-              ),
-            });
+              )
+            : null;
+          if (tjReport) send({ type: "report", cached: true, report: tjReport });
           const cached = await providerReports(
             [
               "Walmart",
@@ -93,14 +90,7 @@ export async function POST(request: Request) {
             request.signal,
             AbortSignal.timeout(process.env.OPENAI_API_KEY ? 4500 : 2500),
           ]);
-          const agentPlan = await planBasketSearch(p.items, planningSignal);
-          request.signal.throwIfAborted();
-          send({
-            type: "agent",
-            stage: agentPlan ? "ready" : "unavailable",
-            provider: agentPlan?.provider,
-            model: agentPlan?.model,
-          });
+          const planningTask = planBasketSearch(p.items, planningSignal).catch(() => null);
           const response = await compare(
             new Request(request.url, {
               method: "POST",
@@ -113,8 +103,8 @@ export async function POST(request: Request) {
                 type: "report",
                 report: normalizeCatalogReport(report, p.items),
               }),
-            agentPlan ?? undefined,
-            { deferProvider: true },
+            undefined,
+            { deferProvider: true, deferPublic: true, deferPlan: true },
           );
           const result = await response.json();
           if (!response.ok) {
@@ -123,43 +113,50 @@ export async function POST(request: Request) {
           }
           // The comparison is usable now; slow retailer collection continues on this stream.
           send({ type: "complete", result });
+          if (tjReport) send({ type: "report", cached: true, report: tjReport });
           for (const report of cached)
             if (report.lines.some((line) => line.products.length))
               send({ type: "report", report: normalizeCatalogReport(report, p.items), cached: true });
-          const reviewTask = agentPlan && Array.isArray(result.publicCatalogs)
-            ? (async () => {
-                send({ type: "agent", stage: "reviewing" });
-                const reviewSignal = AbortSignal.any([
-                  request.signal,
-                  AbortSignal.timeout(process.env.OPENAI_API_KEY ? 4500 : 2500),
-                ]);
-                const reviewed = await reviewProductMatches(result.publicCatalogs, reviewSignal);
-                send({
-                  type: "catalog-review",
-                  reports: reviewed.reports.map((report: ScrapeReport) => normalizeCatalogReport(report, p.items)),
-                  reviewedMatches: reviewed.reviewed,
-                });
-                send({ type: "agent", stage: "reviewed", reviewedMatches: reviewed.reviewed });
-              })()
-            : Promise.resolve();
-          try {
-            await providerReports(
-              [...new Set((result.storeCoverage as { retailer: string }[]).map((store) => store.retailer))],
-              p.items,
-              p.zip,
-              true,
-              false,
-              (report) => send({ type: "report", report: normalizeCatalogReport(report, p.items) }),
-              agentPlan ?? undefined,
-              false,
-              request.signal,
-            );
-            send({ type: "sources-complete" });
-          } catch {
-            if (!request.signal.aborted)
-              send({ type: "sources-error", error: "Some retailer sources did not finish. Available prices are shown." });
-          }
-          await reviewTask;
+          const coverage = result.storeCoverage as StoreCoverage[];
+          const planNotification = planningTask.then((agentPlan) => send({
+            type: "agent",
+            stage: agentPlan ? "ready" : "unavailable",
+            provider: agentPlan?.provider,
+            model: agentPlan?.model,
+          }));
+          // Independent source tasks stream as they finish. One slow catalog cannot
+          // delay the initial comparison or the other retailers' observations.
+          const publicTask = (async () => {
+            const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
+            const retailers = [...new Set(coverage.map((store) => store.retailer))];
+            const outcomes = await Promise.allSettled(retailers.map(async (retailer) =>
+              scrapeRetailers(
+                coverage.filter((store) => store.retailer === retailer),
+                p.items,
+                mapped.places,
+                retailer === "Trader Joe’s" ? (await planningTask) ?? undefined : undefined,
+                request.signal,
+                (report) => send({ type: "report", report: normalizeCatalogReport(report, p.items) }),
+              ),
+            ));
+            if (outcomes.some((outcome) => outcome.status === "rejected"))
+              throw new Error("A public catalog did not finish.");
+          })();
+          const providerTask = planningTask.then((agentPlan) => providerReports(
+            [...new Set(coverage.map((store) => store.retailer))],
+            p.items,
+            p.zip,
+            true,
+            false,
+            (report) => send({ type: "report", report: normalizeCatalogReport(report, p.items) }),
+            agentPlan ?? undefined,
+            false,
+            request.signal,
+          ));
+          const outcomes = await Promise.allSettled([publicTask, providerTask, planNotification]);
+          if (outcomes.some((outcome) => outcome.status === "rejected") && !request.signal.aborted)
+            send({ type: "sources-error", error: "Some retailer sources did not finish. Available prices are shown." });
+          send({ type: "sources-complete" });
         } catch {
           send({
             type: "error",

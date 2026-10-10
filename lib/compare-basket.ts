@@ -46,7 +46,7 @@ export async function compareBasket(
   request: Request,
   onReport?: (report: ScrapeReport) => void,
   agentPlan?: SearchPlan,
-  options: { deferProvider?: boolean } = {},
+  options: { deferProvider?: boolean; deferPublic?: boolean; deferPlan?: boolean } = {},
 ) {
   const parsed = input.safeParse(await request.json().catch(() => null));
   if (
@@ -67,7 +67,9 @@ export async function compareBasket(
     const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([
-      scrapeRetailers(
+      options.deferPublic
+        ? Promise.resolve([] as ScrapeReport[])
+        : scrapeRetailers(
         coverage,
         p.items,
         mapped.places,
@@ -201,11 +203,14 @@ export async function compareBasket(
           aiConnected: !!agentPlan,
           mode: agentPlan
             ? `${agentPlan.provider === "openai" ? "OpenAI" : "Local AI"} planned product searches using ${agentPlan.model}; prices still come from validated retailer pages.`
+            : options.deferPlan
+              ? "AI is planning product searches while connected prices load."
             : process.env.BRIGHT_DATA_SERP_ZONE
               ? "Website search is running; AI planning was unavailable or timed out."
               : "AI planning and the website search provider are unavailable.",
         },
         providerSearchDeferred: options.deferProvider,
+        publicSearchDeferred: options.deferPublic,
         publicCatalogs,
         storeCoverage: coverage,
         warnings,
