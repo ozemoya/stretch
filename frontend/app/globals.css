@@ -1070,7 +1070,7 @@ footer {
 .trip-settings summary { cursor: pointer; font-size: 13px; color: var(--green); font-weight: 700; }
 .trip-app .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 14px; }
 .trip-app .settings label:first-child { grid-column: 1 / -1; }
-.planner-area-map { min-height: 0; display: flex; flex-direction: column; padding: 20px; border-radius: 20px; background: var(--pale); border: 1px solid var(--green); overflow: auto; }
+.planner-area-map { align-self: start; height: clamp(400px, calc(100dvh - 220px), 700px); min-height: 0; display: flex; flex-direction: column; padding: 20px; border-radius: 20px; background: var(--pale); border: 1px solid var(--green); overflow: auto; }
 .map-panel-heading h2 { font-size: 25px; margin: 8px 0; }
 .map-panel-heading p { font-size: 13px; margin: 5px 0; }
 .planner-area-map .osm-map { flex: 1; min-height: 120px; height: auto; }

@@ -530,7 +530,7 @@ export default function Stretch({
                 <div className="home-search-footer">
                   <label htmlFor="home-area">Starting area</label>
                   <select id="home-area" value={homeArea} onChange={(event) => setHomeArea(event.target.value)}>
-                    <option value="ip">Near me · approximate IP area</option>
+                    <option value="ip">Near me</option>
                     <option value="downtown">Downtown Atlanta</option>
                     <option value="midtown">Midtown Atlanta</option>
                     <option value="decatur">Decatur</option>
