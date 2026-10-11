@@ -13,7 +13,7 @@ vi.mock("../lib/provider-prices", async importOriginal => ({
 }));
 vi.mock("../lib/retailer-scraper", () => ({ scrapeRetailers: vi.fn() }));
 vi.mock("../lib/live-data", () => ({
-  nearbyPlaces: vi.fn(), krogerConfigured: () => true,
+  googleNearbyPlaces: vi.fn(), krogerConfigured: () => true,
   krogerStores: vi.fn(), krogerProducts: vi.fn(),
   errorResponse: (error: Error) => Response.json({ error: error.message }, { status: 502 }),
 }));
@@ -27,7 +27,7 @@ import { POST as refresh } from "../app/api/live/provider-status/route";
 import { POST as compare } from "../app/api/live/compare/route";
 import { providerReports } from "../lib/provider-prices";
 import { scrapeRetailers } from "../lib/retailer-scraper";
-import { nearbyPlaces, krogerStores, krogerProducts } from "../lib/live-data";
+import { googleNearbyPlaces, krogerStores, krogerProducts } from "../lib/live-data";
 import { locationKey, savePriceBatch } from "../lib/scrapers/persistence";
 
 const item = { id: "milk", name: "Milk", unit: "1 gallon", quantity: 1 };
@@ -49,7 +49,7 @@ beforeEach(() => {
     onReport?.(report);
     return [report];
   });
-  vi.mocked(nearbyPlaces).mockResolvedValue({ origin: { label: "Atlanta" }, places: [
+  vi.mocked(googleNearbyPlaces).mockResolvedValue({ origin: { label: "Atlanta" }, places: [
     { id: "node/1", name: "Kroger", kind: "grocery", lat: 33.75, lon: -84.39, address: "Atlanta", miles: 1, mapUrl: "" },
     { id: "node/2", name: "Target", kind: "grocery", lat: 33.76, lon: -84.39, address: "Atlanta", miles: 2, mapUrl: "" },
   ] } as never);
