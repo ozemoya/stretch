@@ -14,6 +14,9 @@ class Product(BaseModel):
 class Store(BaseModel):
     id: str
     name: str
+    address: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class Offer(BaseModel):
@@ -23,6 +26,12 @@ class Offer(BaseModel):
     recordedAt: str
     isSample: bool
     available: bool
+    productName: str | None = None
+    packageSize: str | None = None
+    sourceUrl: str | None = None
+    priceSource: str | None = None
+    unitBasis: str | None = None
+    requestedUnit: str | None = None
 
 
 class CatalogResponse(BaseModel):

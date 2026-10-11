@@ -16,6 +16,16 @@ def to_catalog(
                 for part in (store["store"], store.get("sub-location"))
                 if part
             ),
+            **(
+                {"address": store["address"]}
+                if store.get("address")
+                else {}
+            ),
+            **(
+                {"latitude": store["latitude"], "longitude": store["longitude"]}
+                if store.get("latitude") is not None and store.get("longitude") is not None
+                else {}
+            ),
         }
         for store in store_rows
         if store.get("location_scope", "branch") == "branch"
@@ -41,8 +51,7 @@ def to_catalog(
         recorded_at = row.get("observed_at") or row.get("date")
         if isinstance(recorded_at, date):
             recorded_at = recorded_at.isoformat()
-        offers.append(
-            {
+        offer = {
                 "productId": str(product_id),
                 "storeId": store_id,
                 "priceCents": price_cents,
@@ -54,7 +63,18 @@ def to_catalog(
                 "isSample": False,
                 "available": True,
             }
-        )
+        for source_key, output_key in (
+            ("product_name", "productName"),
+            ("package_size", "packageSize"),
+            ("source_url", "sourceUrl"),
+            ("price_source", "priceSource"),
+            ("unit_basis", "unitBasis"),
+            ("requested_unit", "requestedUnit"),
+        ):
+            value = row.get(source_key)
+            if value:
+                offer[output_key] = str(value)
+        offers.append(offer)
     return {
         "products": [
             {
