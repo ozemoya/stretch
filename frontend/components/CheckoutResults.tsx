@@ -77,7 +77,7 @@ export default function CheckoutResults() {
   const canCheckout = !!draft?.gasStop && !!draft.items.length && missingItems.length === 0;
 
   return (
-    <div className="trip-app">
+    <div className="trip-app results-trip">
       <TripFlowHeader
         step={draft === null || draft?.items.length === 0 ? 1 : 2}
       />
@@ -96,15 +96,7 @@ export default function CheckoutResults() {
             Map & gas
           </button>
         </div>
-        {!!draft?.items.length && (canCheckout
-          ? <Link className="results-checkout" href="/cart">Checkout →</Link>
-          : <button className="results-checkout" type="button" disabled
-              title={!draft.gasStop ? "Choose a gas station first" : "Choose a product for every grocery on your list"}>Checkout →</button>)}
       </div>
-      {!!draft?.items.length && !draft.gasStop &&
-        <p className="results-checkout-hint" role="status">Choose a gas station from the open list or map before checkout.</p>}
-      {!!draft?.gasStop && missingItems.length > 0 &&
-        <p className="results-checkout-hint" role="status">Choose a product for {missingItems.map((item) => item.name).join(", ")} before checkout.</p>}
       <main data-view={workspaceTab} id="results-main" className="results-page">
         {draft === undefined ? (
           <p role="status">Opening your trip…</p>
@@ -215,36 +207,55 @@ export default function CheckoutResults() {
                 {groceryStores.length > storeLimit && <button type="button" className="directory-more" onClick={() => setStoreLimit((count) => count + 20)}>Show 20 more stores</button>}
               </details>
             </section>
-            <section
-              className="results-map-panel"
-              aria-label="Nearby stores and gas map"
-            >
-              <StopFinder
-                compact
-                autoLoad
-                area={draft.prefs.area}
-                origin={draft.origin}
-                selectedStation={draft.gasStop}
-                selectedQuote={draft.fuelSource}
-                radius={radius}
-                onRadiusChange={setRadius}
-                onPlaces={setNearbyPlaces}
-                onPlacesError={setPlacesError}
-                selectedPlaceId={selectedPlaceId}
-                onSelectPlace={(place) => setSelectedPlaceId(place.id)}
-                onStation={(gasStop, fuelSource) =>
-                  update((current) => ({
-                    ...current,
-                    gasStop,
-                    fuelSource,
-                    prefs: {
-                      ...current.prefs,
-                      gas: fuelSource?.dollarsPerGallon ?? current.manualGas,
-                    },
-                  }))
-                }
-              />
-            </section>
+            <aside className="results-sidebar" aria-label="Nearby stops and checkout">
+              <section
+                className="results-map-panel"
+                aria-label="Nearby stores and gas map"
+              >
+                <StopFinder
+                  compact
+                  autoLoad
+                  area={draft.prefs.area}
+                  origin={draft.origin}
+                  selectedStation={draft.gasStop}
+                  selectedQuote={draft.fuelSource}
+                  radius={radius}
+                  onRadiusChange={setRadius}
+                  onPlaces={setNearbyPlaces}
+                  onPlacesError={setPlacesError}
+                  selectedPlaceId={selectedPlaceId}
+                  onSelectPlace={(place) => setSelectedPlaceId(place.id)}
+                  onStation={(gasStop, fuelSource) =>
+                    update((current) => ({
+                      ...current,
+                      gasStop,
+                      fuelSource,
+                      prefs: {
+                        ...current.prefs,
+                        gas: fuelSource?.dollarsPerGallon ?? current.manualGas,
+                      },
+                    }))
+                  }
+                />
+              </section>
+              <div className="results-checkout-panel">
+                <div className="results-checkout-action" tabIndex={!canCheckout ? 0 : undefined}
+                  role={!canCheckout ? "group" : undefined}
+                  aria-label={!canCheckout ? "Checkout unavailable" : undefined}
+                  aria-describedby={!canCheckout ? "results-checkout-feedback" : undefined}>
+                  {canCheckout
+                    ? <Link className="results-checkout" href="/cart">Checkout →</Link>
+                    : <button className="results-checkout" type="button" disabled aria-describedby="results-checkout-feedback">Checkout →</button>}
+                  {!canCheckout && <div id="results-checkout-feedback" className="results-checkout-hint" role="tooltip">
+                    <p><strong>To enable checkout:</strong></p>
+                    <ul>
+                      {!draft.gasStop && <li>Choose a gas station from the list or map.</li>}
+                      {missingItems.length > 0 && <li>Choose a product for {missingItems.map((item) => item.name).join(", ")}.</li>}
+                    </ul>
+                  </div>}
+                </div>
+              </div>
+            </aside>
           </>
         )}
       </main>
