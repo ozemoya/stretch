@@ -44,16 +44,58 @@ it("keeps the prior area usable when device permission is denied", async () => {
   vi.stubGlobal("navigator", { geolocation: { getCurrentPosition: (_success: unknown, error: (value: {code: number}) => void) => error({ code: 1 }) } });
   await expect(detectDeviceLocation()).rejects.toThrow("Location permission was denied");
 });
-it("falls back to the visitor IP when direct browser geolocation fails", async () => {
-  const fetcher = vi
-    .fn()
-    .mockRejectedValueOnce(new Error("CORS"))
-    .mockResolvedValueOnce(Response.json({ ip: "8.8.8.8" }))
-    .mockResolvedValueOnce(Response.json(normalizeIpLocation(city)));
+it("uses a fresh device position for automatic detection without contacting IP providers", async () => {
+  const getCurrentPosition = vi.fn((success) => success({ coords: {
+    latitude: 40.7128123, longitude: -74.0060456, accuracy: 8,
+  } }));
+  vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+  const fetcher = vi.fn();
   vi.stubGlobal("fetch", fetcher);
-  expect((await detectLocation(new AbortController().signal)).lat).toBe(40.713);
-  expect(fetcher.mock.calls[2][0]).toBe("/api/location");
-  expect(JSON.parse(fetcher.mock.calls[2][1].body)).toEqual({ ip: "8.8.8.8" });
+  expect(await detectLocation(new AbortController().signal)).toEqual({
+    lat: 40.7128123, lon: -74.0060456, label: "Your device location",
+    source: "device", accuracyMeters: 8,
+  });
+  expect(getCurrentPosition).toHaveBeenCalledWith(expect.any(Function), expect.any(Function),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 });
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it.each([1, 2, 3])("requires manual selection on device-location failure %s without falling back to IP", async (code) => {
+  vi.stubGlobal("navigator", { geolocation: {
+    getCurrentPosition: (_success: unknown, error: (value: { code: number }) => void) => error({ code }),
+  } });
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  await expect(detectLocation(new AbortController().signal)).rejects.toThrow(/manually/);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it("requires manual selection when the browser has no location service", async () => {
+  vi.stubGlobal("navigator", {});
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  await expect(detectLocation(new AbortController().signal)).rejects.toThrow(/unavailable/);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it("does not request a position for an already cancelled lookup", async () => {
+  const getCurrentPosition = vi.fn();
+  vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+  const controller = new AbortController(); controller.abort();
+  await expect(detectLocation(controller.signal)).rejects.toThrow(/cancelled/);
+  expect(getCurrentPosition).not.toHaveBeenCalled();
+});
+it("ignores a late device position after cancelling the lookup", async () => {
+  const getCurrentPosition = vi.fn();
+  vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+  const controller = new AbortController();
+  const lookup = detectLocation(controller.signal);
+  controller.abort();
+  getCurrentPosition.mock.calls[0][0]({ coords: { latitude: 33.7, longitude: -84.3, accuracy: 10 } });
+  await expect(lookup).rejects.toThrow(/cancelled/);
+});
+it.each([
+  { latitude: 91, longitude: 0, accuracy: 10 },
+  { latitude: 0, longitude: NaN, accuracy: 10 },
+  { latitude: 0, longitude: 0, accuracy: -1 },
+])("rejects unusable device coordinates or accuracy", async (coords) => {
+  vi.stubGlobal("navigator", { geolocation: { getCurrentPosition: (success: (value: unknown) => void) => success({ coords }) } });
+  await expect(detectLocation(new AbortController().signal)).rejects.toThrow(/usable location/);
 });
 it("rejects malformed coordinates and internal addresses before any provider lookup", async () => {
   expect(() => parseOrigin(new URLSearchParams("lat=0&lon="))).toThrow();

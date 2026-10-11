@@ -41,7 +41,12 @@ export default function CheckoutResults() {
   const [catalogPicks, setCatalogPicks] = useState<CatalogPick[]>([]);
 
   useEffect(() => {
-    setDraft(readCheckoutDraft(window.sessionStorage));
+    const saved = readCheckoutDraft(window.sessionStorage);
+    if (saved?.origin?.source === "ip") {
+      router.replace("/plan?panel=settings");
+      return;
+    }
+    setDraft(saved);
   }, []);
 
   useEffect(() => {

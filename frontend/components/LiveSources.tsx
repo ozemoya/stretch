@@ -51,12 +51,12 @@ export default function LiveSources({
   originCallback.current = onOrigin;
   const manualArea = useRef(false);
   const [locationNote, setLocationNote] = useState(
-    "Finding your approximate area from your IP…",
+    "Finding your device location…",
   );
   const [detecting, setDetecting] = useState(true);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (origin) {
+    if (origin && attempt === 0 && origin.source !== "ip") {
       setDetecting(false);
       setLocationNote(`Using ${origin.label} for your checkout search.`);
       return;
@@ -64,19 +64,19 @@ export default function LiveSources({
     let active = true;
     const controller = new AbortController();
     setDetecting(true);
-    setLocationNote("Finding your approximate area from your IP…");
+    setLocationNote("Finding your device location…");
     detectLocation(controller.signal)
       .then((detected) => {
         if (!active || controller.signal.aborted || manualArea.current) return;
         originCallback.current(detected);
         setPlaces(null);
         setLocationNote(
-          `Approximate IP location: ${detected.label}. Nearby searches use these coordinates. You can change the area below.`,
+          `Device location · accurate to about ${detected.accuracyMeters} m. You can change the area below.`,
         );
       })
-      .catch(() => {
+      .catch((error) => {
         if (active && !manualArea.current)
-          setLocationNote("IP location is unavailable. Choose an area below.");
+          setLocationNote(error instanceof Error ? error.message : "Choose an area below.");
       })
       .finally(() => {
         if (active) setDetecting(false);
@@ -185,12 +185,12 @@ export default function LiveSources({
       <label className="live-area">
         Explore an area
         <select
-          value={origin ? "ip" : area}
+          value={origin ? "device" : area}
           onChange={(e) => {
             manualArea.current = true;
             onOrigin(null);
             setLocationNote(
-              "Using your selected area. IP detection will not override it.",
+              "Using your selected area. Location detection will not override it.",
             );
             onArea(e.target.value as Area);
             setPlaces(null);
@@ -198,7 +198,7 @@ export default function LiveSources({
           }}
         >
           {origin && (
-            <option value="ip">Current IP area: {origin.label}</option>
+            <option value="device">Starting location: {origin.label}</option>
           )}
           <option value="downtown">Downtown Atlanta</option>
           <option value="midtown">Midtown Atlanta</option>
@@ -214,7 +214,7 @@ export default function LiveSources({
         }}
       >
         {" "}
-        {detecting ? "DETECTING LOCATION…" : "DETECT MY AREA ↗"}
+        {detecting ? "FINDING LOCATION…" : "USE MY CURRENT LOCATION ↗"}
       </button>
       <p className="small" role="status">
         {locationNote}
@@ -227,17 +227,16 @@ export default function LiveSources({
       )}
       {origin && (
         <details>
-          <summary>Approximate location details</summary>
+          <summary>Location details</summary>
           <p>
-            Search center: {origin.lat}, {origin.lon}. IP locations can cover a
-            broad area; this is not GPS.
+            Search center: {origin.lat}, {origin.lon}.
+            {origin.accuracyMeters !== undefined && ` Reported accuracy: about ${origin.accuracyMeters} m.`}
           </p>
         </details>
       )}
       <p className="small">
-        Approximate location provided by IPwhois; ipify is used if needed. VPNs
-        and mobile networks can change the result; your IP is not saved by
-        Stretch.
+        Allow location access to search near your current device location, or
+        choose a starting area manually.
       </p>
       <StopFinder
         area={area}

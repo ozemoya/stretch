@@ -25,19 +25,32 @@ export function normalizeIpLocation(data: unknown): SearchOrigin {
         : undefined,
   };
 }
-export function detectDeviceLocation(): Promise<SearchOrigin> {
+export function detectDeviceLocation(signal?: AbortSignal): Promise<SearchOrigin> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", abort);
+      reject(error);
+    };
+    const abort = () => fail(new Error("Location lookup cancelled."));
+    if (signal?.aborted) { abort(); return; }
+    signal?.addEventListener("abort", abort, { once: true });
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      reject(new Error("Device location is unavailable in this browser."));
+      fail(new Error("Device location is unavailable in this browser. Choose an area manually."));
       return;
     }
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        if (settled) return;
         if (!validCoordinates(coords.latitude, coords.longitude) ||
           !Number.isFinite(coords.accuracy) || coords.accuracy < 0) {
-          reject(new Error("Your device did not return a usable location."));
+          fail(new Error("Your device did not return a usable location. Try again or choose an area manually."));
           return;
         }
+        settled = true;
+        signal?.removeEventListener("abort", abort);
         resolve({
           lat: coords.latitude,
           lon: coords.longitude,
@@ -46,49 +59,16 @@ export function detectDeviceLocation(): Promise<SearchOrigin> {
           accuracyMeters: Math.round(coords.accuracy),
         });
       },
-      (error) => reject(new Error(error.code === 1
+      (error) => fail(new Error(error.code === 1
         ? "Location permission was denied. You can still choose an area manually."
         : "Could not get your device location. Try again or choose an area manually.")),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 },
     );
   });
 }
-async function json(url: string, signal: AbortSignal, init: RequestInit = {}) {
-  const r = await fetch(url, {
-    ...init,
-    signal,
-    credentials: "omit",
-    referrerPolicy: "no-referrer",
-    cache: "no-store",
-  });
-  if (!r.ok) throw new Error("IP lookup unavailable.");
-  return r.json();
-}
-export async function detectLocation(
+/** Automatic location uses the device's current position, with no IP fallback. */
+export function detectLocation(
   signal: AbortSignal,
 ): Promise<SearchOrigin> {
-  try {
-    return normalizeIpLocation(
-      await json(
-        "https://ipwho.is/",
-        AbortSignal.any([signal, AbortSignal.timeout(7000)]),
-      ),
-    );
-  } catch {
-    if (signal.aborted) throw new Error("Location lookup cancelled.");
-  }
-  // Resolve the visitor's public IP in their browser. Never geolocate the Next.js server's IP.
-  const { ip } = await json(
-    "https://api.ipify.org?format=json",
-    AbortSignal.any([signal, AbortSignal.timeout(7000)]),
-  );
-  return json(
-    "/api/location",
-    AbortSignal.any([signal, AbortSignal.timeout(10000)]),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ip }),
-    },
-  );
+  return detectDeviceLocation(signal);
 }

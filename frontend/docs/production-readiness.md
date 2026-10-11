@@ -9,7 +9,7 @@ This checklist applies to a real Atlanta-area pilot. A local build and the sampl
 - [ ] Verify the routing service and geographic coverage under deployed traffic. Compare a few route distances with a navigation app. If routing fails, do not rank by a guessed straight-line distance.
 - [ ] Connect a legitimate station-level fuel-price source if advertising station-specific gas prices. Otherwise label user-entered fuel prices as estimates and report that station prices are unavailable.
 - [ ] Move search quotas, cache, rate limits, and provider job state to shared durable infrastructure before deploying multiple server instances. Set provider-level spending caps and alerts.
-- [ ] Review privacy and terms with counsel or the project owner. Document IP-based approximate location, outside location/search providers, local browser storage, data retention, and account or receipt handling if those features are added.
+- [ ] Review privacy and terms with counsel or the project owner. Document browser device-location permission, outside location/search providers, local browser storage, data retention, and account or receipt handling if those features are added.
 - [ ] Smoke-test the deployed food-list → results → trip-review flow on desktop and mobile, including denied location lookup, missing provider credentials, no branch prices, timeout, partial basket, stale quote, gas-price estimate, and a product source without a URL.
 - [ ] Run `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and `npm audit --omit=dev --audit-level=high` on the release commit. Confirm server-only keys are not in the repository or browser bundle.
 
