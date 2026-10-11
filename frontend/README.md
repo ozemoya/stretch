@@ -18,7 +18,9 @@ npm start
 
 ## Supabase setup
 
-The FastAPI bridge reads the existing `products`, `product`, and `store` tables. `product.id` joins to `products.id`, and `product.locationID` joins to `store.locationID`. Prices are converted from dollars to frontend cents; rows without a product or store mapping are skipped.
+The FastAPI bridge reads the existing `products`, `product`, and `store` tables. `product.id` joins to `products.id`, and `product.location_key` joins to `store.location_key`. Prices are converted from dollars to frontend cents; rows without a product or store mapping are skipped. Only branch locations enter the local catalog.
+
+Apply `supabase/migrations/202610100004_modular_scraper_prices.sql` followed by `202610100005_store_location_key.sql` after the existing migrations. These bring over the price persistence schema from `price-scrape-fix`: `store.location_key` becomes the primary key, all store references use it, and existing `locationID` values remain compatibility aliases. The server saves validated package winners after searches, comparisons, and provider refreshes through the service-role-only `save_store_prices` RPC. Set `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` on the server. Online catalog keys (for example, `target:catalog:zip:30303`) stay separate from branch keys (for example, `kroger:branch:1100672`). `store_prices` exposes the saved rows joined by `location_key`.
 
 Run the FastAPI bridge from the repository root with `uvicorn backend.main:app --reload --port 8000` after copying `backend/.env.example` to `backend/.env` and setting its Supabase credentials. Set `BACKEND_API_URL=http://localhost:8000` in the frontend `.env.local`, then restart Expo/Next.js. The comparison panel should say **Catalog connected to Supabase**. Supabase credentials belong only to the backend; never expose a service-role key to the frontend.
 

@@ -44,7 +44,7 @@ function fixture({
   lookupError?: boolean;
   dietary?: boolean;
 } = {}) {
-  const write = vi.fn((table: string, rows: unknown[]) => ({
+  const write = vi.fn((table: string, rows: unknown[], _options: unknown) => ({
     select: async () => ({ data: rows, error: null }),
   }));
   const makeClient = vi.fn(() => ({
@@ -56,7 +56,7 @@ function fixture({
           error: lookupError ? { message: "denied" } : null,
         }),
       }),
-      upsert: (rows: unknown[]) => write(table, rows),
+      upsert: (rows: unknown[], options: unknown) => write(table, rows, options),
     }),
   }));
   const fetcher = vi.fn<typeof fetch>(async (input) => {
@@ -116,6 +116,26 @@ function fixture({
 afterEach(() => vi.restoreAllMocks());
 
 describe("shared Kroger library", () => {
+  it("upserts stores by location_key and links each saved product to that key", async () => {
+    const h = fixture();
+    const result = await saveCheapestKrogerProducts({ item: "eggs", amount: 12, origin }, h);
+    expect(h.write.mock.calls[0][2]).toEqual({ onConflict: "location_key" });
+    expect(result.products.map(row => row.location_key)).toEqual([
+      "kroger:branch:1100672", "kroger:branch:1100695", "kroger:branch:1100461",
+    ]);
+    expect(result.products.every(row => row.location_key === row.store.location_key)).toBe(true);
+  });
+
+  it("rejects another retailer's location_key even when its numeric alias matches", async () => {
+    const initial = await saveCheapestKrogerProducts({ item: "eggs", amount: 12, origin }, fixture());
+    const h = fixture({ existing: initial.products.map(row => ({ ...row,
+      location_key: row.location_key.replace("kroger:", "target:") })) });
+    await expect(saveCheapestKrogerProducts({ item: "eggs", amount: 12, origin }, h))
+      .rejects.toThrow("A saved product ID conflicts");
+    expect(h.write).not.toHaveBeenCalled();
+    expect(h.fetcher.mock.calls.some(([url]) => new URL(String(url)).pathname.endsWith("/products"))).toBe(false);
+  });
+
   it("saves and reuses dietary winners separately from regular searches", async () => {
     const options = {
       item: "black beans",

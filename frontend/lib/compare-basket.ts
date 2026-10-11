@@ -16,6 +16,7 @@ import { mergeCatalogReports } from "@/lib/merge-catalog-reports";
 import type { SearchPlan } from "@/lib/local-search-agent";
 import { normalizeCatalogReport } from "@/lib/product-ownership";
 import { freshMarketBranchOffers } from "@/lib/fresh-market-specials";
+import { branchPriceBatch, catalogPriceBatch, type PriceBatch } from "@/lib/scrapers/persistence";
 export const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   area: z.enum(["downtown", "midtown", "decatur"]).default("downtown"),
@@ -47,7 +48,8 @@ export async function compareBasket(
   request: Request,
   onReport?: (report: ScrapeReport) => void,
   agentPlan?: SearchPlan,
-  options: { deferProvider?: boolean; deferPublic?: boolean; deferPlan?: boolean } = {},
+  options: { deferProvider?: boolean; deferPublic?: boolean; deferPlan?: boolean;
+    onPrices?: (batches: PriceBatch[]) => void } = {},
 ) {
   const parsed = input.safeParse(await request.json().catch(() => null));
   if (
@@ -184,6 +186,7 @@ export async function compareBasket(
           checkedStores.push({
             ...store,
             id: row.id,
+            sourceLocationId: store.id,
             lines: [
               ...store.lines.map((line) => ({
                 ...line,
@@ -214,6 +217,11 @@ export async function compareBasket(
         );
       }
     }
+    request.signal.throwIfAborted();
+    options.onPrices?.([
+      ...publicCatalogs.map(report => catalogPriceBatch(report, p.zip)),
+      ...checkedStores.map(store => branchPriceBatch(store, coverage)),
+    ]);
     return Response.json(
       {
         stores: checkedStores,

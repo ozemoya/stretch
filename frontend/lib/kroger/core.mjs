@@ -674,6 +674,7 @@ export function productRow(result) {
     price: result.regular_price_cents / 100,
     unit_price: result.unit_price_cents / 100,
     locationID: Number(result.location_id),
+    location_key: `kroger:branch:${BigInt(result.location_id)}`,
     date: productDate(result.retrieved_at ?? new Date()),
     ...Object.fromEntries(
       Object.values(dietaryColumns).map((column) => [
@@ -715,6 +716,10 @@ export function storeRow(result) {
   const address = result.store_address ?? {};
   return {
     locationID: location,
+    location_key: `kroger:branch:${BigInt(result.location_id)}`,
+    retailer_key: "kroger",
+    location_scope: "branch",
+    source_location_id: BigInt(result.location_id).toString(),
     ...splitStoreName(result.store_name),
     latitude: point?.latitude ?? null,
     longitude: point?.longitude ?? null,
@@ -796,7 +801,7 @@ export async function run(
     (flag) => options[flag] === true,
   );
   const productColumns =
-    "ID,category,count,price,unit_price,locationID,date,gluten_free,vegan,nut_free";
+    "ID,category,count,price,unit_price,locationID,location_key,date,gluten_free,vegan,nut_free";
   log(
     `[1/5] Checking configuration for ${JSON.stringify(item)} using ${zip ? `ZIP ${zip}` : options.origin ? "supplied coordinates" : "current approximate IP location"}.`,
   );
@@ -838,7 +843,7 @@ export async function run(
     if (error) {
       if (["42703", "PGRST204"].includes(error.code))
         throw new Error(
-          "The product table is missing required columns: ID, category, count, price, unit_price, locationID, date, gluten_free, vegan, nut_free. Apply the product_date and product_dietary migrations.",
+          "The product table is missing required columns: ID, category, count, price, unit_price, location_key, date, gluten_free, vegan, nut_free. Apply the product_date, product_dietary, modular_scraper_prices, and store_location_key migrations.",
         );
       if (["PGRST205", "42P01"].includes(error.code))
         throw new Error(
@@ -850,7 +855,7 @@ export async function run(
     }
     const storeCheck = await db
       .from("store")
-      .select("locationID,store,sub-location,latitude,longitude,address")
+      .select("location_key,locationID,store,sub-location,latitude,longitude,address")
       .limit(0);
     if (storeCheck.error)
       throw new Error(
@@ -945,7 +950,7 @@ export async function run(
       if (
         !store ||
         row.category !== item.toLowerCase() ||
-        Number(row.locationID) !== Number(store.locationId)
+        row.location_key !== `kroger:branch:${BigInt(store.locationId)}`
       )
         throw new Error(
           "A saved product ID conflicts with this search; no Kroger product searches performed.",
@@ -973,6 +978,7 @@ export async function run(
         price: Number(row.price),
         unit_price: Number(row.unit_price),
         locationID: Number(row.locationID),
+        location_key: row.location_key,
         date: row.date,
         ...Object.fromEntries(
           Object.values(dietaryColumns).map((column) => [
@@ -1122,13 +1128,13 @@ export async function run(
       ...new Map(
         rows.map((row) => {
           const mapped = storeRow(row);
-          return [mapped.locationID, mapped];
+          return [mapped.location_key, mapped];
         }),
       ).values(),
     ];
     const existing = await db
       .from("product")
-      .select("ID,category,locationID")
+      .select("ID,category,location_key")
       .in(
         "ID",
         savedRows.map((row) => row.ID),
@@ -1142,7 +1148,7 @@ export async function run(
       if (
         !intended ||
         row.category !== intended.category ||
-        Number(row.locationID) !== intended.locationID
+        row.location_key !== intended.location_key
       )
         throw new Error(
           "A product ID conflicts with an unrelated existing row; no winners saved.",
@@ -1150,13 +1156,13 @@ export async function run(
     }
     const storeSave = await db
       .from("store")
-      .upsert(savedStores, { onConflict: "locationID" })
-      .select("locationID,store,sub-location,latitude,longitude,address");
+      .upsert(savedStores, { onConflict: "location_key" })
+      .select("location_key,locationID,store,sub-location,latitude,longitude,address");
     if (storeSave.error || storeSave.data?.length !== savedStores.length)
       throw new Error(
         "Supabase did not confirm the store save; no product winners were saved.",
       );
-    log(`  Saved ${storeSave.data.length} stores, linked by locationID.`);
+    log(`  Saved ${storeSave.data.length} stores, linked by location_key.`);
     const { data, error } = await db
       .from("product")
       .upsert(savedRows, { onConflict: "ID" })

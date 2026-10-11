@@ -16,7 +16,7 @@ const schema = z.object({
       }),
     )
     .min(1),
-  stores: z.array(z.object({ id: z.string(), name: z.string() })).length(3),
+  stores: z.array(z.object({ id: z.string(), name: z.string() })).min(1),
   offers: z.array(
     z.object({
       productId: z.string(),

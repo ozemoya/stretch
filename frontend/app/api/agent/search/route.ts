@@ -11,6 +11,8 @@ import { settlePendingReports } from "../../../../lib/search-state";
 import { deadlineStream, untilAborted } from "../../../../lib/deadline-stream";
 import { AI_PLAN_WINDOW_MS, SEARCH_WINDOW_MS } from "../../../../lib/search-timing";
 import { catalogCache } from "../../../../lib/catalog-cache";
+import { catalogPriceBatch, type PriceBatch } from "../../../../lib/scrapers/persistence";
+import { savePricesAfterResponse } from "../../../../lib/scrapers/save-after-response";
 
 export const runtime = "nodejs";
 const supported = ["Walmart", "Target", "Publix", "ALDI", "The Fresh Market",
@@ -35,6 +37,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "Choose 1–30 distinct foods and a valid search location." }, { status: 400 });
   const p = parsed.data;
   const reports = new Map<string, ScrapeReport>();
+  const branchBatches: PriceBatch[] = [];
+  savePricesAfterResponse(() => [
+    ...[...reports.values()].map(report => catalogPriceBatch(report, p.zip)),
+    ...branchBatches,
+  ]);
   let comparison: Record<string, unknown> | null = null;
   let plan: SearchPlan | null = null;
   let failures = false;
@@ -78,7 +85,8 @@ export async function POST(request: Request) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p), signal,
     }), (report) => emit(report), undefined,
-    { deferProvider: true, deferPublic: true, deferPlan: true }).then(async (response) => {
+    { deferProvider: true, deferPublic: true, deferPlan: true,
+      onPrices: batches => { if (!signal.aborted) branchBatches.push(...batches); } }).then(async (response) => {
       const result = await response.json();
       if (!signal.aborted && response.ok) comparison = result;
       else if (!signal.aborted) failures = true;

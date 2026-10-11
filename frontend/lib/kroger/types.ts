@@ -113,12 +113,17 @@ export interface KrogerProductRow extends KrogerDietaryFlags {
   /** Dollars per comparison_unit, independent of the physical item count. */
   unit_price: number;
   locationID: number;
+  location_key: string;
   /** Last price retrieval day (YYYY-MM-DD) in America/New_York; historical rows may be null. */
   date: string | null;
 }
 
 export interface KrogerStoreRow {
   locationID: number;
+  location_key: string;
+  retailer_key: "kroger";
+  location_scope: "branch";
+  source_location_id: string;
   store: "Kroger";
   "sub-location": string | null;
   latitude: number | null;
