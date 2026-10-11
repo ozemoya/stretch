@@ -19,6 +19,8 @@ import { nearbyGroceryStores } from "@/lib/nearby-store-display";
 import { readCart, SMART_CART_EVENT, type CartLine } from "@/lib/smart-cart";
 import { readCatalogPicks, type CatalogPick } from "@/lib/catalog-picks";
 import { missingCartItems } from "@/lib/cart-coverage";
+import { readRoutePreviewStops, toggleRoutePreviewStop, writeRoutePreviewStops,
+  type RoutePreviewStop, MAX_PREVIEW_STORES } from "@/lib/route-preview";
 
 export default function CheckoutResults() {
   const router = useRouter();
@@ -31,9 +33,11 @@ export default function CheckoutResults() {
   const [placesError, setPlacesError] = useState("");
   const [storeQuery, setStoreQuery] = useState("");
   const [storeLimit, setStoreLimit] = useState(20);
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [selectedPreviewStops, setSelectedPreviewStops] = useState<RoutePreviewStop[]>([]);
+  const [routeNotice, setRouteNotice] = useState("");
   const groceryStores = nearbyGroceryStores(nearbyPlaces, storeQuery);
   const groceryCount = nearbyGroceryStores(nearbyPlaces).length;
+  const selectedPlaceIds = selectedPreviewStops.map((stop) => stop.id);
   const [draft, setDraft] = useState<CheckoutDraft | null | undefined>(
     undefined,
   );
@@ -41,7 +45,10 @@ export default function CheckoutResults() {
   const [catalogPicks, setCatalogPicks] = useState<CatalogPick[]>([]);
 
   useEffect(() => {
-    setDraft(readCheckoutDraft(window.sessionStorage));
+    const opened = readCheckoutDraft(window.sessionStorage);
+    setDraft(opened);
+    if (opened) setSelectedPreviewStops(readRoutePreviewStops(window.sessionStorage,
+      opened.origin ?? centers[opened.prefs.area]));
   }, []);
 
   useEffect(() => {
@@ -69,12 +76,31 @@ export default function CheckoutResults() {
     });
   }
 
+  const maxRouteStores = Math.min(MAX_PREVIEW_STORES, Math.max(1, draft?.prefs.maxStops ?? MAX_PREVIEW_STORES));
+  function selectGroceryStop(place: NearbyPlace) {
+    const next = toggleRoutePreviewStop(selectedPreviewStops, place, maxRouteStores);
+    if (next === selectedPreviewStops) {
+      setRouteNotice(`Choose up to ${maxRouteStores} grocery stores. Remove one to add another.`);
+      return;
+    }
+    setRouteNotice("");
+    setSelectedPreviewStops(next);
+    if (draft) writeRoutePreviewStops(window.sessionStorage, next,
+      draft.origin ?? centers[draft.prefs.area]);
+  }
+  function clearGroceryStops() {
+    setSelectedPreviewStops([]);
+    setRouteNotice("");
+    if (draft) writeRoutePreviewStops(window.sessionStorage, [],
+      draft.origin ?? centers[draft.prefs.area]);
+  }
+
   const reportAge = draft?.fuelSource ? Date.now() - Date.parse(draft.fuelSource.period) : Infinity;
   const recentStationPrice = !!draft?.gasStop && draft.fuelSource?.kind === "station" &&
     Number.isFinite(reportAge) && reportAge >= 0 && reportAge <= 48 * 60 * 60 * 1000;
   const effectiveGasPrice = recentStationPrice ? draft!.prefs.gas : draft?.manualGas ?? 0;
   const missingItems = draft ? missingCartItems(draft.items, cartLines, catalogPicks) : [];
-  const canCheckout = !!draft?.gasStop && !!draft.items.length && missingItems.length === 0;
+  const canCheckout = !!draft?.items.length && missingItems.length === 0;
 
   return (
     <div className="trip-app">
@@ -93,17 +119,17 @@ export default function CheckoutResults() {
             aria-pressed={workspaceTab === "map"}
             onClick={() => setWorkspaceTab("map")}
           >
-            Map & gas
+            Map & route
           </button>
         </div>
         {!!draft?.items.length && (canCheckout
           ? <Link className="results-checkout" href="/cart">Checkout →</Link>
           : <button className="results-checkout" type="button" disabled
-              title={!draft.gasStop ? "Choose a gas station first" : "Choose a product for every grocery on your list"}>Checkout →</button>)}
+              title="Choose a product for every grocery on your list">Checkout →</button>)}
       </div>
       {!!draft?.items.length && !draft.gasStop &&
-        <p className="results-checkout-hint" role="status">Choose a gas station from the open list or map before checkout.</p>}
-      {!!draft?.gasStop && missingItems.length > 0 &&
+        <p className="results-checkout-hint">To see the grocery drive, open Map & route and choose up to {maxRouteStores} grocery stores. A gas stop is optional.</p>}
+      {missingItems.length > 0 &&
         <p className="results-checkout-hint" role="status">Choose a product for {missingItems.map((item) => item.name).join(", ")} before checkout.</p>}
       <main data-view={workspaceTab} id="results-main" className="results-page">
         {draft === undefined ? (
@@ -203,8 +229,8 @@ export default function CheckoutResults() {
                 </label>
                 <div className="nearby-grocery-list">
                   {groceryStores.slice(0, storeLimit).map((store) => (
-                    <button type="button" key={store.id} aria-pressed={selectedPlaceId === store.id}
-                      onClick={() => { setSelectedPlaceId((current) => current === store.id ? null : store.id); setWorkspaceTab("map"); }}>
+                    <button type="button" key={store.id} aria-pressed={selectedPlaceIds.includes(store.id)}
+                      onClick={() => { selectGroceryStop(store); setWorkspaceTab("map"); }}>
                       <span><strong>{store.name}</strong><small>{store.address || "Address not listed"}</small></span>
                       <span>{store.miles} mi <span aria-hidden="true">↗</span></span>
                     </button>
@@ -219,6 +245,25 @@ export default function CheckoutResults() {
               className="results-map-panel"
               aria-label="Nearby stores and gas map"
             >
+              <div className="results-route-callout" role="status">
+                <strong>Grocery route · {selectedPreviewStops.length} of {maxRouteStores} stores selected</strong>
+                {selectedPreviewStops.length ? <><ol>{selectedPreviewStops.map((stop) =>
+                  <li key={stop.id}><span>{stop.name} · {stop.address}</span>
+                    <button type="button" aria-label={`Remove ${stop.name} from route`}
+                      onClick={() => { const place = nearbyPlaces.find((candidate) => candidate.id === stop.id);
+                        if (place) selectGroceryStop(place); else {
+                          const next = selectedPreviewStops.filter((entry) => entry.id !== stop.id);
+                          setSelectedPreviewStops(next);
+                          if (draft) writeRoutePreviewStops(window.sessionStorage, next,
+                            draft.origin ?? centers[draft.prefs.area]);
+                        } }}>×</button></li>)}</ol>
+                  <Link href="/cart/checkout">See the full grocery route at checkout ↗</Link>
+                  <small>These are mapped stops. Online prices are not confirmed for these branches.</small></>
+                  : <span>Choose green markers or store addresses to add stops. The map will draw the full drive.</span>}
+                {routeNotice && <span role="alert">{routeNotice}</span>}
+                {maxRouteStores < MAX_PREVIEW_STORES &&
+                  <small>Your trip setting currently allows {maxRouteStores} grocery stores. <Link href="/plan?panel=settings">Change trip settings ↗</Link></small>}
+              </div>
               <StopFinder
                 compact
                 autoLoad
@@ -227,11 +272,14 @@ export default function CheckoutResults() {
                 selectedStation={draft.gasStop}
                 selectedQuote={draft.fuelSource}
                 radius={radius}
-                onRadiusChange={setRadius}
+                onRadiusChange={(nextRadius) => {
+                  setRadius(nextRadius);
+                  clearGroceryStops();
+                }}
                 onPlaces={setNearbyPlaces}
                 onPlacesError={setPlacesError}
-                selectedPlaceId={selectedPlaceId}
-                onSelectPlace={(place) => setSelectedPlaceId(place.id)}
+                selectedPlaceIds={selectedPlaceIds}
+                onSelectPlace={(place) => { if (place.kind === "grocery") selectGroceryStop(place); }}
                 onStation={(gasStop, fuelSource) =>
                   update((current) => ({
                     ...current,

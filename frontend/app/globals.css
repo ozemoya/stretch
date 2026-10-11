@@ -1104,7 +1104,16 @@ footer {
 .map-panel-heading p { font-size: 13px; margin: 5px 0; }
 .planner-area-map .osm-map { flex: 1; min-height: 120px; height: auto; }
 .planner-area-map > .small, .planner-area-map .map-caption { flex-shrink: 0; font-size: 11px; margin-bottom: 0; }
-.results-map-panel { min-height: 460px; min-width: 0; height: calc(100dvh - 190px); position: sticky; top: 12px; align-self: start; overflow: hidden; }
+.results-map-panel { min-height: 460px; min-width: 0; height: calc(100dvh - 190px); position: sticky; top: 12px; align-self: start; overflow: hidden; display:flex; flex-direction:column; }
+.results-route-callout { flex:none; display:grid; gap:3px; margin:0 0 8px; padding:9px 12px; max-height:190px; overflow:auto; background:var(--pale); border:1px dashed var(--green); border-radius:10px; color:var(--green); font-size:13px; }
+.results-route-callout strong { font-size:16px; }
+.results-route-callout ol { display:grid; gap:4px; margin:3px 0; padding-left:22px; }
+.results-route-callout li { padding-left:2px; }
+.results-route-callout li span { overflow-wrap:anywhere; }
+.results-route-callout li button { margin-left:6px; padding:1px 5px; background:transparent; color:var(--green); border:1px solid var(--green); border-radius:6px; cursor:pointer; }
+.results-route-callout a { justify-self:start; font-weight:800; text-decoration:underline; text-underline-offset:3px; }
+.results-route-callout small { line-height:1.25; }
+.results-map-panel > .compact-stop-finder { flex:1; min-height:0; height:auto; }
 .nearby-grocery-directory { margin: 16px 0 20px; padding: 16px; border: 1px solid var(--sand); border-radius: 16px; background: var(--pale); }
 .nearby-grocery-directory > summary { cursor:pointer; color:var(--green); font-weight:800; font-size:14px; }
 .nearby-grocery-directory[open] > summary { margin-bottom:12px; }

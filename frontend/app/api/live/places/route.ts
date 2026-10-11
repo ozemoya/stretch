@@ -9,13 +9,15 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const area = params.get("area") ?? "downtown",
     radius = Number(params.get("radius") ?? 5),
-    kind = params.get("kind") ?? "all";
+    kind = params.get("kind") ?? "all",
+    coverage = params.get("coverage") ?? "standard";
   if (
     !Object.hasOwn(centers, area) ||
     !Number.isFinite(radius) ||
     radius < 1 ||
     radius > 10 ||
-    !["all", "grocery", "fuel"].includes(kind)
+    !["all", "grocery", "fuel"].includes(kind) ||
+    !["standard", "expanded"].includes(coverage)
   )
     return Response.json(
       {
@@ -40,6 +42,7 @@ export async function GET(request: Request) {
         radius,
         kind as "all" | "grocery" | "fuel",
         origin,
+        coverage === "expanded",
       ),
       { headers: { "Cache-Control": "no-store" } },
     );

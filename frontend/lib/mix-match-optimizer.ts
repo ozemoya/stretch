@@ -7,6 +7,7 @@ export type RoadMatrix = {
   distances: (number | null)[][]; // OSRM road metres, indexed home, stores, optional fuel stop
   durations: (number | null)[][]; // OSRM seconds in the same order
   hasFuelStop: boolean;
+  provider?: "google" | "osrm";
 };
 export type MixMatchPlan = {
   selections: MultiStoreSelections;
@@ -29,29 +30,36 @@ function permutations<T>(values: T[]): T[][] {
     .map((rest) => [value, ...rest]));
 }
 
-export function bestRoadRoute(storeIds: string[], matrix: RoadMatrix) {
-  if (!storeIds.length || storeIds.some((id) => !matrix.storeIds.includes(id))) return null;
+export function roadRouteForOrder(storeIds: string[], matrix: RoadMatrix) {
+  if (!storeIds.length || new Set(storeIds).size !== storeIds.length ||
+    storeIds.some((id) => !matrix.storeIds.includes(id))) return null;
   const fuelIndex = matrix.hasFuelStop ? matrix.storeIds.length + 1 : null;
+  const stops = [0, ...storeIds.map((id) => matrix.storeIds.indexOf(id) + 1),
+    ...(fuelIndex === null ? [] : [fuelIndex]), 0];
+  let metres = 0;
+  let seconds = 0;
+  for (let i = 1; i < stops.length; i++) {
+    const distance = matrix.distances[stops[i - 1]]?.[stops[i]];
+    const duration = matrix.durations[stops[i - 1]]?.[stops[i]];
+    if (distance === null || duration === null || !Number.isFinite(distance) || !Number.isFinite(duration)) {
+      return null;
+    }
+    metres += distance!;
+    seconds += duration!;
+  }
+  return { order: storeIds, miles: metres / 1609.344, minutes: seconds / 60 };
+}
+
+export function bestRoadRoute(storeIds: string[], matrix: RoadMatrix, mode: "distance" | "duration" = "distance") {
+  if (!storeIds.length || storeIds.some((id) => !matrix.storeIds.includes(id))) return null;
   let best: { order: string[]; miles: number; minutes: number } | null = null;
   for (const order of permutations(storeIds)) {
-    const stops = [0, ...order.map((id) => matrix.storeIds.indexOf(id) + 1),
-      ...(fuelIndex === null ? [] : [fuelIndex]), 0];
-    let metres = 0;
-    let seconds = 0;
-    let valid = true;
-    for (let i = 1; i < stops.length; i++) {
-      const distance = matrix.distances[stops[i - 1]]?.[stops[i]];
-      const duration = matrix.durations[stops[i - 1]]?.[stops[i]];
-      if (distance === null || duration === null || !Number.isFinite(distance) || !Number.isFinite(duration)) {
-        valid = false;
-        break;
-      }
-      metres += distance!;
-      seconds += duration!;
-    }
-    if (!valid) continue;
-    const route = { order, miles: metres / 1609.344, minutes: seconds / 60 };
-    if (!best || route.miles < best.miles || route.miles === best.miles && route.minutes < best.minutes)
+    const route = roadRouteForOrder(order, matrix);
+    if (!route) continue;
+    const better = !best || (mode === "duration"
+      ? route.minutes < best!.minutes || route.minutes === best!.minutes && route.miles < best!.miles
+      : route.miles < best!.miles || route.miles === best!.miles && route.minutes < best!.minutes);
+    if (better)
       best = route;
   }
   return best;

@@ -23,7 +23,7 @@ export default function StopFinder({
   onRadiusChange,
   onPlaces,
   onPlacesError,
-  selectedPlaceId,
+  selectedPlaceIds,
   onSelectPlace,
 }: {
   area: Area;
@@ -37,7 +37,7 @@ export default function StopFinder({
   onRadiusChange?: (radius: number) => void;
   onPlaces?: (places: NearbyPlace[]) => void;
   onPlacesError?: (error: string) => void;
-  selectedPlaceId?: string | null;
+  selectedPlaceIds?: string[];
   onSelectPlace?: (place: NearbyPlace) => void;
 }) {
   const selectedStationId = selectedStation?.id ?? null;
@@ -49,6 +49,7 @@ export default function StopFinder({
     [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const [gasQuery, setGasQuery] = useState("");
   const [gasLimit, setGasLimit] = useState(20);
   const [fuelReport, setFuelReport] = useState<LocalFuelResult | null>(null);
@@ -61,13 +62,13 @@ export default function StopFinder({
     setError("");
     onPlacesError?.("");
     setLoaded(false);
-    setPlaces([]);
+    if (!expanded) setPlaces([]);
     setFuelReport(null);
     setFuelBusy(true);
     setFuelError("");
-    onPlaces?.([]);
+    if (!expanded) onPlaces?.([]);
     fetch(
-      `/api/live/places?area=${area}&radius=${radius}&kind=all${originQuery(origin)}`,
+      `/api/live/places?area=${area}&radius=${radius}&kind=all${expanded ? "&coverage=expanded" : ""}${originQuery(origin)}`,
       { signal: controller.signal },
     )
       .then(async (r) => {
@@ -107,10 +108,10 @@ export default function StopFinder({
       })
       .finally(() => { if (!controller.signal.aborted) setFuelBusy(false); });
     return () => controller.abort();
-  }, [area, origin?.lat, origin?.lon, radius, attempt, autoLoad]);
+  }, [area, origin?.lat, origin?.lon, radius, attempt, autoLoad, expanded]);
   useEffect(() => {
-    if (selectedPlaceId) setKind("all");
-  }, [selectedPlaceId]);
+    if (selectedPlaceIds?.length) setKind("all");
+  }, [selectedPlaceIds?.join("|")]);
   const visible = places.filter((p) => kind === "all" || p.kind === kind);
   const gasPlaces = places.filter((place) => place.kind === "fuel");
   const matchingGasPlaces = gasPlaces.filter((place) => `${place.name} ${place.address}`.toLowerCase().includes(gasQuery.toLowerCase()));
@@ -152,7 +153,7 @@ export default function StopFinder({
   </ul>;
   return (
     <article
-      className={"stop-finder" + (compact ? " compact-stop-finder" : "") + (selectedStationId || selectedPlaceId ? " route-selected" : "")}
+      className={"stop-finder" + (compact ? " compact-stop-finder" : "") + (selectedStationId || selectedPlaceIds?.length ? " route-selected" : "")}
     >
       {!compact && <p className="eyebrow">GROCERIES + GAS · ONE GOOD ROUTE</p>}
       <h2 id="live-title">Nearby stores and gas</h2>
@@ -179,6 +180,7 @@ export default function StopFinder({
               const nextRadius = Number(e.target.value);
               if (onRadiusChange) onRadiusChange(nextRadius);
               else setLocalRadius(nextRadius);
+              setExpanded(false);
               onStation(null, null);
             }}
           >
@@ -212,6 +214,9 @@ export default function StopFinder({
         >
           {busy ? "Finding your stops…" : "Refresh stops ↗"}
         </button>}
+        {compact && !expanded && <button type="button" disabled={busy} onClick={() => setExpanded(true)}>
+          Find more grocery stores ↗
+        </button>}
       </div>
       {error && <p role="alert">{error}</p>}
       <div className="next-stop-map">
@@ -222,7 +227,7 @@ export default function StopFinder({
           places={visible}
           routePlaces={places}
           selectedFuelId={selectedStationId}
-          selectedPlaceId={selectedPlaceId}
+          selectedPlaceIds={selectedPlaceIds}
           onSelectPlace={onSelectPlace}
           onSelectFuel={(place) =>
             onStation(
@@ -245,7 +250,7 @@ export default function StopFinder({
             ? "Nearby stops could not load. Try Refresh stops shortly."
             : busy
             ? "Loading groceries and gas stations…"
-            : `${visible.length} mapped stops within ${radius} miles of ${origin?.label || area}.`}
+            : `${visible.length} mapped stops within ${radius} miles of ${origin?.label || area}${expanded ? " · expanded search" : ""}.`}
         </p>
         {loaded && !places.length && (
           <p>No mapped stops matched this filter. Try a wider radius.</p>

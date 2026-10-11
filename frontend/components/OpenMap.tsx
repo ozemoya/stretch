@@ -24,10 +24,10 @@ function fullscreenRouteZoom(bounds: google.maps.LatLngBounds, width: number, he
   return Math.max(11, Math.min(18, Math.floor(Math.log2(Math.max(1, available)))));
 }
 
-export default function OpenMap({ area, radius, places, routePlaces = places, origin, onSelectFuel, onSelectPlace, selectedFuelId, selectedPlaceId, fuelOnly = false }: {
+export default function OpenMap({ area, radius, places, routePlaces = places, origin, onSelectFuel, onSelectPlace, selectedFuelId, selectedPlaceId, selectedPlaceIds, fuelOnly = false }: {
   area: Area; radius: number; places: NearbyPlace[]; routePlaces?: NearbyPlace[]; origin?: SearchOrigin | null;
   onSelectFuel?: (place: NearbyPlace) => void; onSelectPlace?: (place: NearbyPlace) => void;
-  selectedFuelId?: string | null; selectedPlaceId?: string | null; fuelOnly?: boolean;
+  selectedFuelId?: string | null; selectedPlaceId?: string | null; selectedPlaceIds?: string[]; fuelOnly?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const selectedCallback = useRef(onSelectFuel);
@@ -37,9 +37,12 @@ export default function OpenMap({ area, radius, places, routePlaces = places, or
   const [error, setError] = useState("");
   const [roadRoute, setRoadRoute] = useState<{ miles: number; minutes: number; stops: string[] } | null>(null);
   const [routeError, setRouteError] = useState("");
-  const selectedStore = routePlaces.find((place) => place.kind !== "fuel" && place.id === selectedPlaceId);
+  const selectedIds = selectedPlaceIds ?? (selectedPlaceId ? [selectedPlaceId] : []);
+  const selectedKey = selectedIds.join("|");
+  const selectedStores = selectedIds.map((id) => routePlaces.find((place) => place.kind === "grocery" && place.id === id))
+    .filter((place): place is NearbyPlace => !!place);
   const selectedFuel = routePlaces.find((place) => place.kind === "fuel" && place.id === selectedFuelId);
-  const routeStops = [selectedStore, selectedFuel].filter((place): place is NearbyPlace => !!place);
+  const routeStops = [...selectedStores, selectedFuel].filter((place): place is NearbyPlace => !!place);
   const center = origin ?? centers[area];
   const directionsUrl = routeStops.length ? (() => {
     const url = new URL("https://www.google.com/maps/dir/");
@@ -93,9 +96,10 @@ export default function OpenMap({ area, radius, places, routePlaces = places, or
       for (const place of places) {
         if (seen.has(place.id)) continue;
         seen.add(place.id);
-        const active = place.id === selectedFuelId || place.id === selectedPlaceId;
+        const selectedIndex = selectedIds.indexOf(place.id);
+        const active = place.id === selectedFuelId || selectedIndex >= 0;
         const marker = new google.maps.Marker({ map, position: { lat: place.lat, lng: place.lon },
-          title: `${place.name} · ${place.address}`, label: active || !routeStops.length ? { text: place.kind === "fuel" ? "G" : "S", color: "#fffaf0" } : undefined,
+          title: `${place.name} · ${place.address}`, label: active || !routeStops.length ? { text: place.kind === "fuel" ? "G" : selectedIndex >= 0 ? String(selectedIndex + 1) : "S", color: "#fffaf0" } : undefined,
           icon: { path: google.maps.SymbolPath.CIRCLE, scale: active ? 14 : routeStops.length ? 7 : 11,
             fillColor: place.kind === "fuel" ? "#c7563e" : "#61752a", fillOpacity: active || !routeStops.length ? 1 : 0.45,
             strokeColor: "#302d26", strokeWeight: active ? 3 : 1.5 } });
@@ -120,7 +124,7 @@ export default function OpenMap({ area, radius, places, routePlaces = places, or
           info.setContent(content); info.open({ map, anchor: marker });
         });
         markers.push(marker);
-        if (place.id === selectedPlaceId) map.panTo({ lat: place.lat, lng: place.lon });
+        if (place.id === selectedIds.at(-1)) map.panTo({ lat: place.lat, lng: place.lon });
       }
       if (routeStops.length) {
         void fetch("/api/routes", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -143,10 +147,10 @@ export default function OpenMap({ area, radius, places, routePlaces = places, or
       routeController.abort(); markers.forEach((marker) => marker.setMap(null)); circle?.setMap(null);
       roadLine?.setMap(null);
       if (map) google.maps.event.clearInstanceListeners(map); };
-  }, [area, radius, places, origin?.lat, origin?.lon, selectedFuelId, selectedPlaceId]);
+  }, [area, radius, places, origin?.lat, origin?.lon, selectedFuelId, selectedKey]);
   return <><div className="osm-map" ref={container} aria-label={`Google Map: locations within ${radius} miles of ${origin?.label ?? area}`} />
     <p className="map-caption">{fuelOnly ? "Red: gas stations" : "Green: groceries · Red: gas"} · Circle: search radius · Map by Google Maps</p>
-    {roadRoute && <p className="map-route-preview" role="status">Road route preview: starting area → {roadRoute.stops.join(" → ")} → starting area · {roadRoute.miles.toFixed(1)} miles · about {roadRoute.minutes} minutes. Selected map stops do not confirm grocery prices.</p>}
+      {roadRoute && <p className="map-route-preview" role="status">Road route preview: starting area → {roadRoute.stops.join(" → ")} → starting area · {roadRoute.miles.toFixed(1)} miles · about {Math.round(roadRoute.minutes)} minutes. Selected map stops do not confirm grocery prices.</p>}
     {directionsUrl && <a className="map-route-directions" href={directionsUrl} target="_blank" rel="noreferrer">Open driving directions ↗</a>}
     {routeError && <p role="status">{routeError}</p>}
     {error && <p role="status">{error}</p>}</>;

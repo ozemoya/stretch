@@ -385,11 +385,12 @@ const googleNearbyPending = new Map<string, Promise<NearbyPlace[]>>();
 
 /** Google Places discovery for the live app. Its results are intentionally not cached. */
 export async function googleNearbyPlaces(area: Area, radiusMiles = 5,
-  kind: "all" | "grocery" | "fuel" = "all", customOrigin?: SearchOrigin) {
+  kind: "all" | "grocery" | "fuel" = "all", customOrigin?: SearchOrigin, expanded = false) {
   if (!localFuelConfigured()) throw new ProviderError("Google Places is not configured on the server.", 503);
   const c = customOrigin ?? centers[area];
-  const search = (placeKind: "grocery" | "fuel") => {
-    const key = `${c.lat}:${c.lon}:${radiusMiles}:${placeKind}`;
+  const search = (placeKind: "grocery" | "fuel", latitude = c.lat, longitude = c.lon,
+    searchRadiusMiles = radiusMiles) => {
+    const key = `${latitude}:${longitude}:${searchRadiusMiles}:${placeKind}`;
     const existing = googleNearbyPending.get(key);
     if (existing) return existing;
     const task = (async () => {
@@ -400,7 +401,7 @@ export async function googleNearbyPlaces(area: Area, radiusMiles = 5,
       body: JSON.stringify({ ...(placeKind === "fuel" ? { includedTypes: ["gas_station"] } :
         { includedPrimaryTypes: ["grocery_store", "supermarket", "discount_supermarket", "hypermarket"] }),
         maxResultCount: 20, rankPreference: placeKind === "fuel" ? "DISTANCE" : "POPULARITY", locationRestriction: { circle: {
-          center: { latitude: c.lat, longitude: c.lon }, radius: radiusMiles * 1609.344 } } }),
+          center: { latitude, longitude }, radius: searchRadiusMiles * 1609.344 } } }),
     });
     return (googleNearbySchema.parse(await response.json()).places ?? []).map((entry): NearbyPlace => {
       const lat = entry.location.latitude, lon = entry.location.longitude, rad = Math.PI / 180;
@@ -417,7 +418,25 @@ export async function googleNearbyPlaces(area: Area, radiusMiles = 5,
     void task.then(() => googleNearbyPending.delete(key), () => googleNearbyPending.delete(key));
     return task;
   };
-  const result = await Promise.all(kind === "all" ? [search("grocery"), search("fuel")] : [search(kind)]);
+  // Nearby Search (New) caps each request at 20 places. Extra local circles are
+  // requested only when someone explicitly asks to explore more stores.
+  const primarySearches = kind === "fuel" ? [] : [search("grocery")];
+  const extraGrocerySearches: Promise<NearbyPlace[]>[] = [];
+  if (expanded && kind !== "fuel") {
+    const latitudeOffset = radiusMiles * 0.35 / 69;
+    const longitudeOffset = radiusMiles * 0.35 /
+      (69 * Math.max(0.1, Math.cos(c.lat * Math.PI / 180)));
+    for (const latDirection of [-1, 1]) for (const lonDirection of [-1, 1])
+      extraGrocerySearches.push(search("grocery", c.lat + latDirection * latitudeOffset,
+        c.lon + lonDirection * longitudeOffset, radiusMiles * 0.8));
+  }
+  const [primary, extra] = await Promise.all([
+    Promise.all([...primarySearches, ...(kind === "grocery" ? [] : [search("fuel")])]),
+    Promise.allSettled(extraGrocerySearches),
+  ]);
+  // An optional overlapping circle can fail without hiding the original map.
+  const result = [...primary, ...extra.flatMap((entry) =>
+    entry.status === "fulfilled" ? [entry.value] : [])];
   const places = [...new Map(result.flat().map((place) => [place.id, place])).values()]
     .filter((place) => place.miles <= radiusMiles).sort((a, b) => a.miles - b.miles);
   return { places, updatedAt: new Date().toISOString(), source: "Google Maps", radiusMiles, area,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { googleRoute, googleRouteMatrix } from "@/lib/google-routes";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +28,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(12000)]);
+    const googleKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (googleKey) {
+      try {
+        const result = matrix === true
+          ? await googleRouteMatrix(points, googleKey, signal)
+          : await googleRoute(points, googleKey, signal);
+        return NextResponse.json(result);
+      } catch (error) {
+        // The existing road router keeps the trip usable when Routes API is not enabled.
+        console.warn("Google Routes unavailable; trying road-router fallback:",
+          error instanceof Error ? error.message : "unknown error");
+      }
+    }
+
     const coordinates = points.map((p) => `${p.lon},${p.lat}`).join(";");
 
     const base = process.env.OSRM_BASE_URL || "https://router.project-osrm.org";
@@ -36,7 +52,7 @@ export async function POST(request: NextRequest) {
       : `${base}/route/v1/driving/${coordinates}?overview=full&geometries=geojson`;
 
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
+      signal,
       cache: "no-store",
     });
 
@@ -54,7 +70,7 @@ export async function POST(request: NextRequest) {
         !data.durations.every((row: unknown) => Array.isArray(row) && row.length === points.length &&
           row.every((value: unknown) => value === null || typeof value === "number" && Number.isFinite(value) && value >= 0)))
         throw new Error("No road-distance matrix found");
-      return NextResponse.json({ distances: data.distances, durations: data.durations });
+      return NextResponse.json({ distances: data.distances, durations: data.durations, provider: "osrm" });
     }
     if (data.code !== "Ok" || !data.routes?.length) {
       throw new Error("No driving route found");
@@ -64,8 +80,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       miles: Number((route.distance / 1609.344).toFixed(2)),
-      minutes: Math.round(route.duration / 60),
+      minutes: route.duration / 60,
       geometry: route.geometry,
+      legs: Array.isArray(route.legs) ? route.legs.map((leg: { distance: number; duration: number }) => ({
+        miles: leg.distance / 1609.344, minutes: leg.duration / 60,
+      })) : [],
+      provider: "osrm",
     });
   } catch {
     return NextResponse.json(
