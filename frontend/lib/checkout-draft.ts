@@ -24,6 +24,7 @@ const gasStopSchema = z.object({
 const fuelQuoteSchema = z.object({
   kind: z.enum(["station", "regional"]).optional(),
   stationName: z.string().optional(),
+  fuelType: z.string().optional(),
   dollarsPerGallon: z.number().finite(),
   period: z.string(),
   retrievedAt: z.string(),
@@ -63,6 +64,7 @@ const draftSchema = z.object({
   gasStop: gasStopSchema.nullable(),
   fuelSource: fuelQuoteSchema.nullable(),
   manualGas: z.number().finite().nonnegative(),
+  gasGallonsNeeded: z.number().finite().positive().max(100).optional(),
 });
 
 export type CheckoutDraft = {
@@ -75,6 +77,7 @@ export type CheckoutDraft = {
   gasStop: GasStop | null;
   fuelSource: FuelQuote | null;
   manualGas: number;
+  gasGallonsNeeded?: number;
 };
 
 export function parseCheckoutDraft(value: unknown): CheckoutDraft | null {

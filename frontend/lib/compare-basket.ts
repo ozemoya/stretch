@@ -3,7 +3,7 @@ import {
   krogerStores,
   krogerProducts,
   errorResponse,
-  nearbyPlaces,
+  googleNearbyPlaces,
   krogerConfigured,
 } from "@/lib/live-data";
 import { checkStores } from "@/lib/price-agent";
@@ -67,7 +67,7 @@ export async function compareBasket(
   try {
     request.signal.throwIfAborted();
     const p = parsed.data;
-    const mapped = await nearbyPlaces(p.area, p.radius, "grocery", p.origin);
+    const mapped = await googleNearbyPlaces(p.area, p.radius, "grocery", p.origin);
     request.signal.throwIfAborted();
     const coverage = groceryCoverage(mapped.places);
     const [publicCatalogs, providerCatalogs] = await Promise.all([

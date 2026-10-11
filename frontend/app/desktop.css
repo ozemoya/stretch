@@ -1,7 +1,7 @@
 :root{--surface:#fffef9;--canvas:#faf6e8;--olive:#61752a;--olive-dark:#46551f;--forest:#263b24;--sage:#e7ecd9;--text:#292d24;--muted:#606655;--line:#dce1d0;--success:#238354;--danger:#c44949;--radius:16px;--shadow:0 4px 20px #263b2407;--motion:160ms}
 .desktop-shell{display:grid;grid-template-columns:248px minmax(0,1fr);height:100dvh;background:var(--canvas);color:var(--text);overflow:hidden}
 .desktop-shell.sidebar-collapsed{grid-template-columns:80px minmax(0,1fr)}
-.desktop-sidebar{display:flex;flex-direction:column;padding:24px 16px;background:var(--surface);border-right:1px solid var(--line);min-width:0;overflow:auto;position:relative;align-self:stretch;height:100%;border-radius:0;top:auto}
+.desktop-sidebar{display:flex;flex-direction:column;padding:24px 16px;background:#fff;border-right:1px solid var(--line);min-width:0;overflow:auto;position:relative;align-self:stretch;height:100%;border-radius:0;top:auto}
 .desktop-brand{height:72px;display:flex;align-items:center;padding:0 16px}.desktop-brand img{width:138px;height:70px;object-fit:contain;max-width:100%}
 .sidebar-toggle{border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--olive-dark);width:28px;height:28px;align-self:flex-end;margin:0 0 24px}
 .nav-caption{font-size:9px;letter-spacing:1.3px;color:var(--muted);margin:0 14px 16px;font-weight:700}

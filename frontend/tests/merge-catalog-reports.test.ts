@@ -74,3 +74,12 @@ it("adds streamed lines to an initially unsupported retailer and settles pending
   expect(settled.status).toBe("failed");
   expect(settled.lines[0].searchStatus).toBe("timeout");
 });
+
+it("does not say no prices were found after a catalog listing arrives", () => {
+  const unavailable: ScrapeReport = { retailer: "The Fresh Market", status: "unsupported",
+    detail: "No working public scraper connected for this retailer. Local prices remain unknown.",
+    lines: [{ item, products: [] }] };
+  const merged = mergeCatalogReports(unavailable, base);
+  expect(merged.lines[0].products).toHaveLength(1);
+  expect(merged.detail).toBe("Online catalog listing found; nearby branch price and stock remain unverified.");
+});

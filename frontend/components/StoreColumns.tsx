@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import ProductImage from "./ProductImage";
 import { normalizedUnitPrice, packageMatches } from "@/lib/package-match";
-import { ownedCatalogProducts } from "@/lib/product-ownership";
+import { ownedCatalogProducts, type OwnedCatalogProduct } from "@/lib/product-ownership";
+import { addCatalogPick, catalogPick, readCatalogPicks, writeCatalogPicks } from "@/lib/catalog-picks";
+import { SMART_CART_EVENT } from "@/lib/smart-cart";
 import { catalogLineStatus, searchStatusLabel } from "@/lib/search-state";
 import type { AgentItem } from "@/lib/price-agent";
 import type { ScrapeReport, ScrapedProduct } from "@/lib/retailer-scraper";
@@ -22,6 +25,22 @@ export default function StoreColumns({
   items: AgentItem[];
   onRetry?: (retailerId: string) => void;
 }) {
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    const sync = () => setSavedIds(readCatalogPicks(localStorage).map((pick) => pick.id));
+    sync(); window.addEventListener("storage", sync); window.addEventListener(SMART_CART_EVENT, sync);
+    return () => { window.removeEventListener("storage", sync); window.removeEventListener(SMART_CART_EVENT, sync); };
+  }, []);
+  function save(item: AgentItem, product: OwnedCatalogProduct) {
+    const pick = catalogPick(item, product);
+    if (!pick) { setMessage("This product could not be saved. Try another listing."); return; }
+    const next = addCatalogPick(readCatalogPicks(localStorage), pick);
+    if (!writeCatalogPicks(localStorage, next)) { setMessage("Could not save this product on this device."); return; }
+    setSavedIds(next.map((entry) => entry.id));
+    setMessage(`${product.productName} saved as an online listing. Open Smart Cart to review it.`);
+    window.dispatchEvent(new Event(SMART_CART_EVENT));
+  }
   return (
     <div
       className="store-comparison"
@@ -29,6 +48,7 @@ export default function StoreColumns({
       aria-label="Compare online retailer catalog listings"
       tabIndex={0}
     >
+      {message && <p role="status" className="catalog-pick-message">{message} <a href="/cart">Open Smart Cart ↗</a></p>}
       {reports.map((report) => (
         <article className="store-column" key={report.retailer}>
           <div className="store-column-heading">
@@ -126,6 +146,10 @@ export default function StoreColumns({
                       {product.priceSource} · updated{" "}
                       {new Date(product.verifiedAt).toLocaleString()}
                     </p>
+                    <button type="button" className="catalog-pick-button" onClick={() => save(item, product)}>
+                      {savedIds.includes(`${item.id}:${product.retailerId}:${product.productId}`) ? "Add another" : "Save to Smart Cart"}
+                    </button>
+                    <small className="comparison-size">Online listing</small>
                     {products.length > 1 && (
                       <details>
                         <summary>{products.length - 1} other packages</summary>
@@ -146,6 +170,7 @@ export default function StoreColumns({
                               {other.size} · $
                               {(other.priceCents / 100).toFixed(2)}
                             </p>
+                            <button type="button" className="catalog-pick-button" onClick={() => save(item, other)}>Save to Smart Cart</button>
                           </div>
                         ))}
                       </details>

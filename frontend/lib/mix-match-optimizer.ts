@@ -17,8 +17,11 @@ export type MixMatchPlan = {
   miles: number;
   minutes: number;
   routeOrder: string[];
+  gasStopIncluded: boolean;
+  gasPurchaseCents: number;
 };
 export type MixMatchPriority = "balanced" | "lowest_cost" | "fewest_stops";
+export type GasStopEconomics = { gallonsNeeded: number; baselinePrice: number; stationPrice: number };
 
 function permutations<T>(values: T[]): T[][] {
   if (values.length < 2) return [values];
@@ -55,7 +58,8 @@ export function bestRoadRoute(storeIds: string[], matrix: RoadMatrix) {
 }
 
 export function priceSelections(items: AgentItem[], stores: StoreCheck[], selections: MultiStoreSelections,
-  matrix: RoadMatrix, mpg: number, gasPrice: number, maxStores: number): MixMatchPlan | null {
+  matrix: RoadMatrix, mpg: number, gasPrice: number, maxStores: number,
+  gasOption?: GasStopEconomics): MixMatchPlan | null {
   if (!items.length || maxStores < 1 || maxStores > 3) return null;
   const used = new Set<string>();
   let groceryCents = 0;
@@ -68,13 +72,29 @@ export function priceSelections(items: AgentItem[], stores: StoreCheck[], select
     groceryCents += option.product.regularCents! * item.quantity;
   }
   if (used.size > maxStores) return null;
-  const route = bestRoadRoute([...used], matrix);
+  let route = bestRoadRoute([...used], matrix);
   if (!route) return null;
-  const fuelCents = fuelCostCents(route.miles, mpg, gasPrice);
+  let gasStopIncluded = matrix.hasFuelStop;
+  let gasPurchaseCents = 0;
+  if (matrix.hasFuelStop && gasOption && gasOption.gallonsNeeded > 0 &&
+    gasOption.baselinePrice > 0 && gasOption.stationPrice > 0) {
+    const withoutStop = bestRoadRoute([...used], { ...matrix, hasFuelStop: false });
+    if (!withoutStop) return null;
+    const noStopDriving = fuelCostCents(withoutStop.miles, mpg, gasOption.baselinePrice);
+    const withStopDriving = fuelCostCents(route.miles, mpg, gasOption.stationPrice);
+    if (noStopDriving === null || withStopDriving === null) return null;
+    const noStopPurchase = Math.round(gasOption.gallonsNeeded * gasOption.baselinePrice * 100);
+    const withStopPurchase = Math.round(gasOption.gallonsNeeded * gasOption.stationPrice * 100);
+    if (withStopDriving + withStopPurchase >= noStopDriving + noStopPurchase) {
+      route = withoutStop; gasStopIncluded = false; gasPurchaseCents = noStopPurchase;
+    } else gasPurchaseCents = withStopPurchase;
+  }
+  const fuelCents = fuelCostCents(route.miles, mpg,
+    gasOption && !gasStopIncluded ? gasOption.baselinePrice : gasPrice);
   if (fuelCents === null) return null;
   return { selections, storeIds: [...used], groceryCents, fuelCents,
-    totalCents: groceryCents + fuelCents, miles: route.miles,
-    minutes: route.minutes, routeOrder: route.order };
+    gasStopIncluded, gasPurchaseCents, totalCents: groceryCents + fuelCents + gasPurchaseCents,
+    miles: route.miles, minutes: route.minutes, routeOrder: route.order };
 }
 
 function lowestPriced(item: AgentItem, stores: StoreCheck[]) {
@@ -91,7 +111,8 @@ function combinations<T>(values: T[], count: number): T[][] {
 
 /** Exact over the supplied branch set (at most eight stores); prices and routes remain source-bound. */
 export function optimizeMixMatch(items: AgentItem[], stores: StoreCheck[], matrix: RoadMatrix,
-  prefs: { maxStores: number; minNetSavingsCents: number; priority: MixMatchPriority; mpg: number; gasPrice: number }) {
+  prefs: { maxStores: number; minNetSavingsCents: number; priority: MixMatchPriority; mpg: number; gasPrice: number;
+    gasOption?: GasStopEconomics }) {
   const candidates = stores.filter((store) => matrix.storeIds.includes(store.id));
   const unresolved = items.filter((item) => !eligibleMultiStoreOptions(item, candidates).length).map((item) => item.id);
   if (unresolved.length || !items.length) return { unresolved, baseline: null, cheapest: null, fewest: null,
@@ -107,7 +128,7 @@ export function optimizeMixMatch(items: AgentItem[], stores: StoreCheck[], matri
         selections[item.id] = { storeId: option.store.id, candidateId: option.product.id };
       }
       if (Object.keys(selections).length !== items.length) continue;
-      const plan = priceSelections(items, candidates, selections, matrix, prefs.mpg, prefs.gasPrice, prefs.maxStores);
+      const plan = priceSelections(items, candidates, selections, matrix, prefs.mpg, prefs.gasPrice, prefs.maxStores, prefs.gasOption);
       if (!plan) continue;
       const key = [...plan.storeIds].sort().join("|");
       if (seen.has(key)) continue;

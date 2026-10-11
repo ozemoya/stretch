@@ -1,27 +1,34 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { AgentItem, Candidate, StoreCheck } from "@/lib/price-agent";
 import { centers, type SearchOrigin } from "@/lib/locations";
 import type { StoreCoverage } from "@/lib/retailer-coverage";
 import type { GasStop } from "@/lib/gas-stop";
 import { eligibleMultiStoreOptions, type MultiStoreSelections } from "@/lib/multi-store-plan";
-import { optimizeMixMatch, priceSelections, type MixMatchPlan, type MixMatchPriority, type RoadMatrix } from "@/lib/mix-match-optimizer";
+import { optimizeMixMatch, priceSelections, type GasStopEconomics, type MixMatchPlan, type MixMatchPriority, type RoadMatrix } from "@/lib/mix-match-optimizer";
+import { readCheckoutDraft, writeCheckoutDraft } from "@/lib/checkout-draft";
+import { addCartLine, cartLine, readCart, readCartOptions, writeCart, writeCartOptions, SMART_CART_EVENT } from "@/lib/smart-cart";
+import { readCatalogPicks, writeCatalogPicks } from "@/lib/catalog-picks";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-export default function MultiStorePlanner({ items, stores, locations, origin, area, gasStop, mpg, gasPrice,
+export default function MultiStorePlanner({ items, stores, locations, origin, area, gasStop, mpg, gasPrice, gasEconomics,
   maxStores, minExtraStopSavings, shoppingPriority }: {
   items: AgentItem[]; stores: StoreCheck[]; locations: StoreCoverage[]; origin: SearchOrigin | null;
   area: "downtown" | "midtown" | "decatur"; gasStop: GasStop | null | undefined;
-  mpg: number; gasPrice: number; maxStores: number; minExtraStopSavings: number;
+  mpg: number; gasPrice: number; gasEconomics?: GasStopEconomics;
+  maxStores: number; minExtraStopSavings: number;
   shoppingPriority: MixMatchPriority;
 }) {
+  const router = useRouter();
   const [enabled, setEnabled] = useState(maxStores > 1);
   const [selections, setSelections] = useState<MultiStoreSelections>({});
   const [road, setRoad] = useState<{ key: string; matrix: RoadMatrix } | null>(null);
   const [routeStatus, setRouteStatus] = useState<"idle" | "loading" | "unavailable">("idle");
   const [copied, setCopied] = useState("");
+  const [cartMessage, setCartMessage] = useState("");
   const home = origin ?? centers[area];
   const pricedStores = useMemo(() => stores.filter((store) => locations.some((location) => location.id === store.id))
     .sort((a, b) => {
@@ -29,7 +36,7 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
       return coverage(b) - coverage(a) || a.id.localeCompare(b.id);
     }), [stores, locations, items]);
   // One OSRM road-distance table keeps the search bounded. Larger sets are marked approximate.
-  const routeStores = pricedStores.slice(0, 8);
+  const routeStores = useMemo(() => pricedStores.slice(0, 8), [pricedStores]);
   const routeLocations = routeStores.map((store) => locations.find((location) => location.id === store.id)!);
   const routeKey = JSON.stringify([home.lat, home.lon, gasStop?.id, gasStop?.lat, gasStop?.lon,
     routeLocations.map((location) => [location.id, location.lat, location.lon])]);
@@ -58,15 +65,18 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
   }, [enabled, routeKey]);
 
   const matrix = road?.key === routeKey ? road.matrix : null;
-  const optimization = useMemo(() => matrix ? optimizeMixMatch(items, routeStores, matrix, {
+  // Without a usable station report, a selected pump cannot improve a price-based recommendation.
+  const planningMatrix = useMemo(() => matrix && gasStop && !gasEconomics
+    ? { ...matrix, hasFuelStop: false } : matrix, [matrix, gasStop, gasEconomics]);
+  const optimization = useMemo(() => planningMatrix ? optimizeMixMatch(items, routeStores, planningMatrix, {
     maxStores, minNetSavingsCents: Math.round(minExtraStopSavings * 100),
-    priority: shoppingPriority, mpg, gasPrice,
-  }) : null, [matrix, items, routeStores, maxStores, minExtraStopSavings, shoppingPriority, mpg, gasPrice]);
+    priority: shoppingPriority, mpg, gasPrice, gasOption: gasEconomics,
+  }) : null, [planningMatrix, items, routeStores, maxStores, minExtraStopSavings, shoppingPriority, mpg, gasPrice, gasEconomics]);
   useEffect(() => {
     if (optimization?.recommended) setSelections((current) =>
       Object.keys(current).length ? current : optimization.recommended!.selections);
   }, [optimization?.recommended]);
-  const selectedPlan = matrix ? priceSelections(items, routeStores, selections, matrix, mpg, gasPrice, maxStores) : null;
+  const selectedPlan = planningMatrix ? priceSelections(items, routeStores, selections, planningMatrix, mpg, gasPrice, maxStores, gasEconomics) : null;
   const plan = selectedPlan ?? (Object.keys(selections).length ? null : optimization?.recommended ?? null);
   const baseline = optimization?.baseline;
   const savings = plan && baseline ? baseline.totalCents - plan.totalCents : null;
@@ -80,7 +90,7 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
     url.searchParams.set("waypoints", [...plan.routeOrder.map((id) => {
       const location = locations.find((entry) => entry.id === id)!;
       return `${location.lat},${location.lon}`;
-    }), ...(gasStop ? [`${gasStop.lat},${gasStop.lon}`] : [])].join("|"));
+    }), ...(gasStop && plan.gasStopIncluded ? [`${gasStop.lat},${gasStop.lon}`] : [])].join("|"));
     url.searchParams.set("travelmode", "driving");
     return url.toString();
   })() : null;
@@ -102,12 +112,59 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
     });
   }
 
+  function addSelectedItem(item: AgentItem) {
+    const choice = selections[item.id];
+    const option = choice && eligibleMultiStoreOptions(item, routeStores).find(({ store, product }) =>
+      store.id === choice.storeId && product.id === choice.candidateId);
+    const location = option && locations.find((entry) => entry.id === option.store.id);
+    const line = option && location && cartLine(item, option.product, option.store, location);
+    if (!line) { setCartMessage("Choose a verified product with its own store page first."); return; }
+    saveOptions([item]);
+    const next = addCartLine(readCart(localStorage), line);
+    if (!writeCart(localStorage, next)) { setCartMessage("Could not save this item on this device."); return; }
+    writeCatalogPicks(localStorage, readCatalogPicks(localStorage).filter((pick) => pick.itemId !== item.id));
+    window.dispatchEvent(new Event(SMART_CART_EVENT));
+    setCartMessage(`${item.name} added to your cart.`);
+  }
+  function saveOptions(selectedItems: AgentItem[]) {
+    const itemIds = new Set(selectedItems.map((item) => item.id));
+    const options = selectedItems.flatMap((item) => eligibleMultiStoreOptions(item, routeStores).flatMap(({ store, product }) => {
+      const location = locations.find((entry) => entry.id === store.id);
+      const line = location && cartLine(item, product, store, location);
+      return line ? [line] : [];
+    }));
+    const previous = readCartOptions(localStorage).filter((line) => !itemIds.has(line.item.id));
+    writeCartOptions(localStorage, [...previous, ...options].slice(0, 200));
+  }
+  function savePlan(chosen: MixMatchPlan) {
+    const lines = chosen.routeOrder.flatMap((id) => listFor(chosen, id).flatMap(({ item, product }) => {
+      const store = routeStores.find((entry) => entry.id === id);
+      const location = locations.find((entry) => entry.id === id);
+      const line = store && location && cartLine(item, product, store, location);
+      return line ? [line] : [];
+    }));
+    if (lines.length !== items.length || !writeCart(localStorage, lines)) {
+      setCartMessage("This trip could not be saved. Check each store and product match."); return;
+    }
+    saveOptions(items);
+    if (gasStop && !chosen.gasStopIncluded) {
+      const draft = readCheckoutDraft(sessionStorage);
+      if (draft) writeCheckoutDraft(sessionStorage, { ...draft, gasStop: null, fuelSource: null,
+        prefs: { ...draft.prefs, gas: draft.manualGas } });
+    }
+    const selectedIds = new Set(items.map((item) => item.id));
+    writeCatalogPicks(localStorage, readCatalogPicks(localStorage).filter((pick) => !selectedIds.has(pick.itemId)));
+    window.dispatchEvent(new Event(SMART_CART_EVENT));
+    router.push("/cart");
+  }
+
   return <section className="multi-store-planner" aria-label="Mix and match stores">
     <label className="multi-store-toggle"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
       <span><strong>Mix & Match</strong><small>Compare complete lists at up to {maxStores} stores, including the drive.</small></span></label>
     {enabled && <div className="multi-store-content">
       <p className="small">{shoppingPriority === "balanced" ? "Balanced" : shoppingPriority === "lowest_cost" ? "Lowest cost" : "Fewest stops"} priority · {money(Math.round(minExtraStopSavings * 100))} minimum net savings per extra stop. Change these in your saved trip preferences.</p>
       {pricedStores.length > 8 && <p className="small">Road optimization uses the eight nearby stores with the most priced items; this is a bounded comparison.</p>}
+      {gasStop && !gasEconomics && <p className="small">The selected gas station has no recent reported price or fill-up amount, so Mix & Match does not recommend a detour to it.</p>}
       {routeStatus === "loading" && <p role="status">Checking road distances for the priced stores…</p>}
       {routeStatus === "unavailable" && <p role="status">Road routes are unavailable right now, so Stretch cannot quote a Mix & Match total.</p>}
       {optimization?.unresolved.length ? <p>Some foods have no matching branch price: {items.filter((item) => optimization.unresolved.includes(item.id)).map((item) => item.name).join(", ")}. No complete route can be recommended.</p> : null}
@@ -141,6 +198,7 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
               {store.name} · {product.productName} · {product.size} · {money(product.regularCents!)}
             </option>)}
           </select>
+          {value && <button type="button" onClick={() => addSelectedItem(item)}>Add to cart</button>}
           {!options.length && <small>No verified store price for this item yet.</small>}
         </label>;
       })}</div>
@@ -160,13 +218,17 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
         {copied && <p role="status">{copied}</p>}
         <div className="multi-store-total"><strong>Groceries: {money(plan.groceryCents)}</strong>
           <span>Driving: {money(plan.fuelCents)} · {plan.miles.toFixed(1)} road miles · about {Math.round(plan.minutes)} minutes</span>
+          {plan.gasPurchaseCents > 0 && <span>Planned fill-up: {money(plan.gasPurchaseCents)} · {plan.gasStopIncluded ? "selected station" : "entered baseline estimate"}</span>}
+          {gasStop && gasEconomics && <span>{plan.gasStopIncluded ? "Gas stop included: it lowers estimated total cost." : "Gas stop skipped: its detour does not save money."}</span>}
           <b>Estimated trip: {money(plan.totalCents)}</b></div>
         {savings !== null && <p className="small">{savings >= 0 ? `Estimated net savings: ${money(savings)}` : `Estimated extra cost: ${money(-savings)}`} compared with the lowest complete single-store trip.</p>}
         {belowThreshold && <p className="small" role="status">This manual plan does not meet your {money(requiredSavings)} extra-stop savings target, so it is not recommended.</p>}
         {!gasStop && <p className="small">Fuel uses your entered gas price; choose a station on the map to include its detour.</p>}
         {directionsUrl && <a className="multi-store-directions" href={directionsUrl} target="_blank" rel="noreferrer">Open route directions ↗</a>}
+        <button type="button" className="multi-store-directions" onClick={() => savePlan(plan)}>Review this trip in Smart Cart →</button>
         <p className="small">Separate store lists; carts are not transferred. Taxes, stock, and checkout prices may change.</p>
       </> : <p className="small">Choose one priced product for every food to calculate a complete trip.</p>}
+      {cartMessage && <p role="status">{cartMessage}</p>}
     </div>}
   </section>;
 }

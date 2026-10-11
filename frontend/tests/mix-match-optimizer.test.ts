@@ -63,3 +63,22 @@ it("reorders three stores by road distance and recalculates manual assignments",
   expect(plan?.groceryCents).toBe(300);
   expect(priceSelections(items, stores, selections, road, 25, 3.5, 2)).toBeNull();
 });
+
+it("includes a gas stop only when its reported fill-up price beats the road detour", () => {
+  const stores = [store("A", [500, 500, 500])];
+  const selections = Object.fromEntries(items.map((item) => [item.id,
+    { storeId: "A", candidateId: `A-${item.id}` }]));
+  const mile = 1609.344;
+  const road: RoadMatrix = { storeIds: ["A"], hasFuelStop: true,
+    distances: [[0, mile, 5 * mile], [mile, 0, 5 * mile], [5 * mile, 5 * mile, 0]],
+    durations: [[0, 100, 500], [100, 0, 500], [500, 500, 0]] };
+  const expensiveDetour = priceSelections(items, stores, selections, road, 25, 3.9, 3,
+    { gallonsNeeded: 10, baselinePrice: 4, stationPrice: 3.9 });
+  expect(expensiveDetour?.gasStopIncluded).toBe(false);
+  expect(expensiveDetour?.miles).toBe(2);
+  const worthwhileDetour = priceSelections(items, stores, selections, road, 25, 2.5, 3,
+    { gallonsNeeded: 10, baselinePrice: 4, stationPrice: 2.5 });
+  expect(worthwhileDetour?.gasStopIncluded).toBe(true);
+  expect(worthwhileDetour?.miles).toBe(11);
+  expect(worthwhileDetour!.totalCents).toBeLessThan(expensiveDetour!.totalCents);
+});

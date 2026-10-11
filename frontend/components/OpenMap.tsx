@@ -1,145 +1,88 @@
 "use client";
+
 import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap } from "leaflet";
 import { centers, type SearchOrigin } from "@/lib/locations";
 import type { Area, NearbyPlace } from "@/lib/live-data";
-export default function OpenMap({
-  area,
-  radius,
-  places,
-  origin,
-  onSelectFuel,
-  selectedFuelId,
-  selectedPlaceId,
-}: {
-  area: Area;
-  radius: number;
-  places: NearbyPlace[];
-  origin?: SearchOrigin | null;
-  onSelectFuel?: (place: NearbyPlace) => void;
-  selectedFuelId?: string | null;
-  selectedPlaceId?: string | null;
+
+let loaderReady: Promise<google.maps.MapsLibrary> | null = null;
+function loadMaps() {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY;
+  if (!key) return Promise.reject(new Error("Google map browser key is not configured."));
+  if (!loaderReady) loaderReady = import("@googlemaps/js-api-loader").then(({ setOptions, importLibrary }) => {
+    setOptions({ key, v: "weekly" });
+    return importLibrary("maps") as Promise<google.maps.MapsLibrary>;
+  }).catch((error) => { loaderReady = null; throw error; });
+  return loaderReady;
+}
+
+export default function OpenMap({ area, radius, places, origin, onSelectFuel, onSelectPlace, selectedFuelId, selectedPlaceId, fuelOnly = false }: {
+  area: Area; radius: number; places: NearbyPlace[]; origin?: SearchOrigin | null;
+  onSelectFuel?: (place: NearbyPlace) => void; onSelectPlace?: (place: NearbyPlace) => void;
+  selectedFuelId?: string | null; selectedPlaceId?: string | null; fuelOnly?: boolean;
 }) {
-  const container = useRef<HTMLDivElement>(null),
-    map = useRef<LeafletMap | null>(null);
+  const container = useRef<HTMLDivElement>(null);
+  const selectedCallback = useRef(onSelectFuel);
+  selectedCallback.current = onSelectFuel;
+  const placeCallback = useRef(onSelectPlace);
+  placeCallback.current = onSelectPlace;
   const [error, setError] = useState("");
-  const selectFuel = useRef(onSelectFuel);
-  selectFuel.current = onSelectFuel;
   useEffect(() => {
     let cancelled = false;
-    let observer: ResizeObserver | undefined;
+    const markers: google.maps.Marker[] = [];
+    let circle: google.maps.Circle | null = null;
+    let map: google.maps.Map | null = null;
     setError("");
-    import("leaflet")
-      .then((L) => {
-        if (cancelled || !container.current) return;
-        const c = origin ?? centers[area],
-          instance = L.map(container.current, {
-            scrollWheelZoom: false,
-            zoomAnimation: false,
-            fadeAnimation: false,
-            markerZoomAnimation: false,
-          }).setView([c.lat, c.lon], 13);
-        map.current = instance;
-        L.tileLayer(
-          process.env.NEXT_PUBLIC_MAP_TILE_URL ||
-            "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-          {
-            maxZoom: 19,
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
-          },
-        )
-          .on("tileerror", () =>
-            setError(
-              "Some map tiles could not load. The station list and map links are still available.",
-            ),
-          )
-          .addTo(instance);
-        const circle = L.circle([c.lat, c.lon], {
-          radius: radius * 1609.344,
-          color: "#647426",
-          fillOpacity: 0.08,
-          weight: 2,
-        }).addTo(instance);
-        instance.fitBounds(circle.getBounds(), { padding: [12, 12] });
-        const centerLabel = document.createElement("span");
-        centerLabel.textContent = "Search area center";
-        L.circleMarker([c.lat, c.lon], {
-          radius: 7,
-          color: "#382b22",
-          fillColor: "#e7bb7b",
-          fillOpacity: 1,
-        })
-          .bindPopup(centerLabel)
-          .addTo(instance);
-        for (const place of places) {
-          const highlighted = selectedPlaceId === place.id;
-          const popup = document.createElement("div"),
-            name = document.createElement("strong"),
-            text = document.createElement("p"),
-            link = document.createElement("a");
+    void loadMaps().then(({ Map, InfoWindow }) => {
+      if (cancelled || !container.current) return;
+      const center = origin ?? centers[area];
+      map = new Map(container.current, { center: { lat: center.lat, lng: center.lon }, zoom: 12,
+        scrollwheel: false, streetViewControl: false, mapTypeControl: false, fullscreenControl: true, zoomControl: true });
+      circle = new google.maps.Circle({ map, center: { lat: center.lat, lng: center.lon },
+        radius: radius * 1609.344, strokeColor: "#61752a", strokeOpacity: .8,
+        fillColor: "#a6b68b", fillOpacity: .12 });
+      map.fitBounds(circle.getBounds()!);
+      const info = new InfoWindow();
+      const centerMarker = new google.maps.Marker({ map, position: { lat: center.lat, lng: center.lon },
+        title: "Starting area" });
+      markers.push(centerMarker);
+      const seen = new Set<string>();
+      for (const place of places) {
+        if (seen.has(place.id)) continue;
+        seen.add(place.id);
+        const active = place.id === selectedFuelId || place.id === selectedPlaceId;
+        const marker = new google.maps.Marker({ map, position: { lat: place.lat, lng: place.lon },
+          title: `${place.name} · ${place.address}`, label: { text: place.kind === "fuel" ? "G" : "S", color: "#fffaf0" },
+          icon: { path: google.maps.SymbolPath.CIRCLE, scale: active ? 14 : 11,
+            fillColor: place.kind === "fuel" ? "#c7563e" : "#61752a", fillOpacity: 1,
+            strokeColor: "#302d26", strokeWeight: active ? 3 : 1.5 } });
+        marker.addListener("click", () => {
+          placeCallback.current?.(place);
+          const content = document.createElement("div");
+          const name = document.createElement("strong"), address = document.createElement("p"), link = document.createElement("a");
           name.textContent = place.name;
-          text.textContent = `Address: ${place.address || "Not listed in map data"} · ${place.miles} miles from area center`;
-          link.href = place.mapUrl;
-          link.target = "_blank";
-          link.rel = "noreferrer";
-          link.textContent = "View on OpenStreetMap ↗";
-          popup.append(name, text, link);
-          if (place.kind === "fuel" && selectFuel.current) {
-            const select = document.createElement("button");
-            select.type = "button";
-            select.textContent =
-              selectedFuelId === place.id
-                ? "Selected gas stop ✓"
-                : "Add gas stop to trip";
-            select.addEventListener("click", () => selectFuel.current?.(place));
-            popup.append(select);
+          address.textContent = `${place.address || "Address not listed"} · ${place.miles} miles from start`;
+          link.href = place.mapUrl; link.target = "_blank"; link.rel = "noreferrer";
+          link.textContent = "View on Google Maps ↗";
+          content.append(name, address, link);
+          for (const credit of place.attributions ?? []) {
+            const a = document.createElement("a"); a.href = credit.url; a.target = "_blank";
+            a.rel = "noreferrer"; a.textContent = ` · ${credit.name}`; content.append(a);
           }
-          const marker = L.circleMarker([place.lat, place.lon], {
-            radius: selectedFuelId === place.id || highlighted ? 10 : 7,
-            color:
-              selectedFuelId === place.id || highlighted
-                ? "#382b22"
-                : place.kind === "fuel"
-                  ? "#c7563e"
-                  : "#647426",
-            fillColor: place.kind === "fuel" ? "#c7563e" : "#647426",
-            fillOpacity: 0.85,
-            weight: selectedFuelId === place.id || highlighted ? 4 : 2,
-          })
-            .bindPopup(popup)
-            .addTo(instance);
-          if (highlighted) {
-            instance.panTo([place.lat, place.lon]);
-            marker.openPopup();
+          if (place.kind === "fuel" && selectedCallback.current) {
+            const button = document.createElement("button"); button.type = "button";
+            button.textContent = selectedFuelId === place.id ? "Selected gas stop ✓" : "Choose gas stop";
+            button.addEventListener("click", () => selectedCallback.current?.(place)); content.append(button);
           }
-        }
-        observer = new ResizeObserver(() => instance.invalidateSize());
-        observer.observe(container.current);
-      })
-      .catch((error) => {
-        console.error("OpenStreetMap initialization failed", error);
-        if (!cancelled)
-          setError("The map could not load. Use the location links below.");
-      });
-    return () => {
-      cancelled = true;
-      observer?.disconnect();
-      map.current?.remove();
-      map.current = null;
-    };
-  }, [area, radius, places, origin, selectedFuelId, selectedPlaceId]);
-  return (
-    <>
-      <div
-        className="osm-map"
-        ref={container}
-        aria-label={`OpenStreetMap: locations within ${radius} ${radius === 1 ? "mile" : "miles"} of ${origin?.label ?? area}`}
-      />
-      <p className="map-caption">
-        Green: groceries · Red: gas stations · Circle: your search radius
-      </p>
-      {error && <p role="status">{error}</p>}
-    </>
-  );
+          info.setContent(content); info.open({ map, anchor: marker });
+        });
+        markers.push(marker);
+        if (place.id === selectedPlaceId) { map.panTo({ lat: place.lat, lng: place.lon }); google.maps.event.trigger(marker, "click"); }
+      }
+    }).catch(() => { if (!cancelled) setError("The Google map could not load. Use the location links below."); });
+    return () => { cancelled = true; markers.forEach((marker) => marker.setMap(null)); circle?.setMap(null);
+      if (map) google.maps.event.clearInstanceListeners(map); };
+  }, [area, radius, places, origin?.lat, origin?.lon, selectedFuelId, selectedPlaceId]);
+  return <><div className="osm-map" ref={container} aria-label={`Google Map: locations within ${radius} miles of ${origin?.label ?? area}`} />
+    <p className="map-caption">{fuelOnly ? "Red: gas stations" : "Green: groceries · Red: gas"} · Circle: search radius · Map by Google Maps</p>
+    {error && <p role="status">{error}</p>}</>;
 }

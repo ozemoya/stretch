@@ -77,11 +77,12 @@ export default function LocalFuel({
   }
   return (
     <article className="live-card">
-      <span className="live-badge">OPENSTREETMAP · LOCAL GAS STATIONS</span>
+      <span className="live-badge">GOOGLE MAPS · LOCAL GAS STATIONS</span>
       <h3>Fill up around you.</h3>
       <p>
         Find mapped gas stations within your radius of the selected area center.
-        OpenStreetMap provides locations, not a live pump-price feed.
+        Google Maps provides nearby locations. Reported pump prices are shown
+        separately when available.
       </p>
       <div className="settings">
         <label>
@@ -122,8 +123,7 @@ export default function LocalFuel({
             distance.
           </p>
           <p className="small">
-            Map data updated {new Date(mapped.updatedAt).toLocaleString()} · ©
-            OpenStreetMap contributors
+            Locations fetched {new Date(mapped.updatedAt).toLocaleString()} · Google Maps
           </p>
           <ul className="place-list">
             {mapped.places.map((p) => (
@@ -134,7 +134,7 @@ export default function LocalFuel({
                 <span>
                   {p.address || "Address not supplied"} · {p.miles} mi
                 </span>
-                <span>Price not supplied by OpenStreetMap</span>
+                <span>Check reported prices below</span>
               </li>
             ))}
           </ul>
@@ -146,9 +146,8 @@ export default function LocalFuel({
       <details>
         <summary>Check reported pump prices with a separate provider</summary>
         <p>
-          OpenStreetMap station discovery works without a key. Actual reported
-          prices need a price provider; stations with missing prices remain
-          unknown.
+          Google Places may provide reported pump prices for some stations.
+          Stations with missing prices remain unknown.
         </p>
         <label className="fuel-grade">
           Fuel type
@@ -177,9 +176,8 @@ export default function LocalFuel({
           >
             Connect Google Places ↗
           </a>{" "}
-          · Developer access needed for pump prices. Regional averages are not
-          used in this search. The selected fuel grade applies to this price
-          lookup, not to OpenStreetMap's station list.
+          · Developer access is needed for pump prices. Regional averages are not
+          used in this search. The selected fuel grade applies to the price lookup.
         </p>
         {result && (
           <div className="local-fuel-results">

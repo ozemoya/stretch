@@ -20,6 +20,8 @@ import { centers } from "@/lib/locations";
 import type { GasStop } from "@/lib/gas-stop";
 import { fuelCostCents } from "@/lib/live-trip";
 import { normalizedUnitPrice } from "@/lib/package-match";
+import { addCartLine, cartLine, readCart, readCartOptions, writeCart, writeCartOptions, SMART_CART_EVENT } from "@/lib/smart-cart";
+import { readCatalogPicks, writeCatalogPicks } from "@/lib/catalog-picks";
 import { packageMatches } from "@/lib/package-match";
 import { nearbyAlternatives } from "@/lib/nearby-alternatives";
 import {
@@ -51,6 +53,7 @@ export default function PriceAgent({
   gasStop,
   gasPrice,
   gasPriceReported,
+  gasEconomics,
   mpg,
   maxStops,
   minExtraStopSavings,
@@ -67,6 +70,7 @@ export default function PriceAgent({
   gasStop?: GasStop | null;
   gasPrice: number;
   gasPriceReported: boolean;
+  gasEconomics?: { gallonsNeeded: number; baselinePrice: number; stationPrice: number };
   mpg: number;
   maxStops: number;
   minExtraStopSavings: number;
@@ -78,6 +82,7 @@ export default function PriceAgent({
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [cartMessage, setCartMessage] = useState("");
   const [comparisonView, setComparisonView] = useState<"table" | "cards">("table");
   const [comparedStores, setComparedStores] = useState<string[]>([]);
   const [result, setResult] = useState<{
@@ -89,7 +94,7 @@ export default function PriceAgent({
     warnings: string[];
     foundStores: number;
     agent?: { aiConnected: boolean; mode: string; reviewedMatches?: number };
-    search?: { elapsedMs: number; partial: boolean; timedOut: boolean };
+    search?: { elapsedMs: number; partial: boolean; timedOut: boolean; locationError?: string | null };
   } | null>(null);
   const [liveReports, setLiveReports] = useState<ScrapeReport[]>([]);
   const [sourcesBusy, setSourcesBusy] = useState(false);
@@ -465,6 +470,26 @@ export default function PriceAgent({
     : [];
   const visibleCatalogs = catalogReports.filter(hasVisibleCatalogPrice);
   const visibleBranches = result?.stores.filter(hasVisibleBranchPrice) ?? [];
+  function addVerifiedProduct(item: AgentItem, store: StoreCheck, location: StoreCoverage, productId: string) {
+    const product = store.lines.find((line) => line.item.id === item.id)?.candidates.find((entry) => entry.id === productId);
+    const line = product && cartLine(item, product, store, location);
+    if (!line) { setCartMessage("This product needs a matching branch price and package before it can be added."); return; }
+    const options = (result?.stores ?? []).flatMap((candidateStore) => {
+      const candidateLocation = result?.storeCoverage.find((entry) => entry.id === candidateStore.id);
+      const candidateLine = candidateStore.lines.find((entry) => entry.item.id === item.id);
+      return candidateLocation ? (candidateLine?.candidates ?? []).flatMap((candidate) => {
+        const option = cartLine(item, candidate, candidateStore, candidateLocation);
+        return option ? [option] : [];
+      }) : [];
+    });
+    const existing = readCartOptions(localStorage).filter((option) => option.item.id !== item.id);
+    writeCartOptions(localStorage, [...existing, ...options].slice(0, 200));
+    const next = addCartLine(readCart(localStorage), line);
+    if (!writeCart(localStorage, next)) { setCartMessage("This item could not be saved to your cart."); return; }
+    writeCatalogPicks(localStorage, readCatalogPicks(localStorage).filter((pick) => pick.itemId !== item.id));
+    window.dispatchEvent(new Event(SMART_CART_EVENT));
+    setCartMessage(`${item.name} added to Smart Cart.`);
+  }
   const completeBranchCount = result?.stores.filter(
     (store) => pricedItemCount(store) === items.length,
   ).length ?? 0;
@@ -505,6 +530,7 @@ export default function PriceAgent({
         Prices may change at checkout. Trip totals exclude tax and unconfirmed stock.
       </p>
       {error && <p role="alert">{error}</p>}
+      {cartMessage && <p role="status">{cartMessage} <a href="/cart">Open Smart Cart ↗</a></p>}
       {busy && (
         <div className="search-progress" role="status" aria-live="polite">
           <SketchIcon name="cart" size={34} className="sketch-state-icon" />
@@ -531,10 +557,13 @@ export default function PriceAgent({
       )}
       {result?.search && !sourcesBusy && (
         <p role="status" className="small">
-          Search finished in {(result.search.elapsedMs / 1000).toFixed(1)} seconds.
-          {result.search.partial ? " Some stores haven’t returned prices. You can check again." : " Results are below."}
+          {result.search.locationError
+            ? "Nearby store lookup failed, so a local price comparison could not finish."
+            : `Search finished in ${(result.search.elapsedMs / 1000).toFixed(1)} seconds.${result.search.partial
+              ? " Some stores haven’t returned prices. You can check again." : " Results are below."}`}
         </p>
       )}
+      {result?.search?.locationError && <p role="alert" className="small">{result.search.locationError}</p>}
       {sourceError && <p role="alert" className="small">{sourceError}</p>}
       {result && (
         <>
@@ -578,6 +607,11 @@ export default function PriceAgent({
               ? ` ${visibleCatalogs.length} online ${visibleCatalogs.length === 1 ? "catalog" : "catalogs"} available for reference.`
               : ""}{" "}
             Checked {new Date(result.checkedAt).toLocaleString()}.
+          </p>
+          <p className="small" role="status">
+            {visibleBranches.length
+              ? "To add groceries: open a verified branch below, review a matching package, then choose Add to Smart Cart."
+              : <>You can save products from the online catalogs below to Smart Cart now. Only verified store prices count toward the trip total. <a href="/cart/demo">Try the sample walkthrough ↗</a></>}
           </p>
           {(completeTrips.length > 0 || (completeBranchCount > 0 && routeBusy)) && <div
             className="live-card"
@@ -655,7 +689,7 @@ export default function PriceAgent({
             {comparedStores.length > 0 && <button className="text-button" onClick={() => setComparedStores([])}>Show all branches</button>}
           </>}
           {visibleBranches.length >= 2 && <MultiStorePlanner items={items} stores={visibleBranches} locations={result.storeCoverage}
-            origin={origin} area={area} gasStop={gasStop} mpg={mpg} gasPrice={gasPrice} maxStores={maxStops}
+            origin={origin} area={area} gasStop={gasStop} mpg={mpg} gasPrice={gasPrice} gasEconomics={gasEconomics} maxStores={maxStops}
             minExtraStopSavings={minExtraStopSavings} shoppingPriority={shoppingPriority} />
           }
           <div className={`live-grid ${comparisonView === "table" ? "branch-table-mode" : ""}`}>
@@ -789,6 +823,8 @@ export default function PriceAgent({
                             )}
                           </p>
                         )}
+                        {selected && <button type="button" disabled={!cartLine(item, selected, store, location)}
+                          onClick={() => addVerifiedProduct(item, store, location, selected.id)}>Add to Smart Cart</button>}
                       </label>
                     );
                   })}

@@ -1,6 +1,6 @@
 import {
   centers,
-  nearbyPlaces,
+  googleNearbyPlaces,
   errorResponse,
   type Area,
 } from "@/lib/live-data";
@@ -35,12 +35,13 @@ export async function GET(request: Request) {
       );
     }
     return Response.json(
-      await nearbyPlaces(
+      await googleNearbyPlaces(
         area as Area,
         radius,
         kind as "all" | "grocery" | "fuel",
         origin,
       ),
+      { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
     return errorResponse(e);

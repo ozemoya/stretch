@@ -186,7 +186,7 @@
 .dashboard-shell .list-symbol { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; color: var(--sk-olive); }
 
 /* Shopping pages use the same paper and ink without disturbing price alignment. */
-.desktop-shell:not(.dashboard-shell) .desktop-sidebar { background: #fffaf0; }
+.desktop-shell:not(.dashboard-shell) .desktop-sidebar { background: #fff; }
 .desktop-shell:not(.dashboard-shell) .desktop-content { background: var(--sk-paper); }
 .desktop-shell:not(.dashboard-shell) .desktop-primary,
 .desktop-content .trip-app .cta { transition: transform 160ms ease, background 160ms ease; }

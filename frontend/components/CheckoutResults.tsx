@@ -50,24 +50,32 @@ export default function CheckoutResults() {
     });
   }
 
+  const reportAge = draft?.fuelSource ? Date.now() - Date.parse(draft.fuelSource.period) : Infinity;
+  const recentStationPrice = !!draft?.gasStop && draft.fuelSource?.kind === "station" &&
+    Number.isFinite(reportAge) && reportAge >= 0 && reportAge <= 48 * 60 * 60 * 1000;
+  const effectiveGasPrice = recentStationPrice ? draft!.prefs.gas : draft?.manualGas ?? 0;
+
   return (
     <div className="trip-app">
       <TripFlowHeader
         step={draft === null || draft?.items.length === 0 ? 1 : 2}
       />
-      <div className="workspace-tabs" role="group" aria-label="Results view">
-        <button
-          aria-pressed={workspaceTab === "list"}
-          onClick={() => setWorkspaceTab("list")}
-        >
-          Store prices
-        </button>
-        <button
-          aria-pressed={workspaceTab === "map"}
-          onClick={() => setWorkspaceTab("map")}
-        >
-          Map & gas
-        </button>
+      <div className="results-controls">
+        <div className="workspace-tabs" role="group" aria-label="Results view">
+          <button
+            aria-pressed={workspaceTab === "list"}
+            onClick={() => setWorkspaceTab("list")}
+          >
+            Store prices
+          </button>
+          <button
+            aria-pressed={workspaceTab === "map"}
+            onClick={() => setWorkspaceTab("map")}
+          >
+            Map & gas
+          </button>
+        </div>
+        {!!draft?.items.length && <Link className="results-checkout" href="/cart">Checkout →</Link>}
       </div>
       <main data-view={workspaceTab} id="results-main" className="results-page">
         {draft === undefined ? (
@@ -125,7 +133,7 @@ export default function CheckoutResults() {
                 </ul>
                 <p className="small">
                   Vehicle: {draft.prefs.mpg} MPG · Fuel: $
-                  {draft.prefs.gas.toFixed(2)} per gallon
+                  {effectiveGasPrice.toFixed(2)} per gallon
                 </p>
               </details>
               <PriceAgent
@@ -135,8 +143,11 @@ export default function CheckoutResults() {
                 area={draft.prefs.area}
                 origin={draft.origin}
                 gasStop={draft.gasStop}
-                gasPrice={draft.prefs.gas}
-                gasPriceReported={!!draft.fuelSource}
+                gasPrice={effectiveGasPrice}
+                gasPriceReported={recentStationPrice}
+                gasEconomics={recentStationPrice && draft.gasGallonsNeeded && draft.manualGas > 0 && draft.fuelSource
+                  ? { gallonsNeeded: draft.gasGallonsNeeded, baselinePrice: draft.manualGas, stationPrice: draft.fuelSource.dollarsPerGallon }
+                  : undefined}
                 mpg={draft.prefs.mpg}
                 maxStops={draft.prefs.maxStops}
                 minExtraStopSavings={draft.prefs.minExtraStopSavings}

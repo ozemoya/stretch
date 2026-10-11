@@ -4,7 +4,7 @@ import { traderJoesObserved } from "../../../../lib/trader-joes";
 import { planBasketSearch, type SearchPlan } from "../../../../lib/local-search-agent";
 import { normalizeCatalogReport } from "../../../../lib/product-ownership";
 import { scrapeRetailers, type ScrapeReport } from "../../../../lib/retailer-scraper";
-import { nearbyPlaces } from "../../../../lib/live-data";
+import { googleNearbyPlaces } from "../../../../lib/live-data";
 import { groceryCoverage } from "../../../../lib/retailer-coverage";
 import { mergeCatalogReports } from "../../../../lib/merge-catalog-reports";
 import { settlePendingReports } from "../../../../lib/search-state";
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
   let comparison: Record<string, unknown> | null = null;
   let plan: SearchPlan | null = null;
   let failures = false;
+  let locationError: string | null = null;
 
   return deadlineStream(request.signal, async (send, signal) => {
     const emit = (raw: ScrapeReport, cached = false) => {
@@ -80,7 +81,10 @@ export async function POST(request: Request) {
         plan = value ?? null;
         send({ type: "agent", stage: plan ? "ready" : "unavailable", provider: plan?.provider, model: plan?.model });
       });
-    const mappedTask = nearbyPlaces(p.area, p.radius, "grocery", p.origin);
+    const mappedTask = googleNearbyPlaces(p.area, p.radius, "grocery", p.origin).catch((error: unknown) => {
+      locationError = error instanceof Error ? error.message : "Nearby store lookup failed.";
+      throw error;
+    });
     const comparisonTask = compareBasket(new Request(request.url, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p), signal,
@@ -138,7 +142,7 @@ export async function POST(request: Request) {
     };
     const result = {
       ...(comparison ?? fallback), publicCatalogs: catalogs,
-      search: { elapsedMs, partial, timedOut: reason === "timeout" },
+      search: { elapsedMs, partial, timedOut: reason === "timeout", locationError },
       agent: { aiConnected: !!plan,
         mode: plan ? `AI interpreted your list using ${plan.model}. Prices come from retailer sources.`
           : "Searched your product names directly; no AI-generated prices are used." },

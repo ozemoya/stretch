@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import "leaflet/dist/leaflet.css";
 import "./globals.css";
 import DesktopShell from "@/components/DesktopShell";
 import "./desktop.css";
 import "./sketchbook.css";
+import "./smart-cart.css";
 export const metadata: Metadata = {
   title: "Stretch — bring more home",
   description:

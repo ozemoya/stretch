@@ -1,12 +1,12 @@
 import {
   centers,
   fuelTypes,
-  localFuel,
   errorResponse,
   type Area,
   type FuelType,
 } from "@/lib/live-data";
 import { parseOrigin } from "@/lib/locations";
+import { configuredFuelPriceProvider } from "@/lib/fuel-price-provider";
 export async function GET(request: Request) {
   const p = new URL(request.url).searchParams,
     area = p.get("area") ?? "downtown",
@@ -36,8 +36,10 @@ export async function GET(request: Request) {
         { status: 400 },
       );
     }
+    const provider = configuredFuelPriceProvider();
+    if (!provider) return Response.json({ error: "Gas price unavailable. No reported-price provider is configured." }, { status: 503 });
     return Response.json(
-      await localFuel(area as Area, radius, type as FuelType, origin),
+      await provider.search(area as Area, radius, type as FuelType, origin),
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

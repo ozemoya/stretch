@@ -7,7 +7,7 @@ const report = { retailer: "Target", status: "retrieved" as const, detail: "Cata
 vi.mock("../lib/trader-joes", () => ({ traderJoesObserved: () => [] }));
 vi.mock("../lib/catalog-cache", () => ({ catalogCache: { read: () => [], put: vi.fn() } }));
 vi.mock("../lib/local-search-agent", () => ({ planBasketSearch: vi.fn() }));
-vi.mock("../lib/live-data", () => ({ nearbyPlaces: vi.fn() }));
+vi.mock("../lib/live-data", () => ({ googleNearbyPlaces: vi.fn() }));
 vi.mock("../lib/retailer-coverage", () => ({ groceryCoverage: () => [{ id: "target-1", retailer: "Target" }] }));
 vi.mock("../lib/retailer-scraper", () => ({ scrapeRetailers: vi.fn() }));
 vi.mock("../lib/provider-prices", () => ({ providerReports: vi.fn() }));
@@ -20,7 +20,7 @@ import { POST } from "../app/api/agent/search/route";
 import { planBasketSearch } from "../lib/local-search-agent";
 import { providerReports } from "../lib/provider-prices";
 import { scrapeRetailers } from "../lib/retailer-scraper";
-import { nearbyPlaces } from "../lib/live-data";
+import { googleNearbyPlaces } from "../lib/live-data";
 import { compareBasket } from "../lib/compare-basket";
 import { SEARCH_WINDOW_MS } from "../lib/search-timing";
 
@@ -30,7 +30,7 @@ const request = (signal?: AbortSignal) => new Request("http://localhost/api/agen
 const parse = (text: string) => text.trim().split("\n").map(line => JSON.parse(line));
 beforeEach(() => {
   vi.mocked(planBasketSearch).mockReset().mockResolvedValue({ provider: "openai", model: "test", queries: { milk: ["whole milk gallon"] } });
-  vi.mocked(nearbyPlaces).mockReset().mockResolvedValue({ places: [], origin: { label: "Atlanta" } } as never);
+  vi.mocked(googleNearbyPlaces).mockReset().mockResolvedValue({ places: [], origin: { label: "Atlanta" } } as never);
   vi.mocked(compareBasket).mockReset().mockResolvedValue(Response.json({ stores: [], publicCatalogs: [],
     storeCoverage: [{ id: "target-1", retailer: "Target" }], foundStores: 1, warnings: [] }));
   vi.mocked(scrapeRetailers).mockReset().mockImplementation(async (_stores, _items, _places, _plan, _signal, onReport) => {
@@ -86,7 +86,7 @@ it("ends the entire response at the search deadline even when AI and a retailer 
 
 it("returns cached evidence and an honest partial result when map discovery hangs", async () => {
   vi.useFakeTimers();
-  vi.mocked(nearbyPlaces).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(googleNearbyPlaces).mockImplementation(() => new Promise(() => {}));
   vi.mocked(compareBasket).mockImplementation(() => new Promise(() => {}));
   const response = await POST(request());
   const text = response.text();
@@ -97,6 +97,15 @@ it("returns cached evidence and an honest partial result when map discovery hang
   expect(result.search.partial).toBe(true);
   expect(result.publicCatalogs[0].lines[0].products[0].priceCents).toBe(329);
   expect(result.coverage).toContain("did not finish");
+});
+
+it("reports a nearby-store lookup limit instead of presenting an empty search as success", async () => {
+  vi.mocked(googleNearbyPlaces).mockRejectedValue(new Error("Live-data request limit reached. Please try again later."));
+  const response = await POST(request());
+  const complete = parse(await response.text()).find(event => event.type === "complete").result;
+  expect(complete.search.partial).toBe(true);
+  expect(complete.search.locationError).toContain("request limit reached");
+  expect(complete.stores).toEqual([]);
 });
 
 it("stops unfinished item loading states while retaining verified matches", async () => {

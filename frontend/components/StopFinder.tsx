@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import OpenMap from "./OpenMap";
 import { originQuery, type SearchOrigin } from "@/lib/locations";
@@ -6,7 +7,6 @@ import type {
   Area,
   NearbyPlace,
   FuelQuote,
-  LocalFuelResult,
 } from "@/lib/live-data";
 import type { GasStop } from "@/lib/gas-stop";
 export default function StopFinder({
@@ -41,9 +41,6 @@ export default function StopFinder({
     [places, setPlaces] = useState<NearbyPlace[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const [prices, setPrices] = useState<LocalFuelResult | null>(null),
-    [priceBusy, setPriceBusy] = useState(false),
-    [priceError, setPriceError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [gasQuery, setGasQuery] = useState("");
@@ -90,25 +87,6 @@ export default function StopFinder({
   useEffect(() => {
     if (selectedPlaceId) setKind("all");
   }, [selectedPlaceId]);
-  async function checkFuel() {
-    setPriceBusy(true);
-    setPriceError("");
-    try {
-      const r = await fetch(
-        `/api/live/local-fuel?area=${area}&radius=${radius}&type=REGULAR_UNLEADED${originQuery(origin)}`,
-        { signal: AbortSignal.timeout(30000) },
-      );
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Pump-price search failed.");
-      setPrices(data);
-    } catch (e) {
-      setPriceError(
-        e instanceof Error ? e.message : "Pump-price search failed.",
-      );
-    } finally {
-      setPriceBusy(false);
-    }
-  }
   const visible = places.filter((p) => kind === "all" || p.kind === kind);
   const gasPlaces = places.filter((place) => place.kind === "fuel");
   const matchingGasPlaces = gasPlaces.filter((place) => `${place.name} ${place.address}`.toLowerCase().includes(gasQuery.toLowerCase()));
@@ -157,7 +135,6 @@ export default function StopFinder({
               const nextRadius = Number(e.target.value);
               if (onRadiusChange) onRadiusChange(nextRadius);
               else setLocalRadius(nextRadius);
-              setPrices(null);
               onStation(null, null);
             }}
           >
@@ -218,7 +195,9 @@ export default function StopFinder({
       </div>
       <div className="stop-directory">
         <p role="status">
-          {busy
+          {error
+            ? "Nearby stops could not load. Try Refresh stops shortly."
+            : busy
             ? "Loading groceries and gas stations…"
             : `${visible.length} mapped stops within ${radius} miles of ${origin?.label || area}.`}
         </p>
@@ -234,64 +213,11 @@ export default function StopFinder({
           {!matchingGasPlaces.length && !!gasPlaces.length && <p>No gas stations match that search.</p>}
           {matchingGasPlaces.length > gasLimit && <button type="button" onClick={() => setGasLimit((count) => count + 20)}>Show 20 more stations</button>}
         </details> : stopList}
-        <details>
-          <summary>Check reported pump prices</summary>
-          <p>
-            Map locations do not include pump prices. Search the connected price
-            provider for reported regular-gas prices.
-          </p>
-          <button type="button" disabled={priceBusy} onClick={checkFuel}>
-            {priceBusy ? "Checking pump reports…" : "Check pump prices"}
-          </button>
-          {priceError && <p role="alert">{priceError}</p>}
-          {prices?.stations.map((s) => (
-            <div className="live-card" key={s.id}>
-              <strong>{s.name}</strong>
-              <p>
-                {s.dollarsPerGallon === null
-                  ? "No pump report returned"
-                  : `$${s.dollarsPerGallon.toFixed(3)} / gallon`}
-              </p>
-              <button
-                type="button"
-                aria-pressed={selectedStationId === s.id}
-                onClick={() =>
-                  onStation(
-                    {
-                      id: s.id,
-                      name: s.name,
-                      address: s.address,
-                      lat: s.lat,
-                      lon: s.lon,
-                      mapUrl: s.mapUrl,
-                    },
-                    !s.stale && s.dollarsPerGallon !== null && s.updatedAt
-                      ? {
-                          kind: "station",
-                          stationName: s.name,
-                          dollarsPerGallon: s.dollarsPerGallon,
-                          period: s.updatedAt,
-                          retrievedAt: prices.retrievedAt,
-                          sourceUrl: s.mapUrl,
-                          region: s.address,
-                        }
-                      : null,
-                  )
-                }
-              >
-                {selectedStationId === s.id
-                  ? "Selected gas stop ✓"
-                  : "Add this gas stop to trip"}
-              </button>
-              {(s.stale || s.dollarsPerGallon === null) && (
-                <small>Using your entered gas price for this stop.</small>
-              )}
-            </div>
-          ))}
-        </details>
+        <p><Link href="/gas">Compare reported pump prices and choose a gas stop →</Link></p>
         {!compact && <p className="small">
-          OpenStreetMap locations can be incomplete. Distances are straight-line
-          estimates; grocery and pump prices require separate verified sources.
+          Google Maps returns a limited set of nearby stops for each search.
+          Distances are straight-line estimates; grocery and pump prices require
+          separate verified sources.
         </p>}
       </div>
     </article>

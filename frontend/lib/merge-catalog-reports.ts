@@ -30,14 +30,18 @@ export function mergeCatalogReports(
         : {}),
     };
   });
+  const hasProducts = lines.some((line) => line.products.length);
+  const mergedDetail = base.detail.includes(incoming.detail)
+    ? base.detail
+    : [base.detail, incoming.detail].filter(Boolean).join(" ");
   return {
     retailer: base.retailer,
-    status: lines.some((line) => line.products.length)
+    status: hasProducts
       ? "retrieved"
       : incoming.status,
-    detail: base.detail.includes(incoming.detail)
-      ? base.detail
-      : [base.detail, incoming.detail].filter(Boolean).join(" "),
+    detail: hasProducts && /no working public scraper|no prices scraped|no public scraper/i.test(mergedDetail)
+      ? "Online catalog listing found; nearby branch price and stock remain unverified."
+      : mergedDetail,
     lines,
   };
 }

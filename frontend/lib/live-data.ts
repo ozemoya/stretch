@@ -7,6 +7,7 @@ export type Area = keyof typeof centers;
 export type FuelQuote = {
   kind?: "station" | "regional";
   stationName?: string;
+  fuelType?: string;
   dollarsPerGallon: number;
   period: string;
   retrievedAt: string;
@@ -23,6 +24,7 @@ export type NearbyPlace = {
   miles: number;
   mapUrl: string;
   brand?: string;
+  attributions?: { name: string; url: string }[];
 };
 export const EIA_URL = "https://www.eia.gov/petroleum/gasdiesel/";
 export class ProviderError extends Error {
@@ -39,7 +41,7 @@ const providerUsage = new Map<
   string,
   { day: number; total: number; minute: number; recent: number }
 >();
-async function checkedFetch(url: string, init: RequestInit = {}) {
+export async function checkedFetch(url: string, init: RequestInit = {}) {
   const host = new URL(url).hostname,
     day = Math.floor(Date.now() / 86400000),
     minute = Math.floor(Date.now() / 60000);
@@ -58,7 +60,9 @@ async function checkedFetch(url: string, init: RequestInit = {}) {
         : 800;
   if (usage.total >= cap || usage.recent >= 20)
     throw new ProviderError(
-      "Live-data request limit reached. Please try again later.",
+      usage.total >= cap
+        ? "Stretch reached its daily live-data request limit. Try again tomorrow."
+        : "Stretch reached its live-data request limit for this minute. Try again shortly.",
       429,
     );
   providerUsage.set(host, {
@@ -333,6 +337,57 @@ export function nearbyPlaces(
     origin: customOrigin ?? { ...centers[area], label: area },
     places: data.places.filter((p) => kind === "all" || p.kind === kind),
   }));
+}
+
+const googleNearbySchema = z.object({ places: z.array(z.object({
+  id: z.string(), displayName: z.object({ text: z.string() }), formattedAddress: z.string().optional(),
+  location: z.object({ latitude: z.number(), longitude: z.number() }),
+  googleMapsUri: z.string().optional(), attributions: z.array(z.object({ provider: z.string(), providerUri: z.string().optional() })).optional(),
+})).optional() });
+
+// Share identical live requests while they are running. Places content is not
+// retained after the request settles.
+const googleNearbyPending = new Map<string, Promise<NearbyPlace[]>>();
+
+/** Google Places discovery for the live app. Its results are intentionally not cached. */
+export async function googleNearbyPlaces(area: Area, radiusMiles = 5,
+  kind: "all" | "grocery" | "fuel" = "all", customOrigin?: SearchOrigin) {
+  if (!localFuelConfigured()) throw new ProviderError("Google Places is not configured on the server.", 503);
+  const c = customOrigin ?? centers[area];
+  const search = (placeKind: "grocery" | "fuel") => {
+    const key = `${c.lat}:${c.lon}:${radiusMiles}:${placeKind}`;
+    const existing = googleNearbyPending.get(key);
+    if (existing) return existing;
+    const task = (async () => {
+      const response = await checkedFetch("https://places.googleapis.com/v1/places:searchNearby", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY!,
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri,places.attributions" },
+      body: JSON.stringify({ ...(placeKind === "fuel" ? { includedTypes: ["gas_station"] } :
+        { includedPrimaryTypes: ["grocery_store", "supermarket", "discount_supermarket", "hypermarket"] }),
+        maxResultCount: 20, rankPreference: placeKind === "fuel" ? "DISTANCE" : "POPULARITY", locationRestriction: { circle: {
+          center: { latitude: c.lat, longitude: c.lon }, radius: radiusMiles * 1609.344 } } }),
+    });
+    return (googleNearbySchema.parse(await response.json()).places ?? []).map((entry): NearbyPlace => {
+      const lat = entry.location.latitude, lon = entry.location.longitude, rad = Math.PI / 180;
+      const a = Math.sin((lat - c.lat) * rad / 2) ** 2 + Math.cos(lat * rad) * Math.cos(c.lat * rad) *
+        Math.sin((lon - c.lon) * rad / 2) ** 2;
+      const miles = 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return { id: entry.id, name: entry.displayName.text, kind: placeKind,
+        address: entry.formattedAddress ?? "", lat, lon, miles: Math.round(miles * 10) / 10,
+        mapUrl: entry.googleMapsUri ?? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(entry.id)}`,
+        attributions: (entry.attributions ?? []).map((credit) => ({ name: credit.provider, url: credit.providerUri ?? "https://www.google.com/maps" })) };
+      });
+    })();
+    googleNearbyPending.set(key, task);
+    void task.then(() => googleNearbyPending.delete(key), () => googleNearbyPending.delete(key));
+    return task;
+  };
+  const result = await Promise.all(kind === "all" ? [search("grocery"), search("fuel")] : [search(kind)]);
+  const places = [...new Map(result.flat().map((place) => [place.id, place])).values()]
+    .filter((place) => place.miles <= radiusMiles).sort((a, b) => a.miles - b.miles);
+  return { places, updatedAt: new Date().toISOString(), source: "Google Maps", radiusMiles, area,
+    origin: customOrigin ?? { ...centers[area], label: area }, limited: true };
 }
 
 let token: { value: string; until: number } | undefined;
