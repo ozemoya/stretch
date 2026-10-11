@@ -76,13 +76,33 @@ export async function checkedFetch(url: string, init: RequestInit = {}) {
       ? AbortSignal.any([init.signal, AbortSignal.timeout(20000)])
       : AbortSignal.timeout(20000),
   });
-  if (!response.ok)
+  if (!response.ok) {
+    if (host === "places.googleapis.com" && response.status === 403) {
+      const rejection = z
+        .object({
+          error: z.object({
+            details: z.array(z.object({ reason: z.string().optional() })),
+          }),
+        })
+        .safeParse(await response.json().catch(() => null));
+      if (
+        rejection.success &&
+        rejection.data.error.details.some(
+          (detail) => detail.reason === "API_KEY_HTTP_REFERRER_BLOCKED",
+        )
+      )
+        throw new ProviderError(
+          "Google Places rejected the server key's website restrictions. Configure a separate server key for Places API (New).",
+          503,
+        );
+    }
     throw new ProviderError(
       response.status === 429
         ? "The provider is busy. Please try again later."
         : "The provider could not return data. Please try again later.",
       response.status === 429 ? 429 : 502,
     );
+  }
   return response;
 }
 
