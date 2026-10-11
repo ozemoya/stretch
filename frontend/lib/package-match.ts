@@ -14,9 +14,9 @@ export function parseSize(value: string): PackageSize | null {
       ? { ...each, amount: each.amount * Number(multipack[1]) }
       : null;
   }
-  const dozen = text.match(/\b(\d+(?:\.\d+)?)\s*dozen\b/);
+  const dozen = text.match(/\b(\d+(?:\.\d+)?)\s*doz(?:en)?\b/);
   if (dozen) return { kind: "count", amount: Number(dozen[1]) * 12 };
-  if (/\bdozen\b/.test(text)) return { kind: "count", amount: 12 };
+  if (/\bdoz(?:en)?\b/.test(text)) return { kind: "count", amount: 12 };
   const match = text.match(
     /\b(\d+(?:\.\d+)?)\s*(gallons?|gal|quarts?|qt|pints?|pt|fl oz|liters?|litres?|l|milliliters?|ml|pounds?|lbs?|ounces?|oz|kilograms?|kg|grams?|g|counts?|ct|each|packs?|pk|loaves?|loaf)\b/,
   );

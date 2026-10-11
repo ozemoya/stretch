@@ -12,6 +12,7 @@ import {
 } from "./fresh-market-specials";
 import { mergeCatalogReports } from "./merge-catalog-reports";
 import { robotsAllows } from "./robots-rules";
+import { publicPublixReport } from "./scrapers/publix";
 import type { SearchStatus } from "./search-state";
 
 export type ScrapedProduct = {
@@ -242,6 +243,10 @@ export async function scrapeRetailers(
           detail: `${observed.detail} Weekly offer source could not be retrieved.`,
         });
       }
+      continue;
+    }
+    if (retailer === "Publix") {
+      emit(await publicPublixReport({ retailer, stores: stores.filter(store => store.retailer === retailer), items, places, zip: "", plan, signal }));
       continue;
     }
     if (retailer !== "Lidl") {
