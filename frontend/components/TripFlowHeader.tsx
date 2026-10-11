@@ -35,7 +35,7 @@ export default function TripFlowHeader({ step }: { step: 1 | 2 | 3 }) {
           <li className={step === 3 ? "current" : "upcoming"}>
             <span aria-current={step === 3 ? "step" : undefined}>
               <b>3</b>
-              <span>Trip review<small>Food + driving total</small></span>
+              <span>Trip review<small>Food + gas total</small></span>
             </span>
           </li>
         </ol>

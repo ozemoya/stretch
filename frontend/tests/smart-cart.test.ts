@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { addCartLine, cartGroups, cartLine, cartSubtotal, readCart, replacementOptions, replaceCartLine, writeCart } from "../lib/smart-cart";
 import { fuelCostCents } from "../lib/live-trip";
+import { missingCartItems } from "../lib/cart-coverage";
+import type { CatalogPick } from "../lib/catalog-picks";
 import type { AgentItem, Candidate, StoreCheck } from "../lib/price-agent";
 import type { StoreCoverage } from "../lib/retailer-coverage";
 
@@ -18,6 +20,15 @@ const product = (id: string, retailerId: string, storeLocationId: string, cents:
 });
 
 describe("Smart Cart ownership and totals", () => {
+  it("requires a chosen product for each list item before checkout", () => {
+    const eggs = item("Eggs"), milk = item("Milk");
+    const aldi = store("aldi-1", "aldi");
+    const eggLine = cartLine(eggs, product("eggs", "aldi", aldi.id, 249), aldi, location(aldi.id), at)!;
+    expect(missingCartItems([eggs, milk], [eggLine], [])).toEqual([milk]);
+    expect(missingCartItems([eggs, milk], [{ ...eggLine, selected: false }], [])).toEqual([eggs, milk]);
+    const milkPick = { itemId: milk.id } as CatalogPick;
+    expect(missingCartItems([eggs, milk], [eggLine], [milkPick])).toEqual([]);
+  });
   it("does not assign an ALDI listing to Walmart", () => {
     expect(cartLine(item("Eggs"), product("eggs", "aldi", "aldi-1", 249),
       store("walmart-1", "walmart"), location("walmart-1"), at)).toBeNull();

@@ -16,6 +16,9 @@ import { createTripReview, writeTripReview } from "@/lib/trip-review";
 import SketchIcon from "./SketchIcon";
 import type { NearbyPlace } from "@/lib/live-data";
 import { nearbyGroceryStores } from "@/lib/nearby-store-display";
+import { readCart, SMART_CART_EVENT, type CartLine } from "@/lib/smart-cart";
+import { readCatalogPicks, type CatalogPick } from "@/lib/catalog-picks";
+import { missingCartItems } from "@/lib/cart-coverage";
 
 export default function CheckoutResults() {
   const router = useRouter();
@@ -34,9 +37,25 @@ export default function CheckoutResults() {
   const [draft, setDraft] = useState<CheckoutDraft | null | undefined>(
     undefined,
   );
+  const [cartLines, setCartLines] = useState<CartLine[]>([]);
+  const [catalogPicks, setCatalogPicks] = useState<CatalogPick[]>([]);
 
   useEffect(() => {
     setDraft(readCheckoutDraft(window.sessionStorage));
+  }, []);
+
+  useEffect(() => {
+    const syncCart = () => {
+      setCartLines(readCart(window.localStorage));
+      setCatalogPicks(readCatalogPicks(window.localStorage));
+    };
+    syncCart();
+    window.addEventListener("storage", syncCart);
+    window.addEventListener(SMART_CART_EVENT, syncCart);
+    return () => {
+      window.removeEventListener("storage", syncCart);
+      window.removeEventListener(SMART_CART_EVENT, syncCart);
+    };
   }, []);
 
   useEffect(() => {
@@ -54,6 +73,8 @@ export default function CheckoutResults() {
   const recentStationPrice = !!draft?.gasStop && draft.fuelSource?.kind === "station" &&
     Number.isFinite(reportAge) && reportAge >= 0 && reportAge <= 48 * 60 * 60 * 1000;
   const effectiveGasPrice = recentStationPrice ? draft!.prefs.gas : draft?.manualGas ?? 0;
+  const missingItems = draft ? missingCartItems(draft.items, cartLines, catalogPicks) : [];
+  const canCheckout = !!draft?.gasStop && !!draft.items.length && missingItems.length === 0;
 
   return (
     <div className="trip-app">
@@ -75,8 +96,15 @@ export default function CheckoutResults() {
             Map & gas
           </button>
         </div>
-        {!!draft?.items.length && <Link className="results-checkout" href="/cart">Checkout →</Link>}
+        {!!draft?.items.length && (canCheckout
+          ? <Link className="results-checkout" href="/cart">Checkout →</Link>
+          : <button className="results-checkout" type="button" disabled
+              title={!draft.gasStop ? "Choose a gas station first" : "Choose a product for every grocery on your list"}>Checkout →</button>)}
       </div>
+      {!!draft?.items.length && !draft.gasStop &&
+        <p className="results-checkout-hint" role="status">Choose a gas station from the open list or map before checkout.</p>}
+      {!!draft?.gasStop && missingItems.length > 0 &&
+        <p className="results-checkout-hint" role="status">Choose a product for {missingItems.map((item) => item.name).join(", ")} before checkout.</p>}
       <main data-view={workspaceTab} id="results-main" className="results-page">
         {draft === undefined ? (
           <p role="status">Opening your trip…</p>
@@ -197,6 +225,7 @@ export default function CheckoutResults() {
                 area={draft.prefs.area}
                 origin={draft.origin}
                 selectedStation={draft.gasStop}
+                selectedQuote={draft.fuelSource}
                 radius={radius}
                 onRadiusChange={setRadius}
                 onPlaces={setNearbyPlaces}

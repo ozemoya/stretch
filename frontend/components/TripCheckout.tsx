@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import TripFlowHeader from "./TripFlowHeader";
-import { readCheckoutDraft, type CheckoutDraft } from "@/lib/checkout-draft";
+import { readCheckoutDraft, writeCheckoutDraft, type CheckoutDraft } from "@/lib/checkout-draft";
 import { readTripReview, type TripReview } from "@/lib/trip-review";
 import { canCreateInstacartList, copyableShoppingList, retailerShoppingUrl, shopifyCartUrl } from "@/lib/cart-handoff";
 import { tripDirectionsUrl } from "@/lib/trip-directions";
@@ -41,6 +41,7 @@ function TripSummary({ draft, review }: { draft: CheckoutDraft; review: TripRevi
   const [instacartReady, setInstacartReady] = useState(false);
   const [handoffBusy, setHandoffBusy] = useState(false);
   const [handoffNote, setHandoffNote] = useState("");
+  const [gallonsNeeded, setGallonsNeeded] = useState<number | undefined>(draft.gasGallonsNeeded);
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/live/status", { signal: controller.signal })
@@ -71,9 +72,19 @@ function TripSummary({ draft, review }: { draft: CheckoutDraft; review: TripRevi
     catch { setHandoffNote("Copying is blocked in this browser. Use the product links shown in your list."); }
   }
   const station = draft.gasStop!;
-  const budgetLeft = Math.round(draft.prefs.budget * 100) - review.totalCents;
+  const quoteAge = draft.fuelSource ? Date.now() - Date.parse(draft.fuelSource.period) : Infinity;
+  const recentStationPrice = draft.fuelSource?.kind === "station" &&
+    Number.isFinite(quoteAge) && quoteAge >= 0 && quoteAge <= 48 * 60 * 60 * 1000;
+  const fillUpCents = recentStationPrice && gallonsNeeded && gallonsNeeded > 0
+    ? Math.round(gallonsNeeded * draft.fuelSource!.dollarsPerGallon * 100) : null;
+  const displayTotalCents = review.totalCents + (fillUpCents ?? 0);
+  const budgetLeft = Math.round(draft.prefs.budget * 100) - displayTotalCents;
   const oldestPrice = Math.min(...review.products.map((product) => Date.parse(product.verifiedAt)));
   const olderThanDay = Date.now() - oldestPrice > 24 * 60 * 60 * 1000;
+  function updateGallons(value: number) {
+    const next = Number.isFinite(value) && value > 0 && value <= 100 ? value : undefined;
+    if (writeCheckoutDraft(window.sessionStorage, { ...draft, gasGallonsNeeded: next })) setGallonsNeeded(next);
+  }
   return <>
     <div className="trip-checkout-heading">
       <div>
@@ -105,23 +116,29 @@ function TripSummary({ draft, review }: { draft: CheckoutDraft; review: TripRevi
       <aside className="trip-checkout-total" aria-label="Trip estimate">
         <SketchIcon name="coin" size={55} className="review-sticker" />
         <p className="eyebrow">ESTIMATED TOTAL</p>
-        <h2>{money(review.totalCents)}</h2>
-        <p className="trip-checkout-total-caption">Estimated groceries + fuel used to drive</p>
+        <h2>{money(displayTotalCents)}</h2>
+        <p className="trip-checkout-total-caption">{fillUpCents !== null
+          ? "Groceries + driving fuel + gas fill-up" : "Groceries + driving fuel; fill-up excluded"}</p>
         <dl>
           <div><dt>Groceries at {review.storeName}</dt><dd>{money(review.groceryCents)}</dd></div>
           <div><dt>Driving fuel · {review.miles.toFixed(1)} mi at {review.mpg} MPG</dt><dd>{money(review.fuelCents)}</dd></div>
-          <div className="trip-checkout-total-row"><dt>Estimated trip total</dt><dd>{money(review.totalCents)}</dd></div>
+          {fillUpCents !== null && <div><dt>Gas fill-up · {gallonsNeeded} gal at {station.name}</dt><dd>{money(fillUpCents)}</dd></div>}
+          <div className="trip-checkout-total-row"><dt>{fillUpCents !== null ? "Estimated food + gas total" : "Food + driving estimate"}</dt><dd>{money(displayTotalCents)}</dd></div>
         </dl>
         <div className="trip-checkout-stop">
           <span className="trip-checkout-stop-icon" aria-hidden="true"><SketchIcon name="pump" size={32} /></span>
           <div><strong>Gas stop: {station.name}</strong><small>{station.address}</small>
             <small>${review.gasPrice.toFixed(2)}/gal · {review.gasPriceReported ? "reported price" : "your entered estimate"}</small>
             {draft.fuelSource && <small>Reported {new Date(draft.fuelSource.period).toLocaleString()} · <a href={draft.fuelSource.sourceUrl} target="_blank" rel="noreferrer">Price source ↗</a></small>}
+            {recentStationPrice ? <label className="trip-checkout-gallons">Gallons to buy (optional)
+              <input type="number" min="0" max="100" step="0.1" inputMode="decimal" value={gallonsNeeded ?? ""}
+                onChange={(event) => updateGallons(Number(event.target.value))} placeholder="e.g. 10" />
+            </label> : <small>Fill-up cost cannot be included because this station has no recent reported pump price.</small>}
             <a href={station.mapUrl} target="_blank" rel="noreferrer">Open station on map ↗</a>
           </div>
         </div>
         <p className="trip-budget-status">{budgetLeft >= 0 ? `${money(budgetLeft)} under your ${money(Math.round(draft.prefs.budget * 100))} budget` : `${money(-budgetLeft)} over your ${money(Math.round(draft.prefs.budget * 100))} budget`}</p>
-        <p className="small">About {Math.round(review.minutes)} minutes of driving. Fuel is the cost consumed on this route, not a full tank refill. Taxes, discounts, inventory, and checkout totals may change.</p>
+        <p className="small">About {Math.round(review.minutes)} minutes of driving. Driving fuel is used on this route; a fill-up is added only with a recent reported pump price and entered gallons. Taxes, discounts, inventory, and checkout totals may change.</p>
         {olderThanDay && <p className="trip-checkout-warning" role="status">Some grocery prices were observed more than 24 hours ago. Recheck before leaving.</p>}
         {directionsUrl && <div className="trip-route-handoff">
           <h3>Directions</h3>
