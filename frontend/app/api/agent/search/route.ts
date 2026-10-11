@@ -1,153 +1,164 @@
-import { input, compareBasket } from "../../../../lib/compare-basket";
-import { providerReports } from "../../../../lib/provider-prices";
-import { traderJoesObserved } from "../../../../lib/trader-joes";
-import { planBasketSearch, type SearchPlan } from "../../../../lib/local-search-agent";
-import { normalizeCatalogReport } from "../../../../lib/product-ownership";
-import { scrapeRetailers, type ScrapeReport } from "../../../../lib/retailer-scraper";
-import { googleNearbyPlaces } from "../../../../lib/live-data";
-import { groceryCoverage } from "../../../../lib/retailer-coverage";
-import { mergeCatalogReports } from "../../../../lib/merge-catalog-reports";
-import { settlePendingReports } from "../../../../lib/search-state";
-import { deadlineStream, untilAborted } from "../../../../lib/deadline-stream";
-import { AI_PLAN_WINDOW_MS, SEARCH_WINDOW_MS } from "../../../../lib/search-timing";
-import { catalogCache } from "../../../../lib/catalog-cache";
-import { catalogPriceBatch, type PriceBatch } from "../../../../lib/scrapers/persistence";
-import { savePricesAfterResponse } from "../../../../lib/scrapers/save-after-response";
+import { getCatalog } from "@/lib/catalog";
+import { input } from "@/lib/compare-basket";
+import type { AgentItem, Candidate, StoreCheck } from "@/lib/price-agent";
 
 export const runtime = "nodejs";
-const supported = ["Walmart", "Target", "Publix", "ALDI", "The Fresh Market",
-  "Food Lion", "Sam’s Club", "Sprouts", "Costco", "Albertsons family"];
 
-function waitForProviderPoll(signal: AbortSignal) {
-  return new Promise<void>((resolve) => {
-    if (signal.aborted) return resolve();
-    const done = () => {
-      clearTimeout(timer);
-      signal.removeEventListener("abort", done);
-      resolve();
-    };
-    const timer = setTimeout(done, 5_000);
-    signal.addEventListener("abort", done, { once: true });
-  });
+function normalized(value: string) {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function matchesProduct(item: AgentItem, product: { id: string; name: string }) {
+  const requested = normalized(item.name);
+  const id = normalized(product.id);
+  const name = normalized(product.name);
+  return requested === id || requested === name ||
+    name.includes(requested) || requested.includes(name);
+}
+
+function mapUrl(
+  origin: { lat: number; lon: number } | undefined,
+  store: { latitude?: number | null; longitude?: number | null },
+) {
+  if (!origin || store.latitude == null || store.longitude == null) return "";
+  const destination = `${store.latitude},${store.longitude}`;
+  return `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lon}&destination=${destination}&travelmode=driving`;
+}
+
+function toCandidate(
+  offer: {
+    productId: string;
+    storeId: string;
+    priceCents: number;
+    recordedAt: string;
+    productName?: string | null;
+    packageSize?: string | null;
+    sourceUrl?: string | null;
+    priceSource?: string | null;
+    unitBasis?: string | null;
+    requestedUnit?: string | null;
+  },
+  product: { id: string; name: string; unit: string },
+): Candidate {
+  const price = offer.priceCents / 100;
+  return {
+    id: `${offer.productId}:${offer.storeId}`,
+    name: offer.productName || product.name,
+    brand: "",
+    size: offer.packageSize || offer.requestedUnit || product.unit,
+    soldBy: offer.unitBasis === "per_lb" ? "WEIGHT" : "UNIT",
+    regularCents: offer.priceCents,
+    retrievedAt: offer.recordedAt,
+    retailerId: offer.storeId,
+    storeLocationId: offer.storeId,
+    productId: offer.productId,
+    productName: offer.productName || product.name,
+    price,
+    priceSource: offer.priceSource || "Supabase product table",
+    verifiedAt: offer.recordedAt,
+    productUrl: offer.sourceUrl || null,
+    matchKind: "exact",
+  };
 }
 
 export async function POST(request: Request) {
   const parsed = input.safeParse(await request.json().catch(() => null));
-  if (!parsed.success || new Set(parsed.data.items.map((item) => item.id)).size !== parsed.data.items.length)
-    return Response.json({ error: "Choose 1–30 distinct foods and a valid search location." }, { status: 400 });
-  const p = parsed.data;
-  const reports = new Map<string, ScrapeReport>();
-  const branchBatches: PriceBatch[] = [];
-  savePricesAfterResponse(() => [
-    ...[...reports.values()].map(report => catalogPriceBatch(report, p.zip)),
-    ...branchBatches,
-  ]);
-  let comparison: Record<string, unknown> | null = null;
-  let plan: SearchPlan | null = null;
-  let failures = false;
-  let locationError: string | null = null;
+  if (!parsed.success) {
+    return Response.json(
+      { error: "Choose 1–30 distinct foods and a valid search location." },
+      { status: 400 },
+    );
+  }
 
-  return deadlineStream(request.signal, async (send, signal) => {
-    const emit = (raw: ScrapeReport, cached = false) => {
-      if (signal.aborted) return;
-      const incoming = normalizeCatalogReport(raw, p.items);
-      const previous = reports.get(incoming.retailer);
-      const report = previous
-        ? normalizeCatalogReport(mergeCatalogReports(previous, incoming), p.items)
-        : incoming;
-      reports.set(report.retailer, report);
-      if (!cached) catalogCache.put(p.zip, incoming);
-      send({ type: "report", report, cached });
-    };
-    send({ type: "started", deadlineMs: SEARCH_WINDOW_MS });
-    for (const report of catalogCache.read(p.zip, p.items)) emit(report, true);
-    const observed = p.items.map((item) => ({ item, products: traderJoesObserved(item) }));
-    if (observed.some((line) => line.products.length)) emit({
-      retailer: "Trader Joe’s", status: "retrieved",
-      detail: "Dated official website observations. In-store prices and stock may differ.",
-      lines: observed,
-    }, true);
+  try {
+    const { catalog } = await getCatalog();
+    const products = new Map(catalog.products.map((product) => [product.id, product]));
+    const offersByStore = new Map<string, typeof catalog.offers>();
+    for (const offer of catalog.offers) {
+      if (!offer.available) continue;
+      const storeOffers = offersByStore.get(offer.storeId) ?? [];
+      storeOffers.push(offer);
+      offersByStore.set(offer.storeId, storeOffers);
+    }
 
-    // Cache reads, AI understanding and location lookup start together.
-    const cachedTask = providerReports(supported, p.items, p.zip, false, true,
-      undefined, undefined, false, signal).then((cached) => {
-        for (const report of cached) if (report.lines.some((line) => line.products.length)) emit(report, true);
+    const storesWithCoordinates = catalog.stores.filter(
+      (store) =>
+        typeof store.latitude === "number" &&
+        Number.isFinite(store.latitude) &&
+        typeof store.longitude === "number" &&
+        Number.isFinite(store.longitude),
+    );
+    const stores: StoreCheck[] = storesWithCoordinates.flatMap((store) => {
+      const offers = offersByStore.get(store.id) ?? [];
+      const lines = parsed.data.items.map((item) => {
+        const candidates = offers.flatMap((offer) => {
+          const product = products.get(offer.productId);
+          return product && matchesProduct(item, product)
+            ? [toCandidate(offer, product)]
+            : [];
+        });
+        return {
+          item,
+          candidates,
+          searchStatus: candidates.length ? "completed" as const : "no_results" as const,
+          ...(candidates.length ? {} : { error: "No matching Supabase product price for this store." }),
+        };
       });
-    send({ type: "agent", stage: "planning" });
-    const planningSignal = AbortSignal.any([signal, AbortSignal.timeout(AI_PLAN_WINDOW_MS)]);
-    const planningTask = untilAborted(planBasketSearch(p.items, planningSignal), planningSignal)
-      .catch(() => null).then((value) => {
-        if (signal.aborted) return;
-        plan = value ?? null;
-        send({ type: "agent", stage: plan ? "ready" : "unavailable", provider: plan?.provider, model: plan?.model });
-      });
-    const mappedTask = googleNearbyPlaces(p.area, p.radius, "grocery", p.origin).catch((error: unknown) => {
-      locationError = error instanceof Error ? error.message : "Nearby store lookup failed.";
-      throw error;
-    });
-    const comparisonTask = compareBasket(new Request(request.url, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(p), signal,
-    }), (report) => emit(report), undefined,
-    { deferProvider: true, deferPublic: true, deferPlan: true,
-      onPrices: batches => { if (!signal.aborted) branchBatches.push(...batches); } }).then(async (response) => {
-      const result = await response.json();
-      if (!signal.aborted && response.ok) comparison = result;
-      else if (!signal.aborted) failures = true;
+      const coordinates = store.latitude != null && store.longitude != null
+        ? { lat: store.latitude, lon: store.longitude }
+        : undefined;
+      return [{
+        id: store.id,
+        retailerId: store.id,
+        name: store.name,
+        address: store.address || "Address not listed",
+        coordinates,
+        requestedItemIds: parsed.data.items.map((item) => item.id),
+        lines,
+      }];
     });
 
-    const sourceTask = mappedTask.then(async (mapped) => {
-      signal.throwIfAborted();
-      const coverage = groceryCoverage(mapped.places);
-      // Preserve locations even if a branch-specific price feed is slow.
-      comparison ??= { stores: [], storeCoverage: coverage, foundStores: coverage.length,
-        checkedAt: new Date().toISOString(), warnings: [],
-        coverage: `Found ${coverage.length} grocery locations within ${p.radius} miles of ${mapped.origin.label}. Online listings are kept separate from store-priced trips.` };
-      const retailers = [...new Set(coverage.map((store) => store.retailer))];
-      const publicTasks = retailers.map(async (retailer) => {
-        if (retailer === "Trader Joe’s") await planningTask;
-        signal.throwIfAborted();
-        return scrapeRetailers(coverage.filter((store) => store.retailer === retailer),
-          p.items, mapped.places, plan ?? undefined, signal, (report) => emit(report));
-      });
-      const providerTask = planningTask.then(async () => {
-        signal.throwIfAborted();
-        let current = await providerReports(retailers, p.items, p.zip, true, false,
-          (report) => emit(report), plan ?? undefined, false, signal, { fast: true });
-        // Bright Data can return a job ID before it has product records. Check
-        // that same job during this search; start=false avoids creating another.
-        while (!signal.aborted && current.some((report) =>
-          report.lines.some((line) => line.searchStatus === "searching"))) {
-          await waitForProviderPoll(signal);
-          signal.throwIfAborted();
-          current = await providerReports(retailers, p.items, p.zip, false, false,
-            (report) => emit(report), plan ?? undefined, false, signal, { fast: true });
-        }
-        return current;
-      });
-      const outcomes = await Promise.allSettled([...publicTasks, providerTask]);
-      if (outcomes.some((outcome) => outcome.status === "rejected")) failures = true;
-    });
-    const outcomes = await Promise.allSettled([cachedTask, planningTask, comparisonTask, sourceTask]);
-    if (outcomes.some((outcome) => outcome.status === "rejected")) failures = true;
-  }, (reason, elapsedMs) => {
-    const pending = [...reports.values()].some((report) => report.status === "pending" ||
-      report.lines.some((line) => line.searchStatus === "searching"));
-    const partial = reason !== "completed" || failures || pending;
-    const catalogs = settlePendingReports([...reports.values()], "timeout");
-    const fallback = {
-      stores: [], storeCoverage: [], foundStores: 0, warnings: [],
-      checkedAt: new Date().toISOString(),
-      coverage: "Nearby store lookup did not finish. Online listings remain available for reference.",
-    };
+    const origin = parsed.data.origin;
+    const storeCoverage = storesWithCoordinates.map((store) => ({
+      id: store.id,
+      name: store.name,
+      address: store.address || "Address not listed",
+      miles: 0,
+      lat: store.latitude ?? 0,
+      lon: store.longitude ?? 0,
+      mapUrl: mapUrl(origin, store),
+      retailer: store.id,
+      status: "checked" as const,
+      detail: "Prices loaded from Supabase product records.",
+    }));
     const result = {
-      ...(comparison ?? fallback), publicCatalogs: catalogs,
-      search: { elapsedMs, partial, timedOut: reason === "timeout", locationError },
-      agent: { aiConnected: !!plan,
-        mode: plan ? `AI interpreted your list using ${plan.model}. Prices come from retailer sources.`
-          : "Searched your product names directly; no AI-generated prices are used." },
+      stores,
+      storeCoverage,
+      foundStores: stores.length,
+      publicCatalogs: [],
+      warnings: storesWithCoordinates.length === catalog.stores.length
+        ? []
+        : ["Stores without Supabase coordinates were excluded from routed results."],
+      coverage: `Loaded ${stores.length} stores and product prices from Supabase.`,
+      checkedAt: new Date().toISOString(),
+      agent: {
+        aiConnected: false,
+        mode: "Supabase-only product search; no live retailer or web results are included.",
+      },
+      search: { elapsedMs: 0, partial: false, timedOut: false, locationError: null },
     };
-    return [{ type: "complete", result }, { type: "sources-complete", elapsedMs, partial,
-      timedOut: reason === "timeout" }];
-  });
+    const body = [
+      JSON.stringify({ type: "started", deadlineMs: 0 }),
+      JSON.stringify({ type: "complete", result }),
+      "",
+    ].join("\n");
+    return new Response(body, {
+      headers: { "Content-Type": "application/x-ndjson; charset=utf-8" },
+    });
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Supabase catalog search failed." },
+      { status: 502 },
+    );
+  }
 }

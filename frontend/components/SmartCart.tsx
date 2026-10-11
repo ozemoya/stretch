@@ -25,6 +25,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   const [draft, setDraft] = useState<CheckoutDraft | null>(null);
   const [road, setRoad] = useState<{ key: string; matrix: RoadMatrix } | null>(null);
   const [routeStatus, setRouteStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [resolvedStores, setResolvedStores] = useState<Record<string, CartLine["store"]>>({});
   const [saved, setSaved] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState("");
@@ -47,14 +48,55 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   const displayGroups = useMemo(() => cartGroups(tripLines.map((line) => ({ ...line, selected: true })))
     .map((group) => ({ ...group, lines: tripLines.filter((line) => line.store.id === group.store.id),
       subtotalCents: cartSubtotal(tripLines.filter((line) => line.store.id === group.store.id)) })), [lines, draft]);
+  const routeGroups = useMemo(() => groups.map((group) => ({
+    ...group,
+    store: resolvedStores[group.store.id] ?? group.store,
+  })), [groups, resolvedStores]);
+  const storeIdsKey = groups.map((group) => group.store.id).join("|");
+  useEffect(() => {
+    if (!groups.length) {
+      setResolvedStores({});
+      return;
+    }
+    const controller = new AbortController();
+    void fetch("/api/store-locations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storeIds: groups.map((group) => group.store.id) }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Store location lookup failed");
+        return response.json() as Promise<{ stores?: Array<{
+          id: string; name: string; address: string; lat: number; lon: number;
+        }> }>;
+      })
+      .then(({ stores = [] }) => {
+        if (controller.signal.aborted) return;
+        const current = new Map(groups.map((group) => [group.store.id, group.store]));
+        setResolvedStores(Object.fromEntries(stores
+          .filter((store) => Number.isFinite(store.lat) && Number.isFinite(store.lon) && current.has(store.id))
+          .map((store) => [store.id, {
+            ...current.get(store.id)!,
+            name: store.name || current.get(store.id)!.name,
+            address: store.address || current.get(store.id)!.address,
+            lat: store.lat,
+            lon: store.lon,
+          }])));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setResolvedStores({});
+      });
+    return () => controller.abort();
+  }, [storeIdsKey]);
   const home = draft ? draft.origin ?? centers[draft.prefs.area] : null;
-  const routeKey = JSON.stringify([home?.lat, home?.lon, groups.map((g) => [g.store.id, g.store.lat, g.store.lon]),
+  const routeKey = JSON.stringify([home?.lat, home?.lon, routeGroups.map((g) => [g.store.id, g.store.lat, g.store.lon]),
     draft?.gasStop?.id, draft?.gasStop?.lat, draft?.gasStop?.lon]);
   useEffect(() => {
     setRoad(null);
-    if (!home || groups.length > 3 || (!groups.length && !draft?.gasStop)) { setRouteStatus("idle"); return; }
+    if (!home || routeGroups.length > 3 || (!routeGroups.length && !draft?.gasStop)) { setRouteStatus("idle"); return; }
     const controller = new AbortController();
-    const points = [home, ...groups.map((g) => g.store), ...(draft?.gasStop ? [draft.gasStop] : [])]
+    const points = [home, ...routeGroups.map((g) => g.store), ...(draft?.gasStop ? [draft.gasStop] : [])]
       .map(({ lat, lon }) => ({ lat, lon }));
     setRouteStatus("loading");
     void fetch("/api/routes", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -62,7 +104,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
       .then(async (response) => { if (!response.ok) throw new Error("Route unavailable"); return response.json(); })
       .then((data) => {
         if (controller.signal.aborted) return;
-        setRoad({ key: routeKey, matrix: { storeIds: groups.map((g) => g.store.id),
+        setRoad({ key: routeKey, matrix: { storeIds: routeGroups.map((g) => g.store.id),
           distances: data.distances, durations: data.durations, hasFuelStop: !!draft?.gasStop } });
         setRouteStatus("idle");
       }).catch(() => { if (!controller.signal.aborted) setRouteStatus("error"); });
@@ -70,7 +112,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   }, [routeKey]);
 
   const matrix = road?.key === routeKey ? road.matrix : null;
-  const route = matrix ? bestRoadRoute(groups.map((g) => g.store.id), matrix) : null;
+  const route = matrix ? bestRoadRoute(routeGroups.map((g) => g.store.id), matrix) : null;
   const groceryCents = cartSubtotal(tripLines);
   const selectedBranchItemIds = new Set(tripLines.filter((line) => line.selected).map((line) => line.item.id));
   const referencePicks = tripPicks.filter((pick) => !selectedBranchItemIds.has(pick.itemId));
@@ -118,8 +160,8 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   }, [checkout, home?.lat, home?.lon, onlineRetailers.join("|")]);
   const referenceCents = catalogReferenceSubtotal(referencePicks);
   const missingItems = draft ? missingCartItems(draft.items, tripLines, tripPicks) : [];
-  const canProceed = !!draft?.gasStop && !!draft.items.length && missingItems.length === 0;
-  const noGasRoute = matrix?.hasFuelStop ? bestRoadRoute(groups.map((g) => g.store.id), { ...matrix, hasFuelStop: false }) : null;
+  const canProceed = !!draft?.items.length && missingItems.length === 0;
+  const noGasRoute = matrix?.hasFuelStop ? bestRoadRoute(routeGroups.map((g) => g.store.id), { ...matrix, hasFuelStop: false }) : null;
   const reportAge = draft?.fuelSource ? Date.now() - Date.parse(draft.fuelSource.period) : Infinity;
   const recentStationReport = draft?.fuelSource?.kind === "station" && !!draft.gasStop &&
     Number.isFinite(reportAge) && reportAge >= 0 && reportAge <= 48 * 60 * 60 * 1000;
@@ -158,7 +200,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
     url.searchParams.set("origin", `${home.lat},${home.lon}`);
     url.searchParams.set("destination", `${home.lat},${home.lon}`);
     url.searchParams.set("waypoints", [...route.order.map((id) => {
-      const store = groups.find((group) => group.store.id === id)!.store;
+      const store = routeGroups.find((group) => group.store.id === id)!.store;
       return `${store.lat},${store.lon}`;
     }), ...(draft?.gasStop ? [`${draft.gasStop.lat},${draft.gasStop.lon}`] : [])].join("|"));
     url.searchParams.set("travelmode", "driving");
@@ -195,7 +237,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   }
   function finalize() {
     if (!tripLines.length || tripPicks.length || !canProceed || !route || tripTotalCents === null || groups.length > 3) return;
-    const plan = { version: 1, savedAt: new Date().toISOString(), lines: tripLines.filter((line) => line.selected), stores: groups.map((g) => g.store),
+    const plan = { version: 1, savedAt: new Date().toISOString(), lines: tripLines.filter((line) => line.selected), stores: routeGroups.map((g) => g.store),
       gasStop: draft.gasStop, fuelSource: draft.fuelSource, groceryCents, fuelCents, gasPurchaseCents,
       totalCents: tripTotalCents, miles: route.miles, minutes: route.minutes,
       routeOrder: route.order, directionsUrl };
@@ -211,9 +253,9 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   const routePanel = checkout && <section className="smart-cart-route" aria-labelledby="cart-route-title">
     <h2 id="cart-route-title">Your road route</h2>
     {route && home ? <>
-      <p>{draft?.origin?.label ?? `${draft?.prefs.area ?? "Starting"} area`} → {route.order.map((id) => groups.find((group) => group.store.id === id)?.store.name).join(" → ")}
+      <p>{draft?.origin?.label ?? `${draft?.prefs.area ?? "Starting"} area`} → {route.order.map((id) => routeGroups.find((group) => group.store.id === id)?.store.name).join(" → ")}
         {draft?.gasStop ? ` → ${draft.gasStop.name}` : ""} → starting area</p>
-      <CartRouteMap points={[home, ...route.order.map((id) => groups.find((group) => group.store.id === id)!.store), ...(draft?.gasStop ? [draft.gasStop] : [])]} />
+      <CartRouteMap points={[home, ...route.order.map((id) => routeGroups.find((group) => group.store.id === id)!.store), ...(draft?.gasStop ? [draft.gasStop] : [])]} />
       <p>{route.miles.toFixed(1)} road miles · about {Math.round(route.minutes)} minutes · {groups.length} grocery {groups.length === 1 ? "stop" : "stops"}</p>
       {draft && <p>{draft.prefs.mpg} MPG · {draft.fuelSource?.fuelType ?? "Fuel grade not supplied"} · ${effectiveGasPrice.toFixed(3)}/gal · approximately {(route.miles / draft.prefs.mpg).toFixed(2)} gallons used</p>}
       {directionsUrl && <a className="cta smart-cart-route-link" href={directionsUrl} target="_blank" rel="noreferrer">Open full trip directions ↗</a>}
@@ -281,7 +323,9 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
               {normalizedUnitPrice(line.product.regularCents, line.product.size) && <small>
                 {money(normalizedUnitPrice(line.product.regularCents, line.product.size)!.displayCents)} / {normalizedUnitPrice(line.product.regularCents, line.product.size)!.displayUnit}</small>}
               <small>Price checked {new Date(line.product.verifiedAt).toLocaleString()}</small>
-              <a href={line.product.productUrl!} target="_blank" rel="noreferrer">View at {group.store.name} ↗</a>
+              {line.product.productUrl
+                ? <a href={line.product.productUrl} target="_blank" rel="noreferrer">View at {group.store.name} ↗</a>
+                : <small>Product link not supplied by the source; confirm the package at the store.</small>}
               {replacementOptions(line, options).length > 0 && <label className="smart-cart-replace">Switch to a verified listing
                 <select value="" onChange={(event) => {
                   const option = options.find((entry) => entry.id === event.target.value);
@@ -304,7 +348,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
         <p>Stores <strong>{groups.length} / 3</strong></p>
         <p>Gas station <strong>{draft?.gasStop?.name ?? "Choose one first"}</strong></p>
         {groups.length > 3 && <p role="alert">Choose items at no more than three stores to calculate a trip.</p>}
-        {!draft?.gasStop && <p className="small" role="status">Choose a gas station on Stores & Gas before checkout. <Link href="/plan/results?view=map">See gas stations ↗</Link></p>}
+        {!draft?.gasStop && <p className="small" role="status">No gas station selected. Driving fuel is estimated from your MPG and entered gas price; you can add a station later.</p>}
         {!!draft?.gasStop && missingItems.length > 0 && <p className="small" role="status">Choose a product for {missingItems.map((item) => item.name).join(", ")} on Stores & Gas before checkout.</p>}
         {!draft && <p role="alert">Choose your starting area and vehicle details to calculate driving cost. <Link href="/plan">Trip settings ↗</Link></p>}
         {routeStatus === "loading" && <p role="status">Calculating road distance…</p>}

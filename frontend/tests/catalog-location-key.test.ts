@@ -9,7 +9,12 @@ it("loads database location keys when scrapers add more than three branches", as
   const stores = Array.from({ length: 4 }, (_, i) => ({
     id: `kroger:branch:${1100672 + i}`, name: `Kroger ${i}`,
   }));
-  const offers = [{ ...sample.offers[0], storeId: stores[3].id, isSample: false }];
+  const offers = [{
+    ...sample.offers[0],
+    recordedAt: "2026-10-10T00:00:00+00:00",
+    storeId: stores[3].id,
+    isSample: false,
+  }];
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ...sample, stores, offers })));
   const result = await getCatalog();
   expect(result.source).toBe("supabase");

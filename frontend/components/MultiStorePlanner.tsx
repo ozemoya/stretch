@@ -16,7 +16,7 @@ import type { RouteDecisionRequest, RouteDecisionResponse } from "@/lib/route-de
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 export default function MultiStorePlanner({ items, stores, locations, origin, area, gasStop, mpg, gasPrice, gasEconomics,
-  maxStores, budget, minExtraStopSavings, shoppingPriority, aiRouteRequest, onAiRoute }: {
+  maxStores, budget, minExtraStopSavings, shoppingPriority, aiRouteRequest, onAiRoute, onAiStatus }: {
   items: AgentItem[]; stores: StoreCheck[]; locations: StoreCoverage[]; origin: SearchOrigin | null;
   area: "downtown" | "midtown" | "decatur"; gasStop: GasStop | null | undefined;
   mpg: number; gasPrice: number; gasEconomics?: GasStopEconomics; budget: number;
@@ -24,9 +24,10 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
   shoppingPriority: MixMatchPriority;
   aiRouteRequest: number;
   onAiRoute?: (places: { id: string; name: string; address: string; lat: number; lon: number; mapUrl: string; kind: "grocery" | "fuel" }[]) => void;
+  onAiStatus?: (status: "loading" | "ready" | "unavailable") => void;
 }) {
   const router = useRouter();
-  const [enabled, setEnabled] = useState(maxStores > 1);
+  const [enabled, setEnabled] = useState(true);
   const [selections, setSelections] = useState<MultiStoreSelections>({});
   const [road, setRoad] = useState<{ key: string; matrix: RoadMatrix } | null>(null);
   const [routeStatus, setRouteStatus] = useState<"idle" | "loading" | "unavailable">("idle");
@@ -125,7 +126,11 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
     plan,
   })) ?? [], [optimization?.plans]);
   async function askAiForMostEconomicalRoute() {
-    if (!optimization || optimization.unresolved.length || !aiCandidates.length || aiDecisionStatus === "loading") return;
+    if (!optimization || optimization.unresolved.length || !aiCandidates.length || aiDecisionStatus === "loading") {
+      onAiStatus?.("unavailable");
+      return;
+    }
+    onAiStatus?.("loading");
     setAiDecision(null);
     setAiDecisionMessage("Checking the verified route candidates and choosing the lowest-cost option…");
     setAiDecisionStatus("loading");
@@ -172,6 +177,7 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
       setAiDecisionMessage(decision.rationale);
       setSelections(chosen.plan.selections);
       setAiDecisionStatus("idle");
+      onAiStatus?.("ready");
       onAiRoute?.([
         { id: "origin", name: "Starting point", address: `${home.lat}, ${home.lon}`, lat: home.lat, lon: home.lon, mapUrl: "https://www.google.com/maps", kind: "grocery" as const },
         ...chosen.plan.routeOrder.map((storeId) => {
@@ -186,13 +192,19 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
     } catch {
       setAiDecisionStatus("unavailable");
       setAiDecisionMessage("AI route selection is unavailable; the deterministic recommendation remains selected.");
+      onAiStatus?.("unavailable");
     }
   }
   useEffect(() => {
-    if (!aiRouteRequest || aiRouteRequest === handledAiRouteRequest.current ||
-      locationStatus !== "idle" ||
+    if (!aiRouteRequest || aiRouteRequest === handledAiRouteRequest.current) return;
+    if (locationStatus === "unavailable") {
+      handledAiRouteRequest.current = aiRouteRequest;
+      onAiStatus?.("unavailable");
+      return;
+    }
+    if (locationStatus !== "idle" ||
       stores.some((store) => !allLocations.some((location) => location.id === store.id)) ||
-      !optimization || optimization.unresolved.length || !aiCandidates.length) return;
+      !optimization || !aiCandidates.length) return;
     handledAiRouteRequest.current = aiRouteRequest;
     void askAiForMostEconomicalRoute();
   }, [aiRouteRequest, optimization, aiCandidates, locationStatus, stores, allLocations]);
@@ -293,10 +305,16 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
       {routeStatus === "unavailable" && <p role="status">Road routes are unavailable right now, so Stretch cannot quote a Mix & Match total.</p>}
       {locationStatus === "loading" && <p role="status">Finding matching grocery branches on Google Maps…</p>}
       {locationStatus === "unavailable" && <p role="status">Google Maps could not match every priced grocery store, so no complete AI route was selected.</p>}
-      {aiDecisionStatus === "loading" && <p role="status">{aiDecisionMessage || "AI is choosing the final grocery and gas route from the verified candidates…"}</p>}
-      {aiDecisionStatus === "unavailable" && <p role="status">{aiDecisionMessage || `AI route selection is unavailable; the deterministic ${shoppingPriority.replace("_", " ")} recommendation remains selected.`}</p>}
-      {aiDecision && <div className="small" role="log" aria-label="AI route explanation">
-        <strong>AI route assistant</strong>
+      {aiDecisionStatus === "loading" && <div className="ai-route-progress" role="status" aria-live="polite">
+        <strong>AI route assistant is working</strong>
+        <span>{aiDecisionMessage || "Choosing the final grocery and gas route from the verified candidates…"}</span>
+      </div>}
+      {aiDecisionStatus === "unavailable" && <div className="ai-route-progress" role="status">
+        <strong>AI route assistant is unavailable</strong>
+        <span>{aiDecisionMessage || `The deterministic ${shoppingPriority.replace("_", " ")} recommendation remains selected.`}</span>
+      </div>}
+      {aiDecision && <div className="ai-route-assistant" role="log" aria-label="AI route explanation">
+        <h3>AI route recommendation</h3>
         <p>“{aiDecision.rationale}”</p>
       </div>}
       {optimization?.unresolved.length ? <p>Still missing store prices for: {items.filter((item) => optimization.unresolved.includes(item.id)).map((item) => item.name).join(", ")}. No complete route can be recommended.</p> : null}
@@ -314,7 +332,10 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
             baseline.totalCents - candidate.totalCents >= Math.round(minExtraStopSavings * 100) * (candidate.storeIds.length - 1)) &&
           <p className="small">A second stop does not clear your {money(Math.round(minExtraStopSavings * 100))} net-savings minimum. One store is recommended.</p>}
       </>}
-      <div className="multi-store-items">{items.map((item) => {
+      <div className="multi-store-items" aria-label="Store and product options">
+        <h3>Choose store and product options</h3>
+        <p className="small">Each option is a verified product listing. Choose a package for every grocery, or use one of the route strategies above.</p>
+        {items.map((item) => {
         const options = eligibleMultiStoreOptions(item, routeStores);
         const value = selections[item.id];
         return <label key={item.id}><span>{item.quantity} × {item.name}</span>
@@ -333,7 +354,8 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
           {value && <button type="button" onClick={() => addSelectedItem(item)}>Add to cart</button>}
           {!options.length && <small>No verified store price for this item yet.</small>}
         </label>;
-      })}</div>
+        })}
+      </div>
       {plan ? <>
         <div className="multi-store-lists">{plan.routeOrder.map((id, index) => {
           const store = routeStores.find((entry) => entry.id === id)!;

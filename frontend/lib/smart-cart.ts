@@ -28,7 +28,7 @@ export type CartStore = CartLine["store"];
 export function cartLine(item: AgentItem, product: Candidate, store: StoreCheck, location: StoreCoverage,
   at = new Date().toISOString()): CartLine | null {
   if (store.id !== location.id || !ownedCandidate(store, product) || product.soldBy !== "UNIT" ||
-    !packageMatches(item.unit, product.size) || !product.productUrl) return null;
+    !packageMatches(item.unit, product.size)) return null;
   const result = lineSchema.safeParse({
     id: `${item.id}:${store.retailerId}:${store.id}:${product.productId}`, item, product,
     store: { id: store.id, retailerId: store.retailerId, name: store.name,
@@ -42,7 +42,7 @@ export function validCartLine(line: CartLine): boolean {
   return line.product.retailerId === line.store.retailerId && line.product.storeLocationId === line.store.id &&
     line.product.regularCents === Math.round(line.product.price * 100) &&
     packageMatches(line.item.unit, line.product.size) && line.product.soldBy === "UNIT" &&
-    Number.isFinite(Date.parse(line.product.verifiedAt)) && !!line.product.productUrl;
+    Number.isFinite(Date.parse(line.product.verifiedAt));
 }
 
 export function parseCart(value: unknown): CartLine[] {

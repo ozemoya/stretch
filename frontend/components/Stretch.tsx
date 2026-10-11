@@ -101,7 +101,7 @@ export default function Stretch({
   mode = "home",
 }: {
   catalog: Catalog;
-  source: "demo" | "supabase";
+  source: "supabase";
   error?: string;
   mode?: "home" | "planner";
 }) {

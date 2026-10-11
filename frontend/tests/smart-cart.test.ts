@@ -33,6 +33,14 @@ describe("Smart Cart ownership and totals", () => {
     expect(cartLine(item("Eggs"), product("eggs", "aldi", "aldi-1", 249),
       store("walmart-1", "walmart"), location("walmart-1"), at)).toBeNull();
   });
+  it("accepts verified branch prices when the source has no product URL", () => {
+    const kroger = store("kroger:branch:1100672", "kroger:branch:1100672");
+    const listing = { ...product("milk", kroger.retailerId, kroger.id, 279), productUrl: null };
+    const line = cartLine(item("Milk"), listing, kroger, location(kroger.id), at);
+    expect(line).not.toBeNull();
+    expect(line?.product.productUrl).toBeNull();
+    expect(writeCart({ setItem: () => {} }, [line!])).toBe(true);
+  });
   it("keeps the example's two store subtotals separate and calculates driving fuel", () => {
     const aldi = store("aldi-1", "aldi"), walmart = store("walmart-1", "walmart");
     const lines = [

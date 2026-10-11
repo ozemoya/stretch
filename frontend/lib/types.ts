@@ -8,7 +8,13 @@ export type Product = {
   glutenFree: boolean;
   nutFree: boolean;
 };
-export type Store = { id: string; name: string };
+export type Store = {
+  id: string;
+  name: string;
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+};
 export type Offer = {
   productId: string;
   storeId: string;
@@ -16,6 +22,12 @@ export type Offer = {
   recordedAt: string;
   isSample: boolean;
   available: boolean;
+  productName?: string | null;
+  packageSize?: string | null;
+  sourceUrl?: string | null;
+  priceSource?: string | null;
+  unitBasis?: string | null;
+  requestedUnit?: string | null;
 };
 export type Swap = { fromId: string; toId: string; note: string };
 export type Catalog = {

@@ -64,6 +64,7 @@ export default function PriceAgent({
   autoStart = false,
   onSelectTrip,
   onAiRoute,
+  onAiStatus,
 }: {
   items: AgentItem[];
   zip: string;
@@ -81,8 +82,9 @@ export default function PriceAgent({
   nearbyPlaces: NearbyPlace[];
   radius: number;
   autoStart?: boolean;
-  onSelectTrip?: (store: StoreCheck, selected: Record<string, string>, route: { miles: number; minutes: number }, storeLocation: { mapUrl: string; lat: number; lon: number }) => void;
+  onSelectTrip?: (store: StoreCheck, selected: Record<string, string>, route: { miles: number; minutes: number }, storeLocation: StoreCoverage) => void;
   onAiRoute?: (places: { id: string; name: string; address: string; lat: number; lon: number; mapUrl: string; kind: "grocery" | "fuel" }[]) => void;
+  onAiStatus?: (status: "loading" | "ready" | "unavailable") => void;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -116,6 +118,7 @@ export default function PriceAgent({
   const [routeBusy, setRouteBusy] = useState(false);
   const [aiRouteRequest, setAiRouteRequest] = useState(0);
   const [pendingAiRoute, setPendingAiRoute] = useState(false);
+  const [aiRouteBusy, setAiRouteBusy] = useState(false);
   const started = useRef(false);
   const epoch = useRef(new SearchEpoch());
   const requestController = useRef<AbortController | null>(null);
@@ -362,6 +365,7 @@ export default function PriceAgent({
     }
   }
   function requestMostEconomicalRoute() {
+    setAiRouteBusy(true);
     if (!result) {
       setPendingAiRoute(true);
       if (!busy && !sourcesBusy) void check();
@@ -493,6 +497,9 @@ export default function PriceAgent({
     : [];
   const visibleCatalogs = catalogReports.filter(hasVisibleCatalogPrice);
   const visibleBranches = result?.stores.filter(hasVisibleBranchPrice) ?? [];
+  useEffect(() => {
+    if (aiRouteBusy && result && !visibleBranches.length) setAiRouteBusy(false);
+  }, [aiRouteBusy, result, visibleBranches.length]);
   function addVerifiedProduct(item: AgentItem, store: StoreCheck, location: StoreCoverage, productId: string) {
     const product = store.lines.find((line) => line.item.id === item.id)?.candidates.find((entry) => entry.id === productId);
     const line = product && cartLine(item, product, store, location);
@@ -529,9 +536,11 @@ export default function PriceAgent({
       <button
         className="cta"
         onClick={requestMostEconomicalRoute}
-        disabled={!items.length || items.length > 30}
+        disabled={!items.length || items.length > 30 || aiRouteBusy}
+        aria-busy={aiRouteBusy}
       >
-        {busy || sourcesBusy ? "PREPARING ROUTE DATA…" : "ASK AI FOR MOST ECONOMICAL ROUTE ↗"}
+        {aiRouteBusy ? <><span className="search-spinner" aria-hidden="true" /> AI IS CHOOSING A ROUTE…</>
+          : busy || sourcesBusy ? "PREPARING ROUTE DATA…" : "ASK AI FOR MOST ECONOMICAL ROUTE ↗"}
       </button>
       {(busy || sourcesBusy) && (
         <button
@@ -664,7 +673,7 @@ export default function PriceAgent({
                   ${(trip.fuelCents / 100).toFixed(2)} ={" "}
                   <strong>${(trip.totalCents / 100).toFixed(2)}</strong> ·{" "}
                   {trip.miles.toFixed(1)} mi, {trip.minutes} min
-                  {gasStop && onSelectTrip && result.stores.some((store) => store.id === trip.id && canReviewStore(store)) && (
+                  {onSelectTrip && result.stores.some((store) => store.id === trip.id && canReviewStore(store)) && (
                     <button type="button" className="cta" disabled={routeBusy || driving.key !== routeKey}
                       onClick={() => {
                         const store = result.stores.find((entry) => entry.id === trip.id);
@@ -672,13 +681,13 @@ export default function PriceAgent({
                         const location = result.storeCoverage.find((entry) => entry.id === trip.id);
                         if (store && route && location && driving.key === routeKey) onSelectTrip(store, choices[store.id] ?? {}, route, location);
                       }}>
-                      REVIEW THIS TRIP ↗
+                      {gasStop ? "REVIEW THIS TRIP ↗" : "ADD GROCERY ROUTE TO CART ↗"}
                     </button>
                   )}
                 </div>
               ))}
           </div>}
-          {!gasStop && completeBranchCount > 0 && <p>Choose a gas station on the map to calculate the full trip.</p>}
+          {!gasStop && completeBranchCount > 0 && <p>Grocery routes are ready. Gas is optional; the estimate uses your entered gas price until you select a station.</p>}
           {!!visibleCatalogs.length && (
             <StoreColumns
               items={items}
@@ -714,8 +723,11 @@ export default function PriceAgent({
           {visibleBranches.length > 0 && <MultiStorePlanner items={items} stores={visibleBranches} locations={result.storeCoverage}
             origin={origin} area={area} gasStop={gasStop} mpg={mpg} gasPrice={gasPrice} gasEconomics={gasEconomics} maxStores={maxStops}
             budget={budget} minExtraStopSavings={minExtraStopSavings} shoppingPriority={shoppingPriority}
-            aiRouteRequest={aiRouteRequest} onAiRoute={onAiRoute} />
-          }
+            aiRouteRequest={aiRouteRequest} onAiRoute={onAiRoute}
+            onAiStatus={(status) => {
+              setAiRouteBusy(status === "loading");
+              onAiStatus?.(status);
+            }} />}
           <div className={`live-grid ${comparisonView === "table" ? "branch-table-mode" : ""}`}>
             {visibleBranches.filter((store) => !comparedStores.length || comparedStores.includes(store.id)).map((store) => {
               const location = result.storeCoverage.find((entry) => entry.id === store.id)!;
@@ -843,7 +855,7 @@ export default function PriceAgent({
                                 </a>
                               </>
                             ) : (
-                              " · product URL not supplied by source"
+                              " · no product link supplied; price and package data are still verified"
                             )}
                           </p>
                         )}

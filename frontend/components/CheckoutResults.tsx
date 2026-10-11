@@ -16,7 +16,7 @@ import { createTripReview, writeTripReview } from "@/lib/trip-review";
 import SketchIcon from "./SketchIcon";
 import type { NearbyPlace } from "@/lib/live-data";
 import { nearbyGroceryStores } from "@/lib/nearby-store-display";
-import { readCart, SMART_CART_EVENT, type CartLine } from "@/lib/smart-cart";
+import { cartLine, readCart, SMART_CART_EVENT, type CartLine, writeCart } from "@/lib/smart-cart";
 import { readCatalogPicks, type CatalogPick } from "@/lib/catalog-picks";
 import { missingCartItems } from "@/lib/cart-coverage";
 import CartRouteMap from "./CartRouteMap";
@@ -76,7 +76,7 @@ export default function CheckoutResults() {
     Number.isFinite(reportAge) && reportAge >= 0 && reportAge <= 48 * 60 * 60 * 1000;
   const effectiveGasPrice = recentStationPrice ? draft!.prefs.gas : draft?.manualGas ?? 0;
   const missingItems = draft ? missingCartItems(draft.items, cartLines, catalogPicks) : [];
-  const canCheckout = !!draft?.gasStop && !!draft.items.length && missingItems.length === 0;
+  const canCheckout = !!draft?.items.length && missingItems.length === 0;
 
   return (
     <div className="trip-app">
@@ -101,10 +101,8 @@ export default function CheckoutResults() {
         {!!draft?.items.length && (canCheckout
           ? <Link className="results-checkout" href="/cart">Checkout →</Link>
           : <button className="results-checkout" type="button" disabled
-              title={!draft.gasStop ? "Choose a gas station first" : "Choose a product for every grocery on your list"}>Checkout →</button>)}
+              title="Choose a product for every grocery on your list">Checkout →</button>)}
       </div>
-      {!!draft?.items.length && !draft.gasStop &&
-        <p className="results-checkout-hint" role="status">Choose a gas station from the open list or map before checkout.</p>}
       {!!draft?.gasStop && missingItems.length > 0 &&
         <p className="results-checkout-hint" role="status">Choose a product for {missingItems.map((item) => item.name).join(", ")} before checkout.</p>}
       <main data-view={workspaceTab} id="results-main" className="results-page">
@@ -187,6 +185,22 @@ export default function CheckoutResults() {
                 radius={radius}
                 onSelectTrip={(store, selected, route, storeLocation) => {
                   const latest = readCheckoutDraft(window.sessionStorage);
+                  if (latest && !latest.gasStop) {
+                    const lines = latest.items.flatMap((item) => {
+                      const candidate = store.lines
+                        .find((line) => line.item.id === item.id)
+                        ?.candidates.find((product) => product.id === selected[item.id]);
+                      const line = candidate && cartLine(item, candidate, store, storeLocation);
+                      return line ? [line] : [];
+                    });
+                    if (lines.length !== latest.items.length || !writeCart(window.localStorage, lines)) {
+                      setReviewError("This grocery route could not be added to Smart Cart. Refresh the prices and try again.");
+                      return;
+                    }
+                    window.dispatchEvent(new Event(SMART_CART_EVENT));
+                    router.push("/cart");
+                    return;
+                  }
                   const review = latest && createTripReview(latest, store, selected, route, storeLocation);
                   if (!review || !writeTripReview(window.sessionStorage, review)) {
                     setReviewError("This trip could not be verified for review. Refresh the prices and try again.");
