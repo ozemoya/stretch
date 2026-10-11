@@ -5,6 +5,8 @@ import { deadlineStream, untilAborted } from "../../../../lib/deadline-stream";
 import { SEARCH_WINDOW_MS } from "../../../../lib/search-timing";
 import { settlePendingReports } from "../../../../lib/search-state";
 import type { ScrapeReport } from "../../../../lib/retailer-scraper";
+import { catalogPriceBatch } from "../../../../lib/scrapers/persistence";
+import { savePricesAfterResponse } from "../../../../lib/scrapers/save-after-response";
 const input = z.object({
   zip: z.string().regex(/^\d{5}$/),
   start: z.boolean().default(false),
@@ -31,6 +33,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   const p = parsed.data;
+  const reportsToSave = new Map<string, ScrapeReport>();
+  savePricesAfterResponse(() => [...reportsToSave.values()].map(report => catalogPriceBatch(report, p.zip)));
   if (p.stream) {
     const reports = new Map<string, ScrapeReport>();
     return deadlineStream(request.signal, async (send, signal) => {
@@ -38,6 +42,7 @@ export async function POST(request: Request) {
         if (signal.aborted) return;
         const report = normalizeCatalogReport(raw, p.items);
         reports.set(report.retailer, report);
+        reportsToSave.set(report.retailer, report);
         send({ type: "report", report });
       };
       const completed = await providerReports(p.retailers, p.items, p.zip, p.start, false,
@@ -48,7 +53,10 @@ export async function POST(request: Request) {
   }
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(SEARCH_WINDOW_MS)]);
   const reports = await untilAborted(providerReports(p.retailers, p.items, p.zip,
-    p.start, false, undefined, undefined, p.broaden, signal, { fast: true }), signal).catch(() => undefined);
+    p.start, false, report => {
+      if (!signal.aborted) reportsToSave.set(report.retailer, normalizeCatalogReport(report, p.items));
+    }, undefined, p.broaden, signal, { fast: true }), signal).catch(() => undefined);
+  for (const report of reports ?? []) reportsToSave.set(report.retailer, normalizeCatalogReport(report, p.items));
   return Response.json(
     {
       reports: settlePendingReports((reports ?? []).map((report) => normalizeCatalogReport(report, p.items)), "timeout"),

@@ -791,6 +791,10 @@ describe("current location and existing product mapping", () => {
     expect(row).not.toHaveProperty("sub-location");
     expect(storeRow(result)).toEqual({
       locationID: 1100672,
+      location_key: "kroger:branch:1100672",
+      retailer_key: "kroger",
+      location_scope: "branch",
+      source_location_id: "1100672",
       store: "Kroger",
       "sub-location": "Glenwood",
       latitude: null,

@@ -82,7 +82,7 @@ def _to_catalog(
 ) -> dict[str, list[dict[str, Any]]]:
     stores = [
         {
-            "id": str(store["locationID"]),
+            "id": store["location_key"],
             "name": " - ".join(
                 part
                 for part in (store["store"], store.get("sub-location"))
@@ -90,12 +90,13 @@ def _to_catalog(
             ),
         }
         for store in store_rows
+        if store.get("location_scope", "branch") == "branch"
     ]
     valid_store_ids = {store["id"] for store in stores}
     offers = []
     for row in price_rows:
         product_id = row.get("id")
-        location_id = row.get("locationID")
+        location_id = row.get("location_key")
         if not product_id or location_id is None:
             continue
         store_id = str(location_id)
@@ -109,7 +110,7 @@ def _to_catalog(
             continue
         if price_cents < 0:
             continue
-        recorded_at = row.get("date")
+        recorded_at = row.get("observed_at") or row.get("date")
         if isinstance(recorded_at, date):
             recorded_at = recorded_at.isoformat()
         offers.append(
@@ -118,7 +119,7 @@ def _to_catalog(
                 "storeId": store_id,
                 "priceCents": price_cents,
                 "recordedAt": (
-                    f"{recorded_at}T00:00:00Z"
+                    (recorded_at if "T" in recorded_at else f"{recorded_at}T00:00:00Z")
                     if recorded_at
                     else "1970-01-01T00:00:00Z"
                 ),

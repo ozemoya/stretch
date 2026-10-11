@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, it, expect, vi } from "vitest";
+vi.mock("../lib/scrapers/save-after-response", () => ({ savePricesAfterResponse: vi.fn() }));
 const item = { id: "milk", name: "milk", unit: "gallon", quantity: 1 };
 const report = { retailer: "Target", status: "retrieved" as const, detail: "Catalog price", lines: [{ item,
   products: [{ id: "p", name: "Milk", brand: "Target", size: "1 gallon", priceCents: 329,
