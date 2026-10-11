@@ -12,6 +12,7 @@ import { fuelCostCents } from "@/lib/live-trip";
 import { normalizedUnitPrice } from "@/lib/package-match";
 import { catalogReferenceSubtotal, readCatalogPicks, writeCatalogPicks, type CatalogPick } from "@/lib/catalog-picks";
 import { missingCartItems } from "@/lib/cart-coverage";
+import type { NearbyPlace } from "@/lib/live-data";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const FINALIZED_KEY = "stretch.finalized-trip.v1";
@@ -27,6 +28,8 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   const [saved, setSaved] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState("");
+  const [onlineStoreMatches, setOnlineStoreMatches] = useState<NearbyPlace[]>([]);
+  const [onlineStoreStatus, setOnlineStoreStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   useEffect(() => {
     const sync = () => { setLines(readCart(localStorage)); setOptions(readCartOptions(localStorage));
       setPicks(readCatalogPicks(localStorage)); };
@@ -71,6 +74,48 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
   const groceryCents = cartSubtotal(tripLines);
   const selectedBranchItemIds = new Set(tripLines.filter((line) => line.selected).map((line) => line.item.id));
   const referencePicks = tripPicks.filter((pick) => !selectedBranchItemIds.has(pick.itemId));
+  const onlineRetailers = [...new Set(referencePicks.map((pick) => pick.retailerId))];
+  useEffect(() => {
+    if (!checkout || !home || !onlineRetailers.length) {
+      setOnlineStoreMatches([]);
+      setOnlineStoreStatus("idle");
+      return;
+    }
+    const controller = new AbortController();
+    setOnlineStoreStatus("loading");
+    const params = new URLSearchParams({
+      area: draft?.prefs.area ?? "downtown",
+      radius: "10",
+      kind: "grocery",
+      lat: String(home.lat),
+      lon: String(home.lon),
+    });
+    void fetch(`/api/live/places?${params}`, {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Nearby grocery lookup failed");
+        return response.json() as Promise<{ places?: NearbyPlace[] }>;
+      })
+      .then(({ places = [] }) => {
+        if (controller.signal.aborted) return;
+        const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const matches = onlineRetailers.flatMap((retailer) => {
+          const key = normalized(retailer);
+          return places
+            .filter((place) => place.kind === "grocery" &&
+              (normalized(place.name).includes(key) || normalized(place.brand ?? "").includes(key) ||
+                (key.includes("kroger") && /kroger|harris teeter/i.test(`${place.name} ${place.brand ?? ""}`)) ||
+                (key.includes("publix") && /publix/i.test(`${place.name} ${place.brand ?? ""}`))))
+            .sort((a, b) => a.miles - b.miles)
+            .slice(0, 1);
+        });
+        setOnlineStoreMatches(matches);
+        setOnlineStoreStatus(matches.length === onlineRetailers.length ? "ready" : "error");
+      })
+      .catch(() => { if (!controller.signal.aborted) setOnlineStoreStatus("error"); });
+    return () => controller.abort();
+  }, [checkout, home?.lat, home?.lon, onlineRetailers.join("|")]);
   const referenceCents = catalogReferenceSubtotal(referencePicks);
   const missingItems = draft ? missingCartItems(draft.items, tripLines, tripPicks) : [];
   const canProceed = !!draft?.gasStop && !!draft.items.length && missingItems.length === 0;
@@ -172,16 +217,30 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
       <p>{route.miles.toFixed(1)} road miles · about {Math.round(route.minutes)} minutes · {groups.length} grocery {groups.length === 1 ? "stop" : "stops"}</p>
       {draft && <p>{draft.prefs.mpg} MPG · {draft.fuelSource?.fuelType ?? "Fuel grade not supplied"} · ${effectiveGasPrice.toFixed(3)}/gal · approximately {(route.miles / draft.prefs.mpg).toFixed(2)} gallons used</p>}
       {directionsUrl && <a className="cta smart-cart-route-link" href={directionsUrl} target="_blank" rel="noreferrer">Open full trip directions ↗</a>}
+    </> : !groups.length && onlineStoreStatus === "ready" && onlineStoreMatches.length && home ? <>
+      <p>{draft?.origin?.label ?? `${draft?.prefs.area} area`} → {onlineStoreMatches.map((store) => store.name).join(" → ")}
+        {draft?.gasStop ? ` → ${draft.gasStop.name}` : ""} → starting area</p>
+      <CartRouteMap points={[home, ...onlineStoreMatches, ...(draft?.gasStop ? [draft.gasStop] : [])]} />
+      <p>Physical store route resolved for your online listings. Confirm in-store availability and prices before shopping.</p>
+      <Link className="cta smart-cart-route-link" href="/plan/results">Review physical store prices ↗</Link>
     </> : !groups.length && stationOnlyMiles !== null && home && draft?.gasStop ? <>
       <p>{draft.origin?.label ?? `${draft.prefs.area} area`} → {draft.gasStop.name} → starting area</p>
       <CartRouteMap points={[home, draft.gasStop]} />
-      <p>{stationOnlyMiles.toFixed(1)} road miles. This route visits the gas station only; online grocery listings do not identify a confirmed physical store.</p>
+      <p>{stationOnlyMiles.toFixed(1)} road miles. {onlineStoreStatus === "loading"
+        ? "Finding a physical grocery location for your online listings…"
+        : onlineStoreStatus === "error"
+          ? "A matching physical grocery location could not be confirmed for the online listings."
+          : "No physical grocery store has been matched yet."}</p>
       {gasOnlyDirectionsUrl && <a className="cta smart-cart-route-link" href={gasOnlyDirectionsUrl} target="_blank" rel="noreferrer">Open gas-stop directions ↗</a>}
       <p><Link href="/plan/results">Choose a store-priced grocery product</Link> to add its store to the trip route.</p>
     </> : <div className="smart-cart-route-pending" role="status">
       <p>{routeStatus === "loading" ? "Calculating your road route…" : routeStatus === "error" ? "Road routing is unavailable right now." :
         "Choose a physical grocery store or gas station to see a driving route."}</p>
-      {!!tripPicks.length && <p>Online catalog items do not identify a confirmed store location, so they cannot be added to the driving route.</p>}
+      {!!tripPicks.length && <p role={onlineStoreStatus === "error" ? "alert" : "status"}>
+        {onlineStoreStatus === "loading"
+          ? "Finding a nearby physical store for your online listings…"
+          : "A matching physical store could not be confirmed for every online retailer. Choose a store-priced item or select a store on the map."}
+      </p>}
       <Link href="/plan/results">Choose stops on the map ↗</Link>
     </div>}
   </section>;

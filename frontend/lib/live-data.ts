@@ -424,6 +424,48 @@ export async function googleNearbyPlaces(area: Area, radiusMiles = 5,
     origin: customOrigin ?? { ...centers[area], label: area }, limited: true };
 }
 
+const googlePlaceSearchSchema = z.object({ places: z.array(z.object({
+  id: z.string(), displayName: z.object({ text: z.string() }),
+  formattedAddress: z.string().optional(),
+  location: z.object({ latitude: z.number(), longitude: z.number() }),
+  googleMapsUri: z.string().optional(),
+})).optional() });
+
+function comparablePlaceName(value: string) {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Resolve a price-source store to the matching physical Google Maps branch. */
+export async function googlePlaceByName(name: string, origin: SearchOrigin) {
+  if (!localFuelConfigured()) throw new ProviderError("Google Places is not configured on the server.", 503);
+  const response = await checkedFetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY!,
+      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri",
+    },
+    body: JSON.stringify({
+      textQuery: name,
+      includedType: "grocery_store",
+      maxResultCount: 10,
+      locationBias: { circle: { center: { latitude: origin.lat, longitude: origin.lon }, radius: 16093.44 } },
+    }),
+  });
+  const places = googlePlaceSearchSchema.parse(await response.json()).places ?? [];
+  const requested = comparablePlaceName(name);
+  const match = places.find((place) => comparablePlaceName(place.displayName.text) === requested) ?? places[0];
+  if (!match) return null;
+  return {
+    id: match.id,
+    name: match.displayName.text,
+    address: match.formattedAddress ?? "",
+    lat: match.location.latitude,
+    lon: match.location.longitude,
+    mapUrl: match.googleMapsUri ?? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(match.id)}`,
+  };
+}
+
 let token: { value: string; until: number } | undefined;
 let tokenRequest: Promise<string> | undefined;
 export function krogerConfigured() {

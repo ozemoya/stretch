@@ -52,6 +52,7 @@ export default function PriceAgent({
   origin,
   gasStop,
   gasPrice,
+  budget,
   gasPriceReported,
   gasEconomics,
   mpg,
@@ -62,6 +63,7 @@ export default function PriceAgent({
   radius,
   autoStart = false,
   onSelectTrip,
+  onAiRoute,
 }: {
   items: AgentItem[];
   zip: string;
@@ -69,6 +71,7 @@ export default function PriceAgent({
   origin: SearchOrigin | null;
   gasStop?: GasStop | null;
   gasPrice: number;
+  budget: number;
   gasPriceReported: boolean;
   gasEconomics?: { gallonsNeeded: number; baselinePrice: number; stationPrice: number };
   mpg: number;
@@ -79,6 +82,7 @@ export default function PriceAgent({
   radius: number;
   autoStart?: boolean;
   onSelectTrip?: (store: StoreCheck, selected: Record<string, string>, route: { miles: number; minutes: number }, storeLocation: { mapUrl: string; lat: number; lon: number }) => void;
+  onAiRoute?: (places: { id: string; name: string; address: string; lat: number; lon: number; mapUrl: string; kind: "grocery" | "fuel" }[]) => void;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -110,6 +114,8 @@ export default function PriceAgent({
     routes: Record<string, { miles: number; minutes: number }>;
   }>({ key: "", routes: {} });
   const [routeBusy, setRouteBusy] = useState(false);
+  const [aiRouteRequest, setAiRouteRequest] = useState(0);
+  const [pendingAiRoute, setPendingAiRoute] = useState(false);
   const started = useRef(false);
   const epoch = useRef(new SearchEpoch());
   const requestController = useRef<AbortController | null>(null);
@@ -355,6 +361,23 @@ export default function PriceAgent({
       }
     }
   }
+  function requestMostEconomicalRoute() {
+    if (!result) {
+      setPendingAiRoute(true);
+      if (!busy && !sourcesBusy) void check();
+      return;
+    }
+    if (busy || sourcesBusy) {
+      setPendingAiRoute(true);
+      return;
+    }
+    setAiRouteRequest((value) => value + 1);
+  }
+  useEffect(() => {
+    if (!pendingAiRoute || !result || busy || sourcesBusy) return;
+    setPendingAiRoute(false);
+    setAiRouteRequest((value) => value + 1);
+  }, [pendingAiRoute, result, busy, sourcesBusy]);
   async function refreshProvider(retailer?: string, retry = false) {
     if (!result || busy || sourcesBusy) return;
     providerController.current?.abort();
@@ -505,10 +528,10 @@ export default function PriceAgent({
       <h2>Available store prices</h2>
       <button
         className="cta"
-        onClick={check}
-        disabled={busy || !items.length || items.length > 30}
+        onClick={requestMostEconomicalRoute}
+        disabled={!items.length || items.length > 30}
       >
-        {busy ? "SEARCH IN PROGRESS…" : result ? "SEARCH AGAIN ↗" : "SEARCH STORES & PRICES ↗"}
+        {busy || sourcesBusy ? "PREPARING ROUTE DATA…" : "ASK AI FOR MOST ECONOMICAL ROUTE ↗"}
       </button>
       {(busy || sourcesBusy) && (
         <button
@@ -688,9 +711,10 @@ export default function PriceAgent({
             })}</tbody></table>}
             {comparedStores.length > 0 && <button className="text-button" onClick={() => setComparedStores([])}>Show all branches</button>}
           </>}
-          {visibleBranches.length >= 2 && <MultiStorePlanner items={items} stores={visibleBranches} locations={result.storeCoverage}
+          {visibleBranches.length > 0 && <MultiStorePlanner items={items} stores={visibleBranches} locations={result.storeCoverage}
             origin={origin} area={area} gasStop={gasStop} mpg={mpg} gasPrice={gasPrice} gasEconomics={gasEconomics} maxStores={maxStops}
-            minExtraStopSavings={minExtraStopSavings} shoppingPriority={shoppingPriority} />
+            budget={budget} minExtraStopSavings={minExtraStopSavings} shoppingPriority={shoppingPriority}
+            aiRouteRequest={aiRouteRequest} onAiRoute={onAiRoute} />
           }
           <div className={`live-grid ${comparisonView === "table" ? "branch-table-mode" : ""}`}>
             {visibleBranches.filter((store) => !comparedStores.length || comparedStores.includes(store.id)).map((store) => {

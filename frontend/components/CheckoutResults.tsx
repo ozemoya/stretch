@@ -19,6 +19,7 @@ import { nearbyGroceryStores } from "@/lib/nearby-store-display";
 import { readCart, SMART_CART_EVENT, type CartLine } from "@/lib/smart-cart";
 import { readCatalogPicks, type CatalogPick } from "@/lib/catalog-picks";
 import { missingCartItems } from "@/lib/cart-coverage";
+import CartRouteMap from "./CartRouteMap";
 
 export default function CheckoutResults() {
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function CheckoutResults() {
   );
   const [cartLines, setCartLines] = useState<CartLine[]>([]);
   const [catalogPicks, setCatalogPicks] = useState<CatalogPick[]>([]);
+  const [aiRoute, setAiRoute] = useState<{ lat: number; lon: number; name?: string; label?: string }[]>([]);
 
   useEffect(() => {
     setDraft(readCheckoutDraft(window.sessionStorage));
@@ -172,6 +174,7 @@ export default function CheckoutResults() {
                 origin={draft.origin}
                 gasStop={draft.gasStop}
                 gasPrice={effectiveGasPrice}
+                budget={draft.prefs.budget}
                 gasPriceReported={recentStationPrice}
                 gasEconomics={recentStationPrice && draft.gasGallonsNeeded && draft.manualGas > 0 && draft.fuelSource
                   ? { gallonsNeeded: draft.gasGallonsNeeded, baselinePrice: draft.manualGas, stationPrice: draft.fuelSource.dollarsPerGallon }
@@ -192,6 +195,7 @@ export default function CheckoutResults() {
                   setReviewError("");
                   router.push("/plan/review");
                 }}
+                onAiRoute={(places) => setAiRoute(places)}
               />
               {reviewError && <p role="alert">{reviewError}</p>}
               <details className="nearby-grocery-directory" aria-label="Nearby grocery store locations">
@@ -244,6 +248,10 @@ export default function CheckoutResults() {
                   }))
                 }
               />
+              {aiRoute.length > 1 && <section aria-label="AI-selected route">
+                <h3>AI-selected route</h3>
+                <CartRouteMap points={aiRoute} />
+              </section>}
             </section>
           </>
         )}
