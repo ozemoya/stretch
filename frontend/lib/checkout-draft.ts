@@ -12,6 +12,8 @@ const originSchema = z.object({
   lon: z.number().finite().min(-180).max(180),
   label: z.string().min(1),
   zip: z.string().optional(),
+  source: z.enum(["ip", "device", "manual"]).optional(),
+  accuracyMeters: z.number().finite().nonnegative().optional(),
 });
 const gasStopSchema = z.object({
   id: z.string(),

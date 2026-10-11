@@ -51,6 +51,9 @@
 .smart-cart-empty { max-width:560px; }
 .smart-cart-route,.smart-cart-checklist { margin-top:24px; background:#fffaf0; border:2px solid var(--sk-forest); border-radius:17px 11px 18px 13px; box-shadow:5px 6px 0 #61752a36; padding:20px; }
 .smart-cart-route h2,.smart-cart-checklist h2 { color:var(--sk-forest); margin-top:0; }
+.smart-cart-route-link { display:inline-flex; margin:6px 0 12px; }
+.smart-cart-route-pending { border:1px dashed var(--sk-olive); border-radius:12px; padding:16px; background:#f5efd9; }
+.smart-cart-route-pending p:first-child { margin-top:0; }
 .smart-cart-map { width:100%; height:min(40vh,390px); min-height:260px; border:2px solid var(--sk-olive); border-radius:12px; background:#e7eddb; }
 .smart-cart-checklist { background:var(--sk-butter); }
 .smart-cart-checklist > div { border-top:1px dashed var(--sk-olive); padding:9px 0; }

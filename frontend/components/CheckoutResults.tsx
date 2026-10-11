@@ -196,7 +196,7 @@ export default function CheckoutResults() {
               {reviewError && <p role="alert">{reviewError}</p>}
               <details className="nearby-grocery-directory" aria-label="Nearby grocery store locations">
                 <summary>Browse mapped grocery stores · {groceryCount} within {radius} miles</summary>
-                <p className="small">These locations are on the map. Only stores with their own confirmed prices appear in trip comparisons.</p>
+                <p className="small">These locations are on the map. Trip comparisons include stores with prices for your items.</p>
                 <label className="nearby-grocery-search">
                   Find a store
                   <input type="search" value={storeQuery} onChange={(event) => { setStoreQuery(event.target.value); setStoreLimit(20); }} placeholder="Search names or addresses" />
@@ -231,6 +231,7 @@ export default function CheckoutResults() {
                 onPlaces={setNearbyPlaces}
                 onPlacesError={setPlacesError}
                 selectedPlaceId={selectedPlaceId}
+                onSelectPlace={(place) => setSelectedPlaceId(place.id)}
                 onStation={(gasStop, fuelSource) =>
                   update((current) => ({
                     ...current,

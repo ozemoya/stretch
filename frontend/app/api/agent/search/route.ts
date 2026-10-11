@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const observed = p.items.map((item) => ({ item, products: traderJoesObserved(item) }));
     if (observed.some((line) => line.products.length)) emit({
       retailer: "Trader Joe’s", status: "retrieved",
-      detail: "Dated official website observations. Local branch prices and stock remain unverified.",
+      detail: "Dated official website observations. In-store prices and stock may differ.",
       lines: observed,
     }, true);
 
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       // Preserve locations even if a branch-specific price feed is slow.
       comparison ??= { stores: [], storeCoverage: coverage, foundStores: coverage.length,
         checkedAt: new Date().toISOString(), warnings: [],
-        coverage: `Discovered ${coverage.length} mapped grocery locations within ${p.radius} miles of ${mapped.origin.label}. Online catalog prices do not establish branch prices.` };
+        coverage: `Found ${coverage.length} grocery locations within ${p.radius} miles of ${mapped.origin.label}. Online listings are kept separate from store-priced trips.` };
       const retailers = [...new Set(coverage.map((store) => store.retailer))];
       const publicTasks = retailers.map(async (retailer) => {
         if (retailer === "Trader Joe’s") await planningTask;
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     const fallback = {
       stores: [], storeCoverage: [], foundStores: 0, warnings: [],
       checkedAt: new Date().toISOString(),
-      coverage: "Nearby location lookup did not finish in this search. Catalog prices are not verified for your local branch.",
+      coverage: "Nearby store lookup did not finish. Online listings remain available for reference.",
     };
     const result = {
       ...(comparison ?? fallback), publicCatalogs: catalogs,

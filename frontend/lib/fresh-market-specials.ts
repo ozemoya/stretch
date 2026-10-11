@@ -62,7 +62,7 @@ export function freshMarketObservedReport(
     retailer: "The Fresh Market",
     status: lines.some((line) => line.products.length) ? "retrieved" : "failed",
     detail:
-      "In-Store website prices observed for 2099 Peachtree Road NE; observations expire after 24 hours. The displayed package, branch, availability and checkout price must be confirmed before buying. Weekly specials are checked separately.",
+      "Website prices observed for 2099 Peachtree Road NE; observations expire after 24 hours. Check the package, stock and final price before buying. Weekly specials are checked separately.",
     lines,
   };
 }
@@ -277,7 +277,7 @@ export function parseFreshMarketSpecials(
     status: lines.some((l) => l.products.length) ? "retrieved" : "failed",
     detail: addresses.size
       ? `Current weekly advertised offers matched by address and coordinates to ${[...addresses].join("; ")}. Limited sale items only; per-pound prices are rates, not package totals. Stock is unverified. Excluded from full basket rankings.`
-      : "No current weekly offer board matched a nearby physical branch. Prices remain unknown.",
+      : "No current weekly offers matched a nearby store. Prices are unavailable for those items.",
     lines,
   };
 }

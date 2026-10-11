@@ -6,7 +6,7 @@ import OpenMap from "./OpenMap";
 import type { NearbyPlace } from "@/lib/live-data";
 const emptyMapPlaces: NearbyPlace[] = [];
 import type { BasketItem, Catalog, Preferences } from "@/lib/types";
-import { detectLocation } from "@/lib/detect-location";
+import { detectDeviceLocation, detectLocation } from "@/lib/detect-location";
 import { centers, type SearchOrigin } from "@/lib/locations";
 import type { FuelQuote } from "@/lib/live-data";
 import type { GasStop } from "@/lib/gas-stop";
@@ -126,6 +126,7 @@ export default function Stretch({
   const [savedListNotice, setSavedListNotice] = useState("");
   const [searchNotice, setSearchNotice] = useState("");
   const handledSearchRef = useRef<string | null>(null);
+  const locationRequestRef = useRef(0);
   const [isAddItemsOpen, setIsAddItemsOpen] = useState(false);
   const addItemsTriggerRef = useRef<HTMLButtonElement>(null);
   const addItemsModalRef = useRef<HTMLElement>(null);
@@ -196,6 +197,7 @@ export default function Stretch({
     setSavedListNotice(`Saved “${next.name}” on this device.`);
   }
   function loadList(list: SavedList) {
+    const requestId = ++locationRequestRef.current;
     const available = new Set(catalog.products.map((product) => product.id));
     const basket = list.basket.filter((item) => available.has(item.productId));
     if (!basket.length) { setSavedListNotice("The foods in this saved list are no longer in the catalog."); return; }
@@ -213,9 +215,13 @@ export default function Stretch({
       setLocationState("Detecting your current IP area…");
       const controller = new AbortController();
       detectLocation(controller.signal).then((origin) => {
+        if (requestId !== locationRequestRef.current) return;
         setSearchOrigin(origin);
         setLocationState("Approximate location from your IP");
-      }).catch(() => setLocationState("Could not detect your area. Choose one in trip settings."));
+      }).catch(() => {
+        if (requestId === locationRequestRef.current)
+          setLocationState("Could not detect your area. Choose one in trip settings.");
+      });
     }
     setSearch("");
     persistBasket(basket, list.prefs, list.manualOrigin, !list.manualOrigin,
@@ -281,6 +287,20 @@ export default function Stretch({
   const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
   const [ipArea, setIpArea] = useState(true);
   const [locationState, setLocationState] = useState("Detecting your IP area…");
+  async function useDeviceLocation() {
+    const requestId = ++locationRequestRef.current;
+    setLocationState("Finding your device location…");
+    try {
+      const origin = await detectDeviceLocation();
+      if (requestId !== locationRequestRef.current) return;
+      setSearchOrigin(origin);
+      setIpArea(true);
+      setLocationState(`Device location · accurate to about ${origin.accuracyMeters} m`);
+    } catch (error) {
+      if (requestId === locationRequestRef.current)
+        setLocationState(error instanceof Error ? error.message : "Could not get your device location.");
+    }
+  }
   useEffect(() => {
     if (mode !== "planner") return;
     setSavedLists(readSavedLists(window.localStorage));
@@ -315,7 +335,9 @@ export default function Stretch({
         return;
       }
       if (previous.origin) {
-        setLocationState("Approximate location from your IP");
+        setLocationState(previous.origin.source === "device"
+          ? `Device location · accurate to about ${previous.origin.accuracyMeters ?? "unknown"} m`
+          : "Approximate location from your IP");
         return;
       }
     }
@@ -345,15 +367,16 @@ export default function Stretch({
       return;
     }
     const controller = new AbortController();
+    const requestId = locationRequestRef.current;
     detectLocation(controller.signal)
       .then((origin) => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && requestId === locationRequestRef.current) {
           setSearchOrigin(origin);
           setLocationState("Approximate location from your IP");
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted && requestId === locationRequestRef.current)
           setLocationState(
             "Could not detect your area. Choose a starting area below.",
           );
@@ -567,7 +590,7 @@ export default function Stretch({
                   <select
                     value={
                       searchOrigin && ipArea
-                        ? "ip"
+                        ? searchOrigin.source === "device" ? "device" : "ip"
                         : searchOrigin
                           ? prefs.area
                           : "pending"
@@ -575,13 +598,15 @@ export default function Stretch({
                     onChange={(e) => {
                       if (
                         e.target.value === "ip" ||
+                        e.target.value === "device" ||
                         e.target.value === "pending"
                       )
                         return;
                       const area = e.target.value as Preferences["area"];
+                      ++locationRequestRef.current;
                       change("area", area);
                       setIpArea(false);
-                      setSearchOrigin({ ...centers[area], label: area });
+                      setSearchOrigin({ ...centers[area], label: area, source: "manual" });
                       setLocationState("Starting area selected manually");
                     }}
                   >
@@ -589,16 +614,17 @@ export default function Stretch({
                       <option value="pending">{locationState}</option>
                     )}
                     {searchOrigin && ipArea && (
-                      <option value="ip">
-                        Current IP area: {searchOrigin.label}
+                      <option value={searchOrigin.source === "device" ? "device" : "ip"}>
+                        {searchOrigin.source === "device" ? "Device location" : `Approximate IP area: ${searchOrigin.label}`}
                       </option>
                     )}
                     <option value="downtown">Downtown Atlanta</option>
                     <option value="midtown">Midtown Atlanta</option>
                     <option value="decatur">Decatur</option>
                   </select>
-                  <small>{locationState}</small>
+                  <small role="status">{locationState}</small>
                 </label>
+                <button type="button" className="origin-location-button" onClick={useDeviceLocation}>Use my device location</button>
                 {(["budget", "mpg", "gas"] as const).map((k) => (
                   <label key={k}>
                     {

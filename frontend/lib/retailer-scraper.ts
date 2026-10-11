@@ -301,7 +301,7 @@ export async function scrapeRetailers(
       retailer,
       status: lines.some((l) => l.products.length) ? "retrieved" : "failed",
       detail:
-        "Live public US catalog, cached up to five minutes. Default website region; nearby branch prices, stock, dietary suitability and package equivalence are unverified. Excluded from local trip rankings.",
+        "Public US catalog, cached up to five minutes. Prices reflect the website's default region and may differ in-store. Stock, dietary suitability and package equivalence are unknown. Excluded from trip rankings.",
       lines,
     });
   }

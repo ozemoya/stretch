@@ -119,6 +119,15 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
     url.searchParams.set("travelmode", "driving");
     return url.toString();
   })() : null;
+  const gasOnlyDirectionsUrl = !groups.length && home && draft?.gasStop ? (() => {
+    const url = new URL("https://www.google.com/maps/dir/");
+    url.searchParams.set("api", "1");
+    url.searchParams.set("origin", `${home.lat},${home.lon}`);
+    url.searchParams.set("destination", `${home.lat},${home.lon}`);
+    url.searchParams.set("waypoints", `${draft.gasStop.lat},${draft.gasStop.lon}`);
+    url.searchParams.set("travelmode", "driving");
+    return url.toString();
+  })() : null;
 
   function updateLines(next: CartLine[]) {
     if (!writeCart(localStorage, next)) { setMessage("Could not save cart changes on this device."); return; }
@@ -154,16 +163,39 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
     setChecked(next);
     try { localStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)); } catch { /* Browsers may block storage. */ }
   }
+  const routePanel = checkout && <section className="smart-cart-route" aria-labelledby="cart-route-title">
+    <h2 id="cart-route-title">Your road route</h2>
+    {route && home ? <>
+      <p>{draft?.origin?.label ?? `${draft?.prefs.area ?? "Starting"} area`} → {route.order.map((id) => groups.find((group) => group.store.id === id)?.store.name).join(" → ")}
+        {draft?.gasStop ? ` → ${draft.gasStop.name}` : ""} → starting area</p>
+      <CartRouteMap points={[home, ...route.order.map((id) => groups.find((group) => group.store.id === id)!.store), ...(draft?.gasStop ? [draft.gasStop] : [])]} />
+      <p>{route.miles.toFixed(1)} road miles · about {Math.round(route.minutes)} minutes · {groups.length} grocery {groups.length === 1 ? "stop" : "stops"}</p>
+      {draft && <p>{draft.prefs.mpg} MPG · {draft.fuelSource?.fuelType ?? "Fuel grade not supplied"} · ${effectiveGasPrice.toFixed(3)}/gal · approximately {(route.miles / draft.prefs.mpg).toFixed(2)} gallons used</p>}
+      {directionsUrl && <a className="cta smart-cart-route-link" href={directionsUrl} target="_blank" rel="noreferrer">Open full trip directions ↗</a>}
+    </> : !groups.length && stationOnlyMiles !== null && home && draft?.gasStop ? <>
+      <p>{draft.origin?.label ?? `${draft.prefs.area} area`} → {draft.gasStop.name} → starting area</p>
+      <CartRouteMap points={[home, draft.gasStop]} />
+      <p>{stationOnlyMiles.toFixed(1)} road miles. This route visits the gas station only; online grocery listings do not identify a confirmed physical store.</p>
+      {gasOnlyDirectionsUrl && <a className="cta smart-cart-route-link" href={gasOnlyDirectionsUrl} target="_blank" rel="noreferrer">Open gas-stop directions ↗</a>}
+      <p><Link href="/plan/results">Choose a store-priced grocery product</Link> to add its store to the trip route.</p>
+    </> : <div className="smart-cart-route-pending" role="status">
+      <p>{routeStatus === "loading" ? "Calculating your road route…" : routeStatus === "error" ? "Road routing is unavailable right now." :
+        "Choose a physical grocery store or gas station to see a driving route."}</p>
+      {!!tripPicks.length && <p>Online catalog items do not identify a confirmed store location, so they cannot be added to the driving route.</p>}
+      <Link href="/plan/results">Choose stops on the map ↗</Link>
+    </div>}
+  </section>;
   if (lines === null) return <main className="smart-cart-page"><p role="status">Opening your cart…</p></main>;
   return <main className="smart-cart-page">
     <div className="smart-cart-heading"><div><p className="eyebrow">YOUR TRIP, YOUR WAY</p><h1>{checkout ? "Trip checkout" : "Smart Cart"}</h1>
-      <p>{checkout ? "Review your store lists, route, and fuel estimate before saving your plan." : "Keep each item with the branch that supplied its price. Plan your drive before you shop."}</p></div>
+      <p>{checkout ? "Review your store lists, route, and fuel estimate before saving your plan." : "Keep each item with the store that supplied its price. Plan your drive before you shop."}</p></div>
       <Link href={checkout ? "/cart" : "/plan/results"}>← {checkout ? "Edit Smart Cart" : "Compare more stores"}</Link></div>
+    {routePanel}
     {!tripLines.length && !tripPicks.length ? <section className="smart-cart-empty"><h2>Your cart is empty</h2>
       <p>Choose products on Stores & Gas to build a trip.</p><Link className="cta" href="/plan/results">Find groceries ↗</Link></section> : <>
       <div className="smart-cart-grid"><section className="smart-cart-stores" aria-label="Store shopping lists">
         {tripPicks.length > 0 && <article className="smart-cart-store catalog-picks"><div className="smart-cart-store-head"><div>
-          <h2>Products picked from online catalogs</h2><p>These listings are saved for you, but no nearby branch price is confirmed yet.</p></div></div>
+          <h2>Products picked from online catalogs</h2><p>These are online prices. In-store prices may differ.</p></div></div>
           {tripPicks.map((pick) => <div className="smart-cart-line" key={pick.id}>
             <ProductImage name={pick.productName} brand={pick.brand} size={pick.size} retailerImageUrl={pick.imageUrl}
               retailerSourceUrl={pick.productUrl} />
@@ -176,7 +208,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
               <button type="button" onClick={() => updatePicks(picks.filter((entry) => entry.id !== pick.id))}>Remove</button></div>
           </div>)}
           <p className="smart-cart-subtotal">Online reference subtotal <strong>{money(referenceCents)}</strong></p>
-          <p className="small">These prices help form a preliminary estimate. They are not confirmed for a nearby branch and cannot finalize a verified shopping plan.</p>
+          <p className="small">Online items can be reviewed here. Choose store-priced items to finalize the trip.</p>
         </article>}
         {displayGroups.map((group) => <article className="smart-cart-store" key={group.store.id}>
           <div className="smart-cart-store-head"><div><h2>{group.store.name}</h2><p>{group.store.address}</p></div>
@@ -208,7 +240,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
           <p className="smart-cart-subtotal">Selected subtotal <strong>{money(group.subtotalCents)}</strong></p>
         </article>)}
       </section><aside className="smart-cart-summary"><h2>Trip estimate</h2>
-        <p>Branch-confirmed groceries <strong>{groups.length ? money(groceryCents) : "Not yet priced"}</strong></p>
+        <p>Store-priced groceries <strong>{groups.length ? money(groceryCents) : "Not yet priced"}</strong></p>
         {tripPicks.length > 0 && <p>Online reference items <strong>{money(referenceCents)}</strong></p>}
         <p>Stores <strong>{groups.length} / 3</strong></p>
         <p>Gas station <strong>{draft?.gasStop?.name ?? "Choose one first"}</strong></p>
@@ -233,7 +265,7 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
           : tripTotalCents !== null ? <p className="smart-cart-grand">{gasPurchaseCents !== null ? "Estimated total · food + gas" : "Food + driving gas estimate"} <strong>{money(tripTotalCents)}</strong></p>
             : <p className="smart-cart-grand">{routeStatus === "loading" ? "Calculating trip estimate" : "Priced food + fill-up subtotal"} <strong>{routeStatus === "loading" ? "…" : money(pricedSubtotalCents)}</strong></p>}
         {preliminaryTotalCents === null && tripTotalCents === null && routeStatus !== "loading" && <p className="small">Driving fuel is not included until a road route is available. Online catalog prices, if any, are estimates for reference only.</p>}
-        {preliminaryTotalCents !== null && <p className="small">Online product prices are references, not local shelf prices. Driving includes the selected gas station and any branch-confirmed grocery stops; travel to online-only retailers is not included. This is not a complete trip quote.</p>}
+        {preliminaryTotalCents !== null && <p className="small">Online prices may differ in-store. Driving includes the selected gas station and priced grocery stops, but excludes trips to online-only retailers. This is a partial estimate.</p>}
         {gasDetourSavingsCents !== null && <p className="small" role="status">Against your entered ${draft!.manualGas.toFixed(3)}/gal baseline and the route without a gas stop, this stop {gasDetourSavingsCents > 0 ? `could save ${money(gasDetourSavingsCents)}` : `adds about ${money(-gasDetourSavingsCents)} in cost`}. This comparison is an estimate.</p>}
         {draft?.gasStop && gasPurchaseCents === null && <p className="small">Fill-up cost is excluded {recentStationReport ? "until you enter gallons to buy." : "because this station has no recent reported pump price."}</p>}
         <p className="small">Driving fuel is fuel used for this route. A fill-up is added only when the selected station has a recent reported price and you enter gallons. Taxes, fees, discounts, stock, and checkout prices are not confirmed or included.</p>
@@ -241,17 +273,10 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
         {checkout ? <button className="cta" type="button" disabled={!canProceed || tripPicks.length > 0 || !route || tripTotalCents === null || groups.length > 3} onClick={finalize}>Finalize Shopping Plan</button>
           : canProceed ? <Link className="cta" href="/cart/checkout">Continue to checkout ↗</Link>
             : <button className="cta" type="button" disabled>Continue to checkout ↗</button>}
-        {tripPicks.length > 0 && <p className="small" role="status">To finalize a complete trip with a route to every store, replace online reference items with branch-confirmed listings.</p>}
+        {tripPicks.length > 0 && <p className="small" role="status">Choose store-priced items to include every grocery stop in the route and finalize your trip.</p>}
         {saved && <p role="status">Shopping plan saved on this device. Use the checklist below when you shop.</p>}
         {message && <p role="alert">{message}</p>}
       </aside></div>
-      {checkout && route && home && <section className="smart-cart-route"><h2>Your route</h2>
-        <p>{draft?.origin?.label ?? `${draft?.prefs.area ?? "Starting"} area`} → {route.order.map((id) => groups.find((group) => group.store.id === id)?.store.name).join(" → ")}
-          {draft?.gasStop ? ` → ${draft.gasStop.name}` : ""} → starting area</p>
-        <CartRouteMap points={[home, ...route.order.map((id) => groups.find((group) => group.store.id === id)!.store), ...(draft?.gasStop ? [draft.gasStop] : [])]} />
-        <p>{route.miles.toFixed(1)} road miles · about {Math.round(route.minutes)} minutes · {groups.length} grocery {groups.length === 1 ? "stop" : "stops"}</p>
-        {draft && <p>{draft.prefs.mpg} MPG · {draft.fuelSource?.fuelType ?? "Fuel grade not supplied"} · ${effectiveGasPrice.toFixed(3)}/gal · approximately {(route.miles / draft.prefs.mpg).toFixed(2)} gallons used</p>}
-      </section>}
       {saved && <section className="smart-cart-checklist"><h2>Shopping checklist</h2>{groups.map((group) => <div key={group.store.id}>
         <h3>{group.store.name}</h3><p>{group.store.address}</p><ul>{group.lines.map((line) => <li key={line.id}>
           <label><input type="checkbox" checked={!!checked[line.id]} onChange={(event) => toggleCheck(line.id, event.target.checked)} /> {line.quantity} × {line.product.productName} · {line.product.size}</label></li>)}</ul></div>)}

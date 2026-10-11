@@ -319,7 +319,7 @@ export async function publicPublixReport(context: ScrapeContext): Promise<Scrape
         status: lines.some((line) => line.products.length)
           ? "retrieved"
           : "failed",
-        detail: `Publix public weekly ad for website-selected store ${snapshot.storeNumber}, cached up to five minutes. Limited advertised packages only; nearby branch prices and stock remain unverified.`,
+        detail: `Publix public weekly ad for website-selected store ${snapshot.storeNumber}, cached up to five minutes. Limited advertised packages only; in-store price and stock may differ.`,
         lines,
       };
     } catch (error) {

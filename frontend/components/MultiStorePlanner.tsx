@@ -167,7 +167,7 @@ export default function MultiStorePlanner({ items, stores, locations, origin, ar
       {gasStop && !gasEconomics && <p className="small">The selected gas station has no recent reported price or fill-up amount, so Mix & Match does not recommend a detour to it.</p>}
       {routeStatus === "loading" && <p role="status">Checking road distances for the priced stores…</p>}
       {routeStatus === "unavailable" && <p role="status">Road routes are unavailable right now, so Stretch cannot quote a Mix & Match total.</p>}
-      {optimization?.unresolved.length ? <p>Some foods have no matching branch price: {items.filter((item) => optimization.unresolved.includes(item.id)).map((item) => item.name).join(", ")}. No complete route can be recommended.</p> : null}
+      {optimization?.unresolved.length ? <p>Still missing store prices for: {items.filter((item) => optimization.unresolved.includes(item.id)).map((item) => item.name).join(", ")}. No complete route can be recommended.</p> : null}
       {optimization && !optimization.unresolved.length && <>
         <div className="mix-strategies" role="group" aria-label="Shopping strategies">
           {([ ["Balanced", optimization.balanced], ["Cheapest overall", optimization.cheapest], ["Fewest stops", optimization.fewest] ] as const)

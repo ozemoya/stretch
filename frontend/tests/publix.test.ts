@@ -183,7 +183,7 @@ it("fetches one bounded anonymous ad for concurrent baskets and keeps its timest
   expect(cached.lines[0].products[0].retrievedAt).toBe(
     new Date(at).toISOString(),
   );
-  expect(cached.detail).toContain("branch prices and stock remain unverified");
+  expect(cached.detail).toContain("in-store price and stock may differ");
   expect(adapter.checkBranches).toBeUndefined();
 });
 

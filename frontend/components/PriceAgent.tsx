@@ -473,7 +473,7 @@ export default function PriceAgent({
   function addVerifiedProduct(item: AgentItem, store: StoreCheck, location: StoreCoverage, productId: string) {
     const product = store.lines.find((line) => line.item.id === item.id)?.candidates.find((entry) => entry.id === productId);
     const line = product && cartLine(item, product, store, location);
-    if (!line) { setCartMessage("This product needs a matching branch price and package before it can be added."); return; }
+    if (!line) { setCartMessage("Choose a priced product at this store with the right package size."); return; }
     const options = (result?.stores ?? []).flatMap((candidateStore) => {
       const candidateLocation = result?.storeCoverage.find((entry) => entry.id === candidateStore.id);
       const candidateLine = candidateStore.lines.find((entry) => entry.item.id === item.id);
@@ -602,7 +602,7 @@ export default function PriceAgent({
           <p className="small">
             {completeBranchCount
               ? `${completeBranchCount} nearby ${completeBranchCount === 1 ? "store has" : "stores have"} a complete priced basket.`
-              : "No nearby store has a complete verified basket yet."}
+              : "No store has prices for your full list yet."}
             {visibleCatalogs.length
               ? ` ${visibleCatalogs.length} online ${visibleCatalogs.length === 1 ? "catalog" : "catalogs"} available for reference.`
               : ""}{" "}
@@ -610,7 +610,7 @@ export default function PriceAgent({
           </p>
           <p className="small" role="status">
             {visibleBranches.length
-              ? "To add groceries: open a verified branch below, review a matching package, then choose Add to Smart Cart."
+              ? "To add groceries, open a store below, check the package, then choose Add to Smart Cart."
               : <>You can save products from the online catalogs below to Smart Cart now. Only verified store prices count toward the trip total. <a href="/cart/demo">Try the sample walkthrough ↗</a></>}
           </p>
           {(completeTrips.length > 0 || (completeBranchCount > 0 && routeBusy)) && <div
@@ -680,7 +680,7 @@ export default function PriceAgent({
             />
           )}
           {visibleBranches.length > 0 && <>
-            <div className="comparison-toolbar"><strong>Compare verified branches</strong><div><button aria-pressed={comparisonView === "table"} onClick={() => setComparisonView("table")}>Table</button><button aria-pressed={comparisonView === "cards"} onClick={() => setComparisonView("cards")}>Cards</button></div></div>
+            <div className="comparison-toolbar"><strong>Compare store prices</strong><div><button aria-pressed={comparisonView === "table"} onClick={() => setComparisonView("table")}>Table</button><button aria-pressed={comparisonView === "cards"} onClick={() => setComparisonView("cards")}>Cards</button></div></div>
             {comparisonView === "table" && <table className="comparison-table"><caption className="small">Select stores to focus the product breakdown below. Totals require reviewed packages and a route.</caption><thead><tr><th>Store</th><th>Coverage</th><th>Groceries</th><th>Drive / fuel</th><th>Trip total</th></tr></thead><tbody>{visibleBranches.map((store) => {
               const trip = completeTrips.find((entry) => entry.id === store.id);
               const total = reviewedTotal(store, choices[store.id] ?? {});
@@ -834,7 +834,7 @@ export default function PriceAgent({
                       ? "Incomplete basket — missing or unreviewed prices"
                       : `Reviewed groceries: $${(total / 100).toFixed(2)}`}
                   </strong>
-                  {total !== null && !canReviewStore(store) && <p className="small">A selected product could not be verified for this branch.</p>}
+                  {total !== null && !canReviewStore(store) && <p className="small">A selected product has no price at this store.</p>}
                   {total !== null &&
                     totals.length >= 2 &&
                     total === Math.min(...totals) && (

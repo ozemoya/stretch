@@ -8,6 +8,8 @@ export type SearchOrigin = {
   lon: number;
   label: string;
   zip?: string;
+  source?: "ip" | "device" | "manual";
+  accuracyMeters?: number;
 };
 export function validCoordinates(lat: unknown, lon: unknown): lat is number {
   return (

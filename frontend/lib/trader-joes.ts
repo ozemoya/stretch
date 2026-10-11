@@ -79,5 +79,5 @@ export async function traderJoesReport(items:AgentItem[],plan?:SearchPlan,signal
    })();
    pending.set(key,task);try{const line=await task;if(!signal?.aborted)recent.set(key,{at:Date.now(),line});return line;}finally{pending.delete(key);}
  }));
- return {retailer,status:lines.some(l=>l.products.length)?"retrieved":"failed",detail:"Prices returned by Trader Joe’s public online catalog; observation time is shown on each item. Local branch availability and checkout prices still require confirmation.",lines};
+ return {retailer,status:lines.some(l=>l.products.length)?"retrieved":"failed",detail:"Prices returned by Trader Joe’s public online catalog; observation time is shown on each item. In-store stock and checkout prices may differ.",lines};
 }

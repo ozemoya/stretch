@@ -45,8 +45,8 @@ export default function CartDemoPage() {
       <p>Illustrative driving fuel <strong>{money(fuelCents)}</strong></p>
       <p className="smart-cart-grand">Example total <strong>{money(groceryCents + fuelCents)}</strong></p>
       <p className="small">The $2.40 fuel figure is an example, not a route calculation. With all four items added once, the total is $21.56.</p>
-      <Link className="cta" href="/plan/results">Find branch-priced products ↗</Link>
+      <Link className="cta" href="/plan/results">Find store-priced products ↗</Link>
     </aside></div>
-    <p className="smart-cart-gas">In live results: open a verified branch card, review a matching package, and click <strong>Add to Smart Cart</strong>. Online catalog listings without a branch price cannot be added to a priced trip.</p>
+    <p className="smart-cart-gas">In live results: open a store card, review a matching package, and click <strong>Add to Smart Cart</strong>. Online-only listings can be saved for reference but cannot complete a priced trip.</p>
   </main>;
 }

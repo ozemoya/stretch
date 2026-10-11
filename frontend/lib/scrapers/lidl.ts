@@ -189,7 +189,7 @@ export const lidlScraper: RetailerScraper = {
     }));
     return {
       retailer, status: lines.some(line => line.products.length) ? "retrieved" : "failed",
-      detail: "Live public US catalog, cached up to five minutes. Local branch prices remain unverified.",
+      detail: "Public US catalog, cached up to five minutes. Online prices may differ in-store.",
       lines,
     };
   },

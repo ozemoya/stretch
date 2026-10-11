@@ -156,7 +156,7 @@ function TripSummary({ draft, review }: { draft: CheckoutDraft; review: TripRevi
             <button type="button" className="trip-handoff-primary" disabled={handoffBusy} onClick={() => void openInstacartList()}>
               {handoffBusy ? "CREATING SHOPPING LIST…" : "SEND LIST TO INSTACART ↗"}
             </button>
-            <p className="small">Instacart will ask you to select {review.storeName} and review the matched items before adding them to its cart. The exact branch and final prices must be confirmed there.</p>
+            <p className="small">Instacart will ask you to select {review.storeName} and review the matched items before adding them to its cart. Check the selected store and final prices there.</p>
           </>}
           {shopUrl && <a className="trip-handoff-shop" href={shopUrl} target="_blank" rel="noreferrer">OPEN {review.storeName.toUpperCase()} SHOP ↗</a>}
           <button type="button" className="trip-handoff-copy" onClick={() => void copyList()}>COPY SHOPPING LIST</button>

@@ -40,7 +40,7 @@ export function mergeCatalogReports(
       ? "retrieved"
       : incoming.status,
     detail: hasProducts && /no working public scraper|no prices scraped|no public scraper/i.test(mergedDetail)
-      ? "Online catalog listing found; nearby branch price and stock remain unverified."
+      ? "Online listing found. In-store price and stock may differ."
       : mergedDetail,
     lines,
   };

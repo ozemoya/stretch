@@ -7,7 +7,7 @@ import "./smart-cart.css";
 export const metadata: Metadata = {
   title: "Stretch — bring more home",
   description:
-    "Plan an Atlanta-area grocery trip with available branch-verified prices and estimated driving fuel.",
+    "Plan an Atlanta-area grocery trip using available store prices and estimated driving fuel.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

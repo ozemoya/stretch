@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { normalizeIpLocation, detectLocation } from "../lib/detect-location";
+import { normalizeIpLocation, detectLocation, detectDeviceLocation } from "../lib/detect-location";
 import { parseOrigin } from "../lib/locations";
 import { publicIp, POST } from "../app/api/location/route";
 import { groceryCoverage } from "../lib/retailer-coverage";
@@ -22,10 +22,27 @@ it("keeps arbitrary visitor coordinates and strips provider IP/network details",
     lat: 40.713,
     lon: -74.006,
     label: "New York, New York, United States",
+    source: "ip",
     zip: "10007",
   });
   expect(() => normalizeIpLocation({ ...city, latitude: 100 })).toThrow();
   expect(() => normalizeIpLocation({ ...city, success: false })).toThrow();
+});
+it("uses device coordinates and reports the browser's accuracy only after a location request", async () => {
+  const getCurrentPosition = vi.fn((success) => success({ coords: {
+    latitude: 33.7487521, longitude: -84.3876844, accuracy: 17.4,
+  } }));
+  vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+  expect(await detectDeviceLocation()).toEqual({
+    lat: 33.7487521, lon: -84.3876844, label: "Your device location",
+    source: "device", accuracyMeters: 17,
+  });
+  expect(getCurrentPosition).toHaveBeenCalledWith(expect.any(Function), expect.any(Function),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 });
+});
+it("keeps the prior area usable when device permission is denied", async () => {
+  vi.stubGlobal("navigator", { geolocation: { getCurrentPosition: (_success: unknown, error: (value: {code: number}) => void) => error({ code: 1 }) } });
+  await expect(detectDeviceLocation()).rejects.toThrow("Location permission was denied");
 });
 it("falls back to the visitor IP when direct browser geolocation fails", async () => {
   const fetcher = vi

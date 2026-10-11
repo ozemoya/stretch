@@ -24,6 +24,7 @@ export default function StopFinder({
   onPlaces,
   onPlacesError,
   selectedPlaceId,
+  onSelectPlace,
 }: {
   area: Area;
   origin: SearchOrigin | null;
@@ -37,6 +38,7 @@ export default function StopFinder({
   onPlaces?: (places: NearbyPlace[]) => void;
   onPlacesError?: (error: string) => void;
   selectedPlaceId?: string | null;
+  onSelectPlace?: (place: NearbyPlace) => void;
 }) {
   const selectedStationId = selectedStation?.id ?? null;
   const [localRadius, setLocalRadius] = useState(5);
@@ -150,7 +152,7 @@ export default function StopFinder({
   </ul>;
   return (
     <article
-      className={"stop-finder" + (compact ? " compact-stop-finder" : "")}
+      className={"stop-finder" + (compact ? " compact-stop-finder" : "") + (selectedStationId || selectedPlaceId ? " route-selected" : "")}
     >
       {!compact && <p className="eyebrow">GROCERIES + GAS · ONE GOOD ROUTE</p>}
       <h2 id="live-title">Nearby stores and gas</h2>
@@ -218,8 +220,10 @@ export default function StopFinder({
           origin={origin}
           radius={radius}
           places={visible}
+          routePlaces={places}
           selectedFuelId={selectedStationId}
           selectedPlaceId={selectedPlaceId}
+          onSelectPlace={onSelectPlace}
           onSelectFuel={(place) =>
             onStation(
               {

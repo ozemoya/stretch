@@ -81,5 +81,5 @@ it("does not say no prices were found after a catalog listing arrives", () => {
     lines: [{ item, products: [] }] };
   const merged = mergeCatalogReports(unavailable, base);
   expect(merged.lines[0].products).toHaveLength(1);
-  expect(merged.detail).toBe("Online catalog listing found; nearby branch price and stock remain unverified.");
+  expect(merged.detail).toBe("Online listing found. In-store price and stock may differ.");
 });

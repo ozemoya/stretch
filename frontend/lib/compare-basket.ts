@@ -182,7 +182,7 @@ export async function compareBasket(
           )!;
           row.status = store.lines.every((l) => l.error) ? "failed" : "checked";
           row.detail =
-            "Kroger API search (up to ten items, two matched branches, at most three 20-product pages per item). More catalog results may exist; remaining items and stock are unverified.";
+            "Kroger API search (up to ten items, two matched stores, at most three 20-product pages per item). More catalog results may exist; some items and stock may still be unknown.";
           checkedStores.push({
             ...store,
             id: row.id,

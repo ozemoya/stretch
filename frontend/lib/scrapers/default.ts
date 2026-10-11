@@ -120,6 +120,6 @@ export const defaultScraper: RetailerScraper = {
       }
     }
     return { retailer, status: lines.some((line) => line.products.length) ? "retrieved" : "failed",
-      detail: "Public product catalog. Online prices are not verified for a physical branch.", lines };
+      detail: "Public product catalog. Online prices may differ in-store.", lines };
   },
 };

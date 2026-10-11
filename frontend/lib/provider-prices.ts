@@ -643,7 +643,7 @@ export async function providerReports(
               ? "pending"
               : "failed",
           detail:
-            "Website search in progress. Branch prices remain unverified.",
+            "Website search in progress. Prices will appear when available.",
           lines: items.map(
             (i) =>
               group.find((l) => l.item.id === i.id) ?? {
@@ -669,7 +669,7 @@ export async function providerReports(
         : ordered.some((l) => l.searchStatus === "searching")
           ? "pending"
           : "failed",
-      detail: `Website collection for ZIP ${zip}. Advertised online prices; branch, stock and in-store price equivalence are unverified. Excluded from trip rankings.`,
+      detail: `Website collection for ZIP ${zip}. Online prices may differ in-store; excluded from trip rankings.`,
       lines: ordered,
     };
   });
