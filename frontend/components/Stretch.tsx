@@ -107,7 +107,7 @@ export default function Stretch({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [homeArea, setHomeArea] = useState("ip");
+  const [homeArea, setHomeArea] = useState("device");
   useEffect(() => {
     if (searchParams.has("q")) setSearch(searchParams.get("q") ?? "");
     const panel = searchParams.get("panel");
@@ -212,15 +212,15 @@ export default function Stretch({
       setLocationState("Starting area selected manually");
     } else {
       setSearchOrigin(null);
-      setLocationState("Detecting your current IP area…");
+      setLocationState("Finding your device location…");
       const controller = new AbortController();
       detectLocation(controller.signal).then((origin) => {
         if (requestId !== locationRequestRef.current) return;
         setSearchOrigin(origin);
-        setLocationState("Approximate location from your IP");
-      }).catch(() => {
+        setLocationState(`Device location · accurate to about ${origin.accuracyMeters} m`);
+      }).catch((error) => {
         if (requestId === locationRequestRef.current)
-          setLocationState("Could not detect your area. Choose one in trip settings.");
+          setLocationState(error instanceof Error ? error.message : "Choose a starting area in trip settings.");
       });
     }
     setSearch("");
@@ -285,8 +285,9 @@ export default function Stretch({
   const [gasStop, setGasStop] = useState<GasStop | null>(null);
   const [manualGas, setManualGas] = useState(defaults.gas);
   const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
+  // Retain the saved draft's legacy field name for automatic device location.
   const [ipArea, setIpArea] = useState(true);
-  const [locationState, setLocationState] = useState("Detecting your IP area…");
+  const [locationState, setLocationState] = useState("Finding your device location…");
   async function useDeviceLocation() {
     const requestId = ++locationRequestRef.current;
     setLocationState("Finding your device location…");
@@ -308,6 +309,7 @@ export default function Stretch({
     const requestedArea = searchParams.get("area");
     const selectedArea = requestedArea && Object.prototype.hasOwnProperty.call(centers, requestedArea)
       ? requestedArea as Preferences["area"] : null;
+    const useCurrentLocation = searchParams.get("location") === "device";
     const previous = readCheckoutDraft(window.sessionStorage);
     if (previous) {
       setBasket(previous.basket);
@@ -324,7 +326,7 @@ export default function Stretch({
         setLocationState("Starting area selected manually");
         return;
       }
-      if (!previous.ipArea) {
+      if (!previous.ipArea && !useCurrentLocation) {
         setSearchOrigin(
           previous.origin ?? {
             ...centers[previous.prefs.area],
@@ -334,12 +336,8 @@ export default function Stretch({
         setLocationState("Starting area selected manually");
         return;
       }
-      if (previous.origin) {
-        setLocationState(previous.origin.source === "device"
-          ? `Device location · accurate to about ${previous.origin.accuracyMeters ?? "unknown"} m`
-          : "Approximate location from your IP");
-        return;
-      }
+      // Refresh automatic locations rather than restoring an old IP or device fix.
+      setSearchOrigin(null);
     }
     const savedSettings = readSavedSettings(window.localStorage);
     if (!previous && savedSettings) {
@@ -352,7 +350,7 @@ export default function Stretch({
         setLocationState("Starting area selected manually");
         return;
       }
-      if (savedSettings.manualOrigin) {
+      if (savedSettings.manualOrigin && !useCurrentLocation) {
         setIpArea(false);
         setSearchOrigin(savedSettings.manualOrigin);
         setLocationState("Starting area selected manually");
@@ -368,17 +366,19 @@ export default function Stretch({
     }
     const controller = new AbortController();
     const requestId = locationRequestRef.current;
+    setIpArea(true);
+    setLocationState("Finding your device location…");
     detectLocation(controller.signal)
       .then((origin) => {
         if (!controller.signal.aborted && requestId === locationRequestRef.current) {
           setSearchOrigin(origin);
-          setLocationState("Approximate location from your IP");
+          setLocationState(`Device location · accurate to about ${origin.accuracyMeters} m`);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!controller.signal.aborted && requestId === locationRequestRef.current)
           setLocationState(
-            "Could not detect your area. Choose a starting area below.",
+            error instanceof Error ? error.message : "Choose a starting area below.",
           );
       });
     return () => controller.abort();
@@ -547,7 +547,8 @@ export default function Stretch({
                 if (!search.trim()) return;
                 const params = new URLSearchParams();
                 params.set("q", search.trim());
-                if (homeArea !== "ip") params.set("area", homeArea);
+                if (homeArea === "device") params.set("location", "device");
+                else params.set("area", homeArea);
                 router.push(`/plan?${params.toString()}`);
               }}>
                 <label htmlFor="home-food-search">What do you need?</label>
@@ -559,7 +560,7 @@ export default function Stretch({
                 <div className="home-search-footer">
                   <label htmlFor="home-area">Starting area</label>
                   <select id="home-area" value={homeArea} onChange={(event) => setHomeArea(event.target.value)}>
-                    <option value="ip">Near me</option>
+                    <option value="device">Near me · current location</option>
                     <option value="downtown">Downtown Atlanta</option>
                     <option value="midtown">Midtown Atlanta</option>
                     <option value="decatur">Decatur</option>
@@ -582,7 +583,7 @@ export default function Stretch({
             <details className="trip-settings">
               <summary>
                 Trip settings · ${prefs.budget} budget ·{" "}
-                {searchOrigin?.label || "Detecting your area…"}
+                {searchOrigin?.label || "Choose a starting area"}
               </summary>
               <div className="settings">
                 <label>
@@ -590,14 +591,13 @@ export default function Stretch({
                   <select
                     value={
                       searchOrigin && ipArea
-                        ? searchOrigin.source === "device" ? "device" : "ip"
+                        ? "device"
                         : searchOrigin
                           ? prefs.area
                           : "pending"
                     }
                     onChange={(e) => {
                       if (
-                        e.target.value === "ip" ||
                         e.target.value === "device" ||
                         e.target.value === "pending"
                       )
@@ -614,8 +614,8 @@ export default function Stretch({
                       <option value="pending">{locationState}</option>
                     )}
                     {searchOrigin && ipArea && (
-                      <option value={searchOrigin.source === "device" ? "device" : "ip"}>
-                        {searchOrigin.source === "device" ? "Device location" : `Approximate IP area: ${searchOrigin.label}`}
+                      <option value="device">
+                        Current device location
                       </option>
                     )}
                     <option value="downtown">Downtown Atlanta</option>

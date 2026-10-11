@@ -45,11 +45,15 @@ export default function CheckoutResults() {
   const [catalogPicks, setCatalogPicks] = useState<CatalogPick[]>([]);
 
   useEffect(() => {
-    const opened = readCheckoutDraft(window.sessionStorage);
-    setDraft(opened);
-    if (opened) setSelectedPreviewStops(readRoutePreviewStops(window.sessionStorage,
-      opened.origin ?? centers[opened.prefs.area]));
-  }, []);
+    const saved = readCheckoutDraft(window.sessionStorage);
+    if (saved?.origin?.source === "ip") {
+      router.replace("/plan?panel=settings");
+      return;
+    }
+    setDraft(saved);
+    if (saved) setSelectedPreviewStops(readRoutePreviewStops(window.sessionStorage,
+      saved.origin ?? centers[saved.prefs.area]));
+  }, [router]);
 
   useEffect(() => {
     const syncCart = () => {
@@ -100,10 +104,10 @@ export default function CheckoutResults() {
     Number.isFinite(reportAge) && reportAge >= 0 && reportAge <= 48 * 60 * 60 * 1000;
   const effectiveGasPrice = recentStationPrice ? draft!.prefs.gas : draft?.manualGas ?? 0;
   const missingItems = draft ? missingCartItems(draft.items, cartLines, catalogPicks) : [];
-  const canCheckout = !!draft?.items.length && missingItems.length === 0;
+  const canCheckout = !!draft?.gasStop && !!draft.items.length && missingItems.length === 0;
 
   return (
-    <div className="trip-app">
+    <div className="trip-app results-trip">
       <TripFlowHeader
         step={draft === null || draft?.items.length === 0 ? 1 : 2}
       />
@@ -122,15 +126,7 @@ export default function CheckoutResults() {
             Map & route
           </button>
         </div>
-        {!!draft?.items.length && (canCheckout
-          ? <Link className="results-checkout" href="/cart">Checkout →</Link>
-          : <button className="results-checkout" type="button" disabled
-              title="Choose a product for every grocery on your list">Checkout →</button>)}
       </div>
-      {!!draft?.items.length && !draft.gasStop &&
-        <p className="results-checkout-hint">To see the grocery drive, open Map & route and choose up to {maxRouteStores} grocery stores. A gas stop is optional.</p>}
-      {missingItems.length > 0 &&
-        <p className="results-checkout-hint" role="status">Choose a product for {missingItems.map((item) => item.name).join(", ")} before checkout.</p>}
       <main data-view={workspaceTab} id="results-main" className="results-page">
         {draft === undefined ? (
           <p role="status">Opening your trip…</p>
@@ -241,6 +237,7 @@ export default function CheckoutResults() {
                 {groceryStores.length > storeLimit && <button type="button" className="directory-more" onClick={() => setStoreLimit((count) => count + 20)}>Show 20 more stores</button>}
               </details>
             </section>
+            <aside className="results-sidebar" aria-label="Nearby stops and checkout">
             <section
               className="results-map-panel"
               aria-label="Nearby stores and gas map"
@@ -257,7 +254,9 @@ export default function CheckoutResults() {
                           if (draft) writeRoutePreviewStops(window.sessionStorage, next,
                             draft.origin ?? centers[draft.prefs.area]);
                         } }}>×</button></li>)}</ol>
-                  <Link href="/cart/checkout">See the full grocery route at checkout ↗</Link>
+                  {canCheckout
+                    ? <Link href="/cart/checkout">See the full grocery route at checkout ↗</Link>
+                    : <small>Choose your groceries and a gas station before checkout. Your route is shown on this map.</small>}
                   <small>These are mapped stops. Online prices are not confirmed for these branches.</small></>
                   : <span>Choose green markers or store addresses to add stops. The map will draw the full drive.</span>}
                 {routeNotice && <span role="alert">{routeNotice}</span>}
@@ -293,6 +292,24 @@ export default function CheckoutResults() {
                 }
               />
             </section>
+              <div className="results-checkout-panel">
+                <div className="results-checkout-action" tabIndex={!canCheckout ? 0 : undefined}
+                  role={!canCheckout ? "group" : undefined}
+                  aria-label={!canCheckout ? "Checkout unavailable" : undefined}
+                  aria-describedby={!canCheckout ? "results-checkout-feedback" : undefined}>
+                  {canCheckout
+                    ? <Link className="results-checkout" href="/cart">Checkout →</Link>
+                    : <button className="results-checkout" type="button" disabled aria-describedby="results-checkout-feedback">Checkout →</button>}
+                  {!canCheckout && <div id="results-checkout-feedback" className="results-checkout-hint" role="tooltip">
+                    <p><strong>To enable checkout:</strong></p>
+                    <ul>
+                      {!draft.gasStop && <li>Choose a gas station from the list or map.</li>}
+                      {missingItems.length > 0 && <li>Choose a product for {missingItems.map((item) => item.name).join(", ")}.</li>}
+                    </ul>
+                  </div>}
+                </div>
+              </div>
+            </aside>
           </>
         )}
       </main>

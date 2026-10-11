@@ -10,6 +10,7 @@ import { calculateGasSavings, milesFromRoadMatrix } from "@/lib/gas-savings";
 import { stationPriceForPlace } from "@/lib/fuel-price-provider";
 import { deduplicatePhysicalStations } from "@/lib/gas-stations";
 import { centers, originQuery, type SearchOrigin } from "@/lib/locations";
+import { detectDeviceLocation } from "@/lib/detect-location";
 import type { Area, FuelType, LocalFuelResult, NearbyPlace } from "@/lib/live-data";
 
 const grades: { value: FuelType; label: string }[] = [
@@ -61,7 +62,11 @@ export default function GasPricePicker() {
   useEffect(() => {
     const saved = readCheckoutDraft(sessionStorage);
     setDraft(saved); setArea(saved?.prefs.area ?? "downtown");
-    setOrigin(saved?.origin ?? { ...centers[saved?.prefs.area ?? "downtown"], label: "Downtown Atlanta" });
+    if (saved && !saved.ipArea) {
+      setOrigin(saved.origin ?? { ...centers[saved.prefs.area], label: saved.prefs.area, source: "manual" });
+    } else {
+      void useMyLocation();
+    }
     setMpg(saved?.prefs.mpg ?? 25);
     setGallons(saved?.gasGallonsNeeded ?? 10);
     const stores = cartGroups(readCart(localStorage)).map(({ store }) => ({ id: store.id, lat: store.lat, lon: store.lon }));
@@ -171,25 +176,28 @@ export default function GasPricePicker() {
     } catch (error) { if (sequence === locationSequence.current) setLocationError(error instanceof Error ? error.message : "Location not found."); }
     finally { if (sequence === locationSequence.current) { setLocationBusy(false); locationRequest.current = null; } }
   }
-  function useMyLocation() {
-    locationRequest.current?.abort(); locationRequest.current = null;
+  async function useMyLocation() {
+    locationRequest.current?.abort();
+    const controller = new AbortController(); locationRequest.current = controller;
     const sequence = ++locationSequence.current;
     setLocationError("");
-    if (!navigator.geolocation) { setLocationError("Location is unavailable in this browser. Enter a ZIP or address."); return; }
     setLocationBusy(true);
-    navigator.geolocation.getCurrentPosition((position) => {
-      if (sequence !== locationSequence.current) return;
-      setOrigin({ lat: position.coords.latitude, lon: position.coords.longitude, label: "your current location" });
-      setLocationBusy(false);
-    }, (error) => { if (sequence !== locationSequence.current) return;
-      setLocationBusy(false); setLocationError(error.code === 1 ? "Location permission was denied. Enter a ZIP or address instead." : "Could not get your location. Enter a ZIP or address instead."); },
-    { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+    try {
+      const detected = await detectDeviceLocation(controller.signal);
+      if (sequence === locationSequence.current) setOrigin(detected);
+    } catch (error) {
+      if (sequence === locationSequence.current)
+        setLocationError(`${error instanceof Error ? error.message : "Could not get your location."} Enter a ZIP or address to search.`);
+    } finally {
+      if (sequence === locationSequence.current) { setLocationBusy(false); locationRequest.current = null; }
+    }
   }
   function chooseStation(place: NearbyPlace) {
     if (!draft) return;
     const price = priceFor(place);
     const reported = price?.dollarsPerGallon != null && !!price.updatedAt;
     const next: CheckoutDraft = { ...draft, origin: origin ?? draft.origin,
+      ipArea: origin ? origin.source === "device" : draft.ipArea,
       gasGallonsNeeded: Number.isFinite(gallons) && gallons > 0 && gallons <= 100 ? gallons : undefined,
       gasStop: { id: place.id, name: place.name, address: place.address,
       lat: place.lat, lon: place.lon, mapUrl: place.mapUrl },
