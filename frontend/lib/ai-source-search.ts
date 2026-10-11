@@ -2,24 +2,9 @@ import type { AgentItem } from "./price-agent";
 import { reserveRecords } from "./provider-budget";
 import type { SearchPlan } from "./local-search-agent";
 
-const instacartSlugs: Record<string, string> = {
-  Publix: "publix",
-  ALDI: "aldi",
-  "The Fresh Market": "the-fresh-market",
-  "Food Lion": "food-lion",
-  "Sam’s Club": "sams-club",
-};
-const domains: Record<string, string> = {
-  "Trader Joe’s": "www.traderjoes.com",
-  Publix: "www.instacart.com",
-  ALDI: "www.instacart.com",
-  "The Fresh Market": "www.instacart.com",
-  "Food Lion": "www.instacart.com",
-  "Sam’s Club": "www.instacart.com",
-  Sprouts: "shop.sprouts.com",
-  Costco: "www.costco.com",
-  "Albertsons family": "www.safeway.com",
-};
+import { sourceHosts, instacartSlugs, catalogSourceBelongsToRetailer } from "./retailer-sources";
+const domains = Object.fromEntries(Object.entries(sourceHosts).map(([retailer, hosts]) =>
+  [retailer, instacartSlugs[retailer] ? "www.instacart.com" : hosts[0]]));
 let searchStarts: number[] = [];
 export function validDiscoveredSource(retailer: string, value: string) {
   try {
@@ -28,9 +13,13 @@ export function validDiscoveredSource(retailer: string, value: string) {
       url.protocol !== "https:" ||
       url.username ||
       url.password ||
+      !catalogSourceBelongsToRetailer(retailer, value) ||
       url.hostname !== domains[retailer]
     )
       return false;
+    if (retailer === "Walmart") return /^\/ip\/[^/]+\/\d+$/.test(url.pathname);
+    if (retailer === "Target") return /^\/p\/.+/.test(url.pathname);
+    if (retailer === "Lidl") return /^\/p\/[a-z0-9-]+\/p\d+$/.test(url.pathname);
     if (retailer === "Trader Joe’s")
       return /^\/home\/products\/pdp\/[a-z0-9-]+$/.test(url.pathname);
     if (instacartSlugs[retailer])

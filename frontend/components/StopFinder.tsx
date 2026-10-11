@@ -7,13 +7,16 @@ import type {
   Area,
   NearbyPlace,
   FuelQuote,
+  LocalFuelResult,
 } from "@/lib/live-data";
 import type { GasStop } from "@/lib/gas-stop";
+import { stationPriceForPlace } from "@/lib/fuel-price-provider";
 export default function StopFinder({
   area,
   origin,
   onStation,
   selectedStation,
+  selectedQuote,
   autoLoad = false,
   compact = false,
   radius: selectedRadius,
@@ -26,6 +29,7 @@ export default function StopFinder({
   origin: SearchOrigin | null;
   onStation: (stop: GasStop | null, quote: FuelQuote | null) => void;
   selectedStation: GasStop | null;
+  selectedQuote?: FuelQuote | null;
   autoLoad?: boolean;
   compact?: boolean;
   radius?: number;
@@ -45,6 +49,9 @@ export default function StopFinder({
   const [attempt, setAttempt] = useState(0);
   const [gasQuery, setGasQuery] = useState("");
   const [gasLimit, setGasLimit] = useState(20);
+  const [fuelReport, setFuelReport] = useState<LocalFuelResult | null>(null);
+  const [fuelBusy, setFuelBusy] = useState(false);
+  const [fuelError, setFuelError] = useState("");
   useEffect(() => {
     if (!autoLoad && !attempt) return;
     const controller = new AbortController();
@@ -53,6 +60,9 @@ export default function StopFinder({
     onPlacesError?.("");
     setLoaded(false);
     setPlaces([]);
+    setFuelReport(null);
+    setFuelBusy(true);
+    setFuelError("");
     onPlaces?.([]);
     fetch(
       `/api/live/places?area=${area}&radius=${radius}&kind=all${originQuery(origin)}`,
@@ -82,6 +92,18 @@ export default function StopFinder({
       .finally(() => {
         if (!controller.signal.aborted) setBusy(false);
       });
+    fetch(`/api/live/local-fuel?area=${area}&radius=${radius}&type=REGULAR_UNLEADED${originQuery(origin)}`,
+      { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Gas prices could not load.");
+        return data as LocalFuelResult;
+      })
+      .then((data) => { if (!controller.signal.aborted) setFuelReport(data); })
+      .catch((cause) => {
+        if (!controller.signal.aborted) setFuelError(cause instanceof Error ? cause.message : "Gas prices could not load.");
+      })
+      .finally(() => { if (!controller.signal.aborted) setFuelBusy(false); });
     return () => controller.abort();
   }, [area, origin?.lat, origin?.lon, radius, attempt, autoLoad]);
   useEffect(() => {
@@ -91,6 +113,23 @@ export default function StopFinder({
   const gasPlaces = places.filter((place) => place.kind === "fuel");
   const matchingGasPlaces = gasPlaces.filter((place) => `${place.name} ${place.address}`.toLowerCase().includes(gasQuery.toLowerCase()));
   const directoryPlaces = compact ? matchingGasPlaces.slice(0, gasLimit) : visible;
+  const quoteFor = (place: NearbyPlace): FuelQuote | null => {
+    if (!fuelReport) return null;
+    const price = stationPriceForPlace(fuelReport, place.id, place.lat, place.lon);
+    if (price?.dollarsPerGallon == null || !price.updatedAt) return null;
+    return { kind: "station", stationName: place.name, fuelType: "REGULAR_UNLEADED",
+      dollarsPerGallon: price.dollarsPerGallon, period: price.updatedAt,
+      retrievedAt: fuelReport.retrievedAt, sourceUrl: place.mapUrl, region: place.address };
+  };
+  useEffect(() => {
+    if (!selectedStation || !fuelReport) return;
+    const place = gasPlaces.find((candidate) => candidate.id === selectedStation.id);
+    if (!place) return;
+    const quote = quoteFor(place);
+    if (quote && (!selectedQuote || selectedQuote.fuelType === "REGULAR_UNLEADED") &&
+        (selectedQuote?.period !== quote.period || selectedQuote?.dollarsPerGallon !== quote.dollarsPerGallon))
+      onStation(selectedStation, quote);
+  }, [fuelReport, selectedStation?.id, selectedQuote?.period, selectedQuote?.dollarsPerGallon, selectedQuote?.fuelType]);
   const stopList = <ul className="stop-results">
     {directoryPlaces.map((p) => (
       <li key={p.id}>
@@ -98,8 +137,11 @@ export default function StopFinder({
         <div>
           <a href={p.mapUrl} target="_blank" rel="noreferrer">{p.name} ↗</a>
           <small>{p.kind === "fuel" ? "Gas station" : "Grocery stop"} · {p.miles} mi · {p.address || "Address not listed"}</small>
+          {p.kind === "fuel" && <small>{quoteFor(p)
+            ? `Regular gas: $${quoteFor(p)!.dollarsPerGallon.toFixed(3)}/gal · Google reported ${new Date(quoteFor(p)!.period).toLocaleString()}`
+            : fuelBusy ? "Checking reported gas price…" : "Gas price unavailable"}</small>}
           {p.kind === "fuel" && <button type="button" aria-pressed={selectedStationId === p.id}
-            onClick={() => onStation({ id: p.id, name: p.name, address: p.address, lat: p.lat, lon: p.lon, mapUrl: p.mapUrl }, null)}>
+            onClick={() => onStation({ id: p.id, name: p.name, address: p.address, lat: p.lat, lon: p.lon, mapUrl: p.mapUrl }, quoteFor(p))}>
             {selectedStationId === p.id ? "Selected gas stop ✓" : "Choose this gas stop"}
           </button>}
         </div>
@@ -188,7 +230,7 @@ export default function StopFinder({
                 lon: place.lon,
                 mapUrl: place.mapUrl,
               },
-              null,
+              quoteFor(place),
             )
           }
         />
@@ -204,8 +246,9 @@ export default function StopFinder({
         {loaded && !places.length && (
           <p>No mapped stops matched this filter. Try a wider radius.</p>
         )}
-        {compact ? <details className="gas-station-list">
+        {compact ? <details className="gas-station-list" open>
           <summary>Choose a gas station from the list · {gasPlaces.length}</summary>
+          {fuelError && <p className="small" role="status">Reported pump prices could not load. You can still choose a station; checkout will label the driving fuel estimate.</p>}
           <label>Find a station
             <input type="search" value={gasQuery} onChange={(event) => { setGasQuery(event.target.value); setGasLimit(20); }} placeholder="Name or address" />
           </label>

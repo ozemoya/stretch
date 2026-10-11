@@ -252,6 +252,10 @@ export default function Stretch({
       setCheckoutError("Check your list and trip settings before continuing.");
       return;
     }
+    // Selecting a new comparison starts a new trip; a station from an older trip
+    // must not satisfy the gas-stop step automatically.
+    setGasStop(null);
+    setFuelSource(null);
     const saved = writeCheckoutDraft(window.sessionStorage, {
       version: 1,
       basket: basket.map((item) => ({ ...item })),
@@ -259,8 +263,8 @@ export default function Stretch({
       prefs,
       origin: searchOrigin,
       ipArea,
-      gasStop,
-      fuelSource,
+      gasStop: null,
+      fuelSource: null,
       manualGas,
     });
     if (!saved) {

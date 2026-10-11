@@ -1,5 +1,6 @@
 import { load } from "cheerio";
 import { z } from "zod";
+import { resolveStoreCoordinates, validStoreCoordinates, storeAddress } from "./store-coordinates.mjs";
 
 import { centers, type SearchOrigin } from "./locations";
 export { centers } from "./locations";
@@ -196,6 +197,19 @@ export function formatOsmAddress(tags: Record<string, string>): string {
     [state, postcode].filter(Boolean).join(" "),
   ].filter(Boolean).join(", ");
 }
+export async function resolveMappedLocations(raw: unknown) {
+  const data = osmSchema.parse(raw);
+  if (data.remark) return data;
+  const elements = await Promise.all(data.elements.map(async element => {
+    if (validStoreCoordinates(element.lat, element.lon)) return element;
+    if (validStoreCoordinates(element.center?.lat, element.center?.lon))
+      return { ...element, lat: element.center!.lat, lon: element.center!.lon };
+    const point = await resolveStoreCoordinates({ address: formatOsmAddress(element.tags ?? {}) });
+    return point ? { ...element, lat: point.latitude, lon: point.longitude } : element;
+  }));
+  return { ...data, elements };
+}
+
 export function normalizePlaces(
   raw: unknown,
   area: Area,
@@ -214,7 +228,7 @@ export function normalizePlaces(
     const t = e.tags ?? {},
       lat = e.lat ?? e.center?.lat,
       lon = e.lon ?? e.center?.lon;
-    if (lat === undefined || lon === undefined) continue;
+    if (!validStoreCoordinates(lat, lon) || lat === undefined || lon === undefined) continue;
     const rad = Math.PI / 180;
     const a =
       Math.sin(((lat - origin.lat) * rad) / 2) ** 2 +
@@ -337,7 +351,7 @@ export function nearbyPlaces(
         try {
           const response = await checkedFetch(endpoint, init);
           return normalizePlaces(
-            await response.json(),
+            await resolveMappedLocations(await response.json()),
             area,
             radiusMiles,
             "all",
@@ -473,26 +487,29 @@ export function krogerStores(zip: string) {
           z.object({
             locationId: z.string(),
             name: z.string(),
-            geolocation: z
-              .object({ latitude: z.number(), longitude: z.number() })
-              .optional(),
-            address: z.object({
-              addressLine1: z.string(),
-              city: z.string(),
-              state: z.string(),
-              zipCode: z.string(),
-            }),
+            geolocation: z.object({ latitude: z.unknown().optional(), longitude: z.unknown().optional() }).nullish(),
+            address: z.union([z.string(), z.object({
+              addressLine1: z.string().optional(),
+              addressLine2: z.string().optional(),
+              city: z.string().optional(),
+              state: z.string().optional(),
+              zipCode: z.string().optional(),
+            })]).nullish(),
           }),
         ),
       })
       .parse(data);
-    return parsed.data.map((s) => ({
-      id: s.locationId,
-      name: s.name,
-      coordinates: s.geolocation
-        ? { lat: s.geolocation.latitude, lon: s.geolocation.longitude }
-        : undefined,
-      address: `${s.address.addressLine1}, ${s.address.city}, ${s.address.state} ${s.address.zipCode}`,
+    return Promise.all(parsed.data.map(async (s) => {
+      const address = storeAddress(s.address);
+      const point = await resolveStoreCoordinates({ latitude: s.geolocation?.latitude,
+        longitude: s.geolocation?.longitude, address });
+      return {
+        id: s.locationId,
+        name: s.name,
+        coordinates: point ? { lat: point.latitude, lon: point.longitude } : undefined,
+        coordinateSource: point?.source,
+        address,
+      };
     }));
   });
 }

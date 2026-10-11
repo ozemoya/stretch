@@ -1350,6 +1350,8 @@ footer {
 .trip-checkout-total .trip-checkout-total-row { font-size:18px; border-bottom:0; }
 .trip-checkout-stop { display:flex; gap:14px; padding:16px; border-radius:15px; background:var(--cream); color:var(--ink); }
 .trip-checkout-stop-icon { font-size:24px; }
+.trip-checkout-gallons { display:grid; gap:5px; margin-top:12px; font-size:12px; font-weight:700; }
+.trip-checkout-gallons input { width:125px; max-width:100%; padding:7px 9px; border:1px solid var(--green); border-radius:8px; background:var(--pale); color:var(--ink); }
 .trip-budget-status { font-size:16px; font-weight:700; margin:18px 0 8px; }
 .trip-checkout-total .small { color:inherit; font-size:11px; line-height:1.5; }
 .trip-checkout-warning { padding:10px; border:1px solid currentColor; border-radius:8px; font-size:12px; }

@@ -54,7 +54,7 @@ beforeEach(() => {
     { id: "node/2", name: "Target", kind: "grocery", lat: 33.76, lon: -84.39, address: "Atlanta", miles: 2, mapUrl: "" },
   ] } as never);
   vi.mocked(krogerStores).mockResolvedValue([{ id: "01100672", name: "Kroger", address: "Atlanta",
-    coordinates: { lat: 33.75, lon: -84.39 } }]);
+    coordinates: { lat: 33.75, lon: -84.39 }, coordinateSource: "explicit" }]);
   vi.mocked(krogerProducts).mockResolvedValue([{ id: "milk-2", productId: "milk-2", name: "Milk",
     locationId: "01100672", upc: "", promoCents: null,
     productName: "Milk", brand: "Kroger", size: "1 gallon", soldBy: "UNIT", regularCents: 299,
