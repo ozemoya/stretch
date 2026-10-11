@@ -20,10 +20,12 @@ export default function StoreColumns({
   reports,
   items,
   onRetry,
+  onProductAdded,
 }: {
   reports: ScrapeReport[];
   items: AgentItem[];
   onRetry?: (retailerId: string) => void;
+  onProductAdded?: (retailerId: string) => void;
 }) {
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
@@ -40,6 +42,7 @@ export default function StoreColumns({
     setSavedIds(next.map((entry) => entry.id));
     setMessage(`${product.productName} saved as an online listing. Open Smart Cart to review it.`);
     window.dispatchEvent(new Event(SMART_CART_EVENT));
+    onProductAdded?.(product.retailerId);
   }
   return (
     <div

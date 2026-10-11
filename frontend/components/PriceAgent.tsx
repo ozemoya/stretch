@@ -62,6 +62,7 @@ export default function PriceAgent({
   radius,
   autoStart = false,
   onSelectTrip,
+  onProductAdded,
 }: {
   items: AgentItem[];
   zip: string;
@@ -78,6 +79,7 @@ export default function PriceAgent({
   nearbyPlaces: NearbyPlace[];
   radius: number;
   autoStart?: boolean;
+  onProductAdded?: (retailerId: string, location?: NearbyPlace) => void;
   onSelectTrip?: (store: StoreCheck, selected: Record<string, string>, route: { miles: number; minutes: number }, storeLocation: { mapUrl: string; lat: number; lon: number }) => void;
 }) {
   const [busy, setBusy] = useState(false),
@@ -489,6 +491,7 @@ export default function PriceAgent({
     writeCatalogPicks(localStorage, readCatalogPicks(localStorage).filter((pick) => pick.itemId !== item.id));
     window.dispatchEvent(new Event(SMART_CART_EVENT));
     setCartMessage(`${item.name} added to Smart Cart.`);
+    onProductAdded?.(store.retailerId, { ...location, kind: "grocery" });
   }
   const completeBranchCount = result?.stores.filter(
     (store) => pricedItemCount(store) === items.length,
@@ -499,7 +502,7 @@ export default function PriceAgent({
       aria-label="Basket price agent"
     >
       {!result && liveReports.some(hasVisibleCatalogPrice) && (
-        <StoreColumns reports={liveReports.filter(hasVisibleCatalogPrice)} items={items} />
+        <StoreColumns reports={liveReports.filter(hasVisibleCatalogPrice)} items={items} onProductAdded={onProductAdded} />
       )}
       <p className="eyebrow">PRICE COMPARISON</p>
       <h2>Available store prices</h2>
@@ -658,6 +661,7 @@ export default function PriceAgent({
           {!gasStop && completeBranchCount > 0 && <p>Choose a gas station on the map to calculate the full trip.</p>}
           {!!visibleCatalogs.length && (
             <StoreColumns
+              onProductAdded={onProductAdded}
               items={items}
               onRetry={(retailerId) =>
                 void (["Lidl", "Trader Joe’s"].includes(retailerId)

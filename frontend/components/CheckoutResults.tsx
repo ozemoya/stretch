@@ -14,6 +14,7 @@ import {
 } from "@/lib/checkout-draft";
 import { createTripReview, writeTripReview } from "@/lib/trip-review";
 import SketchIcon from "./SketchIcon";
+import { productRouteStop } from "@/lib/product-route-stop";
 import type { NearbyPlace } from "@/lib/live-data";
 import { nearbyGroceryStores } from "@/lib/nearby-store-display";
 import { readCart, SMART_CART_EVENT, type CartLine } from "@/lib/smart-cart";
@@ -35,6 +36,7 @@ export default function CheckoutResults() {
   const [storeLimit, setStoreLimit] = useState(20);
   const [selectedPreviewStops, setSelectedPreviewStops] = useState<RoutePreviewStop[]>([]);
   const [routeNotice, setRouteNotice] = useState("");
+  const [pendingRetailer, setPendingRetailer] = useState<string | null>(null);
   const groceryStores = nearbyGroceryStores(nearbyPlaces, storeQuery);
   const groceryCount = nearbyGroceryStores(nearbyPlaces).length;
   const selectedPlaceIds = selectedPreviewStops.map((stop) => stop.id);
@@ -98,6 +100,28 @@ export default function CheckoutResults() {
     if (draft) writeRoutePreviewStops(window.sessionStorage, [],
       draft.origin ?? centers[draft.prefs.area]);
   }
+
+  function showProductRoute(retailer: string, location?: NearbyPlace) {
+    const place = location ?? productRouteStop(retailer, nearbyPlaces);
+    setWorkspaceTab("map");
+    if (!place) {
+      setPendingRetailer(retailer);
+      setSelectedPreviewStops([]);
+      setRouteNotice(`Finding a nearby ${retailer} location for your route…`);
+      return;
+    }
+    setPendingRetailer(null);
+    setRouteNotice(location ? "" : `Route to the nearest ${retailer} location. Check availability with this store.`);
+    setSelectedPreviewStops([place]);
+    if (draft) writeRoutePreviewStops(sessionStorage, [place], draft.origin ?? centers[draft.prefs.area]);
+  }
+  useEffect(() => {
+    if (pendingRetailer && nearbyPlaces.length) {
+      const place = productRouteStop(pendingRetailer, nearbyPlaces);
+      if (place) showProductRoute(pendingRetailer);
+      else setRouteNotice(`No ${pendingRetailer} location was returned in this area. Increase the radius or choose another store.`);
+    }
+  }, [pendingRetailer, nearbyPlaces]);
 
   const reportAge = draft?.fuelSource ? Date.now() - Date.parse(draft.fuelSource.period) : Infinity;
   const recentStationPrice = !!draft?.gasStop && draft.fuelSource?.kind === "station" &&
@@ -187,6 +211,7 @@ export default function CheckoutResults() {
                 </p>
               </details>
               <PriceAgent
+                onProductAdded={showProductRoute}
                 autoStart
                 items={draft.items}
                 zip={draft.origin?.zip ?? centers[draft.prefs.area].zip}
@@ -242,8 +267,8 @@ export default function CheckoutResults() {
               className="results-map-panel"
               aria-label="Nearby stores and gas map"
             >
-              <div className="results-route-callout" role="status">
-                <strong>Grocery route · {selectedPreviewStops.length} of {maxRouteStores} stores selected</strong>
+              <details className="results-route-callout">
+                <summary>My trip · {selectedPreviewStops.length} of {maxRouteStores} stores selected</summary>
                 {selectedPreviewStops.length ? <><ol>{selectedPreviewStops.map((stop) =>
                   <li key={stop.id}><span>{stop.name} · {stop.address}</span>
                     <button type="button" aria-label={`Remove ${stop.name} from route`}
@@ -258,11 +283,11 @@ export default function CheckoutResults() {
                     ? <Link href="/cart/checkout">See the full grocery route at checkout ↗</Link>
                     : <small>Choose your groceries and a gas station before checkout. Your route is shown on this map.</small>}
                   <small>These are mapped stops. Online prices are not confirmed for these branches.</small></>
-                  : <span>Choose green markers or store addresses to add stops. The map will draw the full drive.</span>}
-                {routeNotice && <span role="alert">{routeNotice}</span>}
+                  : <span>Add a product to see directions to its store.</span>}
                 {maxRouteStores < MAX_PREVIEW_STORES &&
                   <small>Your trip setting currently allows {maxRouteStores} grocery stores. <Link href="/plan?panel=settings">Change trip settings ↗</Link></small>}
-              </div>
+              </details>
+              {routeNotice && <p className="results-route-limit" role="alert">{routeNotice}</p>}
               <StopFinder
                 compact
                 autoLoad
@@ -278,6 +303,7 @@ export default function CheckoutResults() {
                 onPlaces={setNearbyPlaces}
                 onPlacesError={setPlacesError}
                 selectedPlaceIds={selectedPlaceIds}
+                productRoutePlaces={selectedPreviewStops.map((stop) => ({ ...stop, kind: "grocery", miles: 0, mapUrl: "https://maps.google.com" }))}
                 onSelectPlace={(place) => { if (place.kind === "grocery") selectGroceryStop(place); }}
                 onStation={(gasStop, fuelSource) =>
                   update((current) => ({

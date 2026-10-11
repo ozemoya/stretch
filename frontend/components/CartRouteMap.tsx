@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import RouteDirections, { type DirectionStep } from "./RouteDirections";
 
 type Point = { lat: number; lon: number; name?: string; label?: string; address?: string; summary?: string };
 
@@ -12,6 +13,7 @@ export default function CartRouteMap({ points, selectedIndex = 0, onSelect, roun
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const [error, setError] = useState("");
+  const [steps, setSteps] = useState<DirectionStep[]>([]);
   const key = JSON.stringify([roundTrip, points.map(({ lat, lon }) => [lat, lon])]);
 
   useEffect(() => {
@@ -22,6 +24,7 @@ export default function CartRouteMap({ points, selectedIndex = 0, onSelect, roun
     const markers: google.maps.Marker[] = [];
     let path: google.maps.Polyline | null = null;
     setError("");
+    setSteps([]);
     void Promise.all([
       import("@googlemaps/js-api-loader").then(({ setOptions, importLibrary }) => {
         setOptions({ key: browserKey, v: "weekly" });
@@ -31,10 +34,11 @@ export default function CartRouteMap({ points, selectedIndex = 0, onSelect, roun
         body: JSON.stringify({ points: (roundTrip ? [...points, points[0]] : points).map(({ lat, lon }) => ({ lat, lon })) }),
         signal: controller.signal }).then(async (response) => {
           if (!response.ok) throw new Error("Route unavailable");
-          return response.json() as Promise<{ miles?: number; minutes?: number; geometry?: { coordinates?: [number, number][] } }>;
+          return response.json() as Promise<{ steps?: DirectionStep[]; miles?: number; minutes?: number; geometry?: { coordinates?: [number, number][] } }>;
         }),
     ]).then(([{ Map }, route]) => {
       if (controller.signal.aborted || !element.current || !route.geometry?.coordinates?.length) return;
+      setSteps(route.steps ?? []);
       if (Number.isFinite(route.miles) && Number.isFinite(route.minutes))
         onRoute?.({ miles: route.miles!, minutes: route.minutes! });
       map = new Map(element.current, { center: { lat: points[0].lat, lng: points[0].lon }, zoom: 11,
@@ -76,5 +80,10 @@ export default function CartRouteMap({ points, selectedIndex = 0, onSelect, roun
   }, [selectedIndex, key]);
 
   return <><div ref={element} className="smart-cart-map" role="img" aria-label="Interactive map of the selected shopping trip" />
+    {steps.length > 0 && <RouteDirections steps={steps} onStep={(step) => {
+      if (Number.isFinite(step.lat) && Number.isFinite(step.lon)) {
+        mapRef.current?.panTo({ lat: step.lat!, lng: step.lon! }); mapRef.current?.setZoom(17);
+      }
+    }} />}
     {error && <p role="status">{error}</p>}</>;
 }

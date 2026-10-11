@@ -25,6 +25,7 @@ export default function StopFinder({
   onPlacesError,
   selectedPlaceIds,
   onSelectPlace,
+  productRoutePlaces = [],
 }: {
   area: Area;
   origin: SearchOrigin | null;
@@ -39,6 +40,7 @@ export default function StopFinder({
   onPlacesError?: (error: string) => void;
   selectedPlaceIds?: string[];
   onSelectPlace?: (place: NearbyPlace) => void;
+  productRoutePlaces?: NearbyPlace[];
 }) {
   const selectedStationId = selectedStation?.id ?? null;
   const [localRadius, setLocalRadius] = useState(5);
@@ -49,7 +51,7 @@ export default function StopFinder({
     [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(compact);
   const [gasQuery, setGasQuery] = useState("");
   const [gasLimit, setGasLimit] = useState(20);
   const [fuelReport, setFuelReport] = useState<LocalFuelResult | null>(null);
@@ -180,7 +182,7 @@ export default function StopFinder({
               const nextRadius = Number(e.target.value);
               if (onRadiusChange) onRadiusChange(nextRadius);
               else setLocalRadius(nextRadius);
-              setExpanded(false);
+              setExpanded(compact);
               onStation(null, null);
             }}
           >
@@ -225,7 +227,8 @@ export default function StopFinder({
           origin={origin}
           radius={radius}
           places={visible}
-          routePlaces={places}
+          routePlaces={[...new Map([...places, ...productRoutePlaces].map((place) => [place.id, place])).values()]}
+          showGroceryRoutes={kind !== "fuel"}
           selectedFuelId={selectedStationId}
           selectedPlaceIds={selectedPlaceIds}
           onSelectPlace={onSelectPlace}

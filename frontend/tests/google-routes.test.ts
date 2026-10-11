@@ -11,13 +11,16 @@ it("decodes Google geometry and route legs without exposing the API key", async 
     expect(String(init?.body)).not.toContain("test-key");
     return Response.json({ routes: [{ distanceMeters: 1609, duration: "420s",
       polyline: { encodedPolyline: "_p~iF~ps|U_ulLnnqC_mqNvxq`@" },
-      legs: [{ distanceMeters: 1609, duration: "420s" }] }] });
+      legs: [{ distanceMeters: 1609, duration: "420s", steps: [{ distanceMeters: 120,
+        navigationInstruction: { instructions: "Turn left onto Main St" },
+        startLocation: { latLng: { latitude: 33.75, longitude: -84.39 } } }] }] }] });
   });
   globalThis.fetch = fetchMock as typeof fetch;
   const route = await googleRoute(points, "test-key", AbortSignal.timeout(1000));
   expect(route.provider).toBe("google");
   expect(route.minutes).toBe(7);
   expect(route.legs).toHaveLength(1);
+  expect(route.steps).toEqual([{ instruction: "Turn left onto Main St", distanceMeters: 120, legIndex: 0, lat: 33.75, lon: -84.39 }]);
   expect(route.geometry.coordinates).toHaveLength(3);
   expect(decodeGooglePolyline("_p~iF~ps|U_ulLnnqC_mqNvxq`@")[0]).toEqual([-120.2, 38.5]);
 });

@@ -8,6 +8,8 @@ import GroceryRoutePlanner from "./GroceryRoutePlanner";
 import { readCart, writeCart, cartGroups, cartSubtotal, readCartOptions, replacementOptions, replaceCartLine, SMART_CART_EVENT, type CartLine } from "@/lib/smart-cart";
 import { readCheckoutDraft, writeCheckoutDraft, type CheckoutDraft } from "@/lib/checkout-draft";
 import { centers } from "@/lib/locations";
+import { originQuery } from "@/lib/locations";
+import { productRouteStop } from "@/lib/product-route-stop";
 import { bestRoadRoute, roadRouteForOrder, type RoadMatrix } from "@/lib/mix-match-optimizer";
 import { fuelCostCents } from "@/lib/live-trip";
 import { normalizedUnitPrice } from "@/lib/package-match";
@@ -69,6 +71,26 @@ export default function SmartCart({ checkout = false }: { checkout?: boolean }) 
     .map((group) => ({ ...group, lines: tripLines.filter((line) => line.store.id === group.store.id),
       subtotalCents: cartSubtotal(tripLines.filter((line) => line.store.id === group.store.id)) })), [lines, draft]);
   const home = draft ? draft.origin ?? centers[draft.prefs.area] : null;
+  // Older catalog selections may predate automatic route selection. Recover a
+  // physical destination without promoting the catalog price to a branch price.
+  const unroutedRetailers = [...new Set(tripPicks.map((pick) => pick.retailerId))].sort().join("|");
+  useEffect(() => {
+    if (!draft || previewStops.length || !unroutedRetailers) return;
+    const controller = new AbortController();
+    void fetch(`/api/live/places?area=${draft.prefs.area}&radius=5&kind=grocery&coverage=expanded${originQuery(draft.origin)}`,
+      { signal: controller.signal }).then(async (response) => {
+        if (!response.ok) throw new Error("Store locations unavailable");
+        return response.json();
+      }).then((data) => {
+        if (controller.signal.aborted) return;
+        const stops = unroutedRetailers.split("|").flatMap((retailer) => {
+          const place = productRouteStop(retailer, data.places ?? []);
+          return place ? [place] : [];
+        });
+        setPreviewStops(stops);
+      }).catch(() => { /* Preserve the normal retry/navigation controls. */ });
+    return () => controller.abort();
+  }, [unroutedRetailers, draft?.origin?.lat, draft?.origin?.lon, draft?.prefs.area]);
   const routeKey = JSON.stringify([home?.lat, home?.lon, routeStores.map((s) => [s.id, s.lat, s.lon]),
     draft?.gasStop?.id, draft?.gasStop?.lat, draft?.gasStop?.lon]);
   useEffect(() => {

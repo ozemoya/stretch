@@ -67,7 +67,7 @@ export async function googleRoute(points: Point[], key: string, signal: AbortSig
     origin: waypoint(points[0]), destination: waypoint(points.at(-1)!),
     intermediates: points.slice(1, -1).map(waypoint),
     travelMode: "DRIVE", routingPreference: "TRAFFIC_AWARE",
-  }, "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.legs.distanceMeters,routes.legs.duration",
+  }, "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.legs.distanceMeters,routes.legs.duration,routes.legs.steps.navigationInstruction,routes.legs.steps.distanceMeters,routes.legs.steps.startLocation",
   key, signal);
   const route = data.routes?.[0];
   const coordinates = typeof route?.polyline?.encodedPolyline === "string"
@@ -81,5 +81,10 @@ export async function googleRoute(points: Point[], key: string, signal: AbortSig
   if (legs.some((leg) => !Number.isFinite(leg.miles) || !Number.isFinite(leg.minutes)))
     throw new Error("Invalid Google route legs");
   return { miles: route.distanceMeters / METRES_PER_MILE, minutes: duration / 60,
+    steps: route.legs.flatMap((leg: { steps?: { navigationInstruction?: { instructions?: string }; distanceMeters?: number; startLocation?: { latLng?: { latitude: number; longitude: number } } }[] }, legIndex: number) =>
+      (leg.steps ?? []).filter((step) => typeof step.navigationInstruction?.instructions === "string").map((step) => ({
+        instruction: step.navigationInstruction!.instructions!, distanceMeters: step.distanceMeters ?? 0, legIndex,
+        lat: step.startLocation?.latLng?.latitude, lon: step.startLocation?.latLng?.longitude,
+      }))),
     legs, geometry: { type: "LineString" as const, coordinates }, provider: "google" as const };
 }

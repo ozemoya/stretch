@@ -995,6 +995,24 @@ footer {
   font-size: 13px;
   line-height: 1.35;
 }
+.route-directions ol { margin:10px 0; padding:0; list-style:none; max-height:260px; overflow-y:auto; }
+.route-directions li { padding:8px 0; border-bottom:1px dashed #9a9b73; }
+.route-directions li button { display:block; width:100%; text-align:left; background:transparent; color:inherit; font:inherit; border:0; border-radius:8px; padding:6px; cursor:pointer; }
+.route-directions li button:hover, .route-directions li button:focus-visible { background:#dfe3bd; outline:2px solid #61752a; }
+.route-directions li small { display:block; padding-left:6px; }
+.map-route-views { display:flex; gap:6px; margin:8px 0 0; flex-shrink:0; }
+.results-route-callout summary { cursor:pointer; font-weight:800; }
+.results-route-limit { margin:0; padding:6px 12px; font-size:12px; flex-shrink:0; }
+.map-route-views button { background:var(--cream); border:1px solid var(--green); border-radius:8px; padding:6px 10px; color:var(--green); font:inherit; font-size:13px; cursor:pointer; }
+.map-route-views button[aria-pressed="true"] { background:var(--green); color:var(--cream); }
+.map-route-views button:disabled { opacity:.5; cursor:default; }
+.map-route-status { font-size:12px; margin:6px 0; flex-shrink:0; }
+.map-route-retry { align-self:flex-start; flex-shrink:0; }
+.map-grocery-routes { flex-shrink:0; font-size:12px; margin:4px 0 8px; }
+.map-grocery-routes summary { cursor:pointer; font-weight:700; color:var(--green); }
+.map-grocery-routes ul { list-style:none; margin:8px 0; padding:0; max-height:180px; overflow:auto; }
+.map-grocery-routes li { display:grid; gap:3px; border-bottom:1px dashed var(--green); padding:8px 4px; }
+.map-grocery-routes a { color:var(--green); text-decoration:underline; }
 .map-route-directions {
   display: inline-block;
   margin: 2px 0 6px;
@@ -1138,23 +1156,19 @@ footer {
 .trip-app .search-workspace { margin: 0; padding: 18px; }
 .trip-app .search-workspace h2 { font-size: 29px; }
 .trip-app .trip-review-list { padding: 12px; font-size: 12px; }
-.compact-stop-finder { height: 100%; margin: 0; padding: 18px; display: flex; flex-direction: column; overflow: hidden; }
+.compact-stop-finder { height: 100%; margin: 0; padding: 18px; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior:contain; }
 .compact-stop-finder h2 { font-size: 25px; margin: 0 0 10px; }
 .compact-stop-finder .stop-toolbar { flex-shrink: 0; gap: 8px; font-size: 11px; }
 .compact-stop-finder .stop-toolbar select { padding: 6px; margin-top: 2px; }
 .compact-stop-finder .search-filters { gap: 5px; margin: 4px 0; }
 .compact-stop-finder .search-filters button { padding: 7px 9px; font-size: 11px; }
-.compact-stop-finder .next-stop-map { flex: 1; min-height: 100px; display: flex; flex-direction: column; }
-.compact-stop-finder .next-stop-map .osm-map { flex: 1; height: auto; min-height: 80px; margin-top: 12px; }
-.compact-stop-finder.route-selected .next-stop-map .osm-map { min-height: 200px; }
-.compact-stop-finder.route-selected .next-stop-map { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.compact-stop-finder.route-selected .next-stop-map .osm-map { flex: 0 0 200px; }
+.compact-stop-finder .next-stop-map { flex: none; min-height: 0; display: flex; flex-direction: column; overflow:visible; }
+.compact-stop-finder .next-stop-map .osm-map { flex: none; height:clamp(260px,38dvh,440px); min-height:260px; margin-top:12px; }
 .compact-stop-finder.route-selected .map-caption,
 .compact-stop-finder.route-selected .map-route-preview,
 .compact-stop-finder.route-selected .map-route-directions { flex-shrink: 0; }
 .compact-stop-finder .map-caption { margin: 6px 0; font-size: 10px; }
-.compact-stop-finder .stop-directory { flex: 0 0 auto; max-height:35%; overflow-y: auto; overscroll-behavior: contain; font-size: 12px; }
-.compact-stop-finder.route-selected .stop-directory { max-height: 20%; }
+.compact-stop-finder .stop-directory { flex:none; max-height:none; overflow:visible; font-size:12px; }
 .compact-stop-finder .stop-directory > p { margin: 8px 0; }
 .compact-stop-finder .gas-station-list > summary { cursor:pointer; color:var(--green); font-weight:800; padding:7px 0; }
 .compact-stop-finder .gas-station-list label { display:grid; gap:5px; margin:8px 0; }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { googleRoute, googleRouteMatrix } from "@/lib/google-routes";
+import { roadDirections } from "@/lib/road-directions";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(12000)]);
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(45000)]);
     const googleKey = process.env.GOOGLE_MAPS_API_KEY;
     if (googleKey) {
       try {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     const url = matrix === true
       ? `${base}/table/v1/driving/${coordinates}?annotations=distance,duration`
-      : `${base}/route/v1/driving/${coordinates}?overview=full&geometries=geojson`;
+      : `${base}/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=true`;
 
     const response = await fetch(url, {
       signal,
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest) {
       miles: Number((route.distance / 1609.344).toFixed(2)),
       minutes: route.duration / 60,
       geometry: route.geometry,
+      steps: roadDirections(route.legs ?? []),
       legs: Array.isArray(route.legs) ? route.legs.map((leg: { distance: number; duration: number }) => ({
         miles: leg.distance / 1609.344, minutes: leg.duration / 60,
       })) : [],
